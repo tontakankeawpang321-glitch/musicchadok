@@ -2,11 +2,10 @@
 <html lang="th">
 <head>
 <meta charset="utf-8"/>
-<meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' https://accounts.google.com;">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>กระทู้/บทความ – ปรับปรุงใหม่ (Compact)</title>
+<title>กระทู้/บทความ – ตารางคมชัด + Google Sign-In</title>
 
-<!-- Google Identity -->
+<!-- GIS Button -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 
 <!-- SweetAlert2 -->
@@ -15,114 +14,80 @@
 
 <style>
   :root{
-    --bg:#f8fafc; --ink:#111827; --muted:#6b7280; --line:#e5e7eb;
-    --brand:#3b82f6; --paper:#ffffff; --radius:12px;
-    --danger:#ef4444; --ghost:#eef2ff; --ok:#22c55e;
-    --shadow-sm: 0 1px 1px rgb(0 0 0 / 0.05);
-    --shadow-md: 0 2px 6px -2px rgb(0 0 0 / 0.12);
-    --h-pad:10px; --v-pad:8px;               /* scale ระยะขอบรวมให้เล็กลง */
-    --ctl-h:34px;                             /* ความสูงปุ่ม/อินพุต */
-    --font-base:14px; --font-small:12.5px;    /* ฟอนต์เล็กลง */
-    --thumb:48px;                              /* รูปตัวอย่างเล็กลง */
+    --bg:#f8fafc; --paper:#ffffff; --ink:#111827; --muted:#6b7280;
+    --brand:#2563eb; --line:#e5e7eb; --line-dark:#d1d5db;
+    --radius:10px; --ctl-h:32px; --fs:14px; --fs-sm:12.5px;
   }
   *{box-sizing:border-box}
-  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Sarabun",system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Thai",Arial,sans-serif;line-height:1.55;font-size:var(--font-base)}
-  a{color:var(--brand);text-decoration:none}
-  header{position:sticky;top:0;z-index:10;background:var(--paper);border-bottom:1px solid var(--line);box-shadow:var(--shadow-sm)}
-  .wrap{max-width:980px;margin:auto;padding:10px 12px}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Sarabun",system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Thai",Arial,sans-serif;font-size:var(--fs);line-height:1.55}
+
+  header{position:sticky;top:0;z-index:50;background:var(--paper);border-bottom:1px solid var(--line)}
+  .wrap{max-width:1040px;margin:auto;padding:10px 12px}
   .toolbar{display:flex;gap:8px;align-items:center;justify-content:space-between;min-height:44px}
 
-  /* คอนโทรลแบบ compact */
-  input[type="search"], select, textarea, input[type="text"]{
-    flex:1; height:var(--ctl-h);
-    padding:0 10px; border:1px solid var(--line); border-radius:8px; background:#fafafa; font-size:13.5px;
-    transition:border-color .15s ease, box-shadow .15s ease;
-  }
-  textarea{height:auto;min-height:84px;padding:8px 10px}
-  input:focus, select:focus, textarea:focus{outline:none;border-color:#93c5fd;box-shadow:0 0 0 2px #bfdbfe}
-
-  /* ปุ่มเล็กลง */
-  button{
-    border:0;border-radius:8px;padding:0 12px;height:var(--ctl-h);
-    background:var(--brand);color:#fff;cursor:pointer;font-weight:700;font-size:13.5px;
-    transition:background .15s ease, box-shadow .15s ease, transform .15s ease;
-  }
-  button.ghost{background:#e9eefb;color:#1e3a8a}
-  button.danger{background:var(--danger)}
-  button[disabled]{opacity:.65;cursor:not-allowed}
-  @media (hover:hover){
-    button:hover:not([disabled]){box-shadow:var(--shadow-md)}
-  }
-
-  /* แถบค้นหาแนวฟอรั่ม */
   .search{flex:1;display:flex;gap:6px;align-items:center}
+  input[type="search"], select{
+    height:var(--ctl-h); padding:0 10px; border:1px solid var(--line); border-radius:8px; background:#fafafa; font-size:13.5px;
+  }
+  input:focus,select:focus{outline:none;border-color:#93c5fd;box-shadow:0 0 0 2px #bfdbfe}
+  button{height:var(--ctl-h); padding:0 12px; border:0; border-radius:8px; background:var(--brand); color:#fff; font-weight:700; font-size:13.5px; cursor:pointer}
+  button.ghost{background:#e9eefb; color:#1e3a8a}
+  button.danger{background:#ef4444}
+  button[disabled]{opacity:.6; cursor:not-allowed}
+
   .sign{display:flex;gap:6px;align-items:center}
-  .avatar{width:28px;height:28px;border-radius:50%;object-fit:cover}
+  .avatar{width:28px;height:28px;border-radius:50%;object-fit:cover;display:none}
 
-  /* รายการแบบตารางฟอรั่ม (เสถียร) */
-  .list{display:grid;gap:10px;margin:12px 0}
-  .card{
-    background:var(--paper); border:1px solid var(--line); border-radius:var(--radius);
-    padding:10px; display:grid; grid-template-columns:var(--thumb) 1fr; gap:10px;
-    box-shadow:var(--shadow-sm);
-  }
-  /* ลด/ปิดทรานส์ฟอร์มบนมือถือเพื่อความเสถียร */
-  @media (hover:hover){
-    .card:hover{box-shadow:var(--shadow-md)}
-  }
-  .thumb{
-    width:var(--thumb); height:var(--thumb); aspect-ratio:1/1;
-    border-radius:8px; object-fit:cover; background:#eee; flex:0 0 var(--thumb);
-  }
-  .title{font-weight:700;margin:0 0 2px 0;font-size:0.98rem;line-height:1.35}
-  .meta{font-size:var(--font-small);color:var(--muted)}
-  .body{margin-top:6px;white-space:pre-wrap;font-size:13.5px}
-  .actions{display:flex;gap:6px;align-items:center;margin-top:8px}
-  .chip{
-    border:1px solid var(--line); background:#fff; color:#111;
-    padding:4px 8px; border-radius:999px; font-size:12.5px; height:28px; display:inline-flex; align-items:center;
-  }
-  .chip.active{background:#e0e7ff;border-color:#a5b4fc;color:#3730a3;font-weight:600}
-  .chip[disabled]{opacity:.55;cursor:not-allowed}
+  /* ===== ตารางจริง (แนวบอร์ด PHP) ===== */
+  .table-wrap{background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden}
+  .scroll-x{overflow-x:auto}
+  table{width:100%; border-collapse:collapse; table-layout:fixed}
+  thead{background:#f3f4f6; position:sticky; top:0; z-index:10; border-bottom:1px solid var(--line-dark)}
+  th, td{padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; word-break:break-word}
+  th{font-weight:700; text-align:left; font-size:13.5px; color:#374151}
+  td{font-size:13.5px}
+  tr:hover td{background:#f9fafb}
 
-  /* เพจเจอร์แบบกะทัดรัด */
-  .pager{display:flex;gap:6px;justify-content:center;align-items:center;margin:14px 0}
-  #pageInfo{font-size:12.5px;padding:6px 10px;border-radius:8px;background:#eef2ff;color:#1e40af}
+  /* คอลัมน์ */
+  .col-id{width:72px}
+  .col-title{width:auto}
+  .col-owner{width:180px}
+  .col-latest{width:160px}
+  .col-replies{width:84px; text-align:right}
+  .col-views{width:84px; text-align:right}
 
-  /* ไดอะล็อกคงรูป & เบา */
-  .dialog-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;padding:12px;z-index:20}
-  .dialog{background:var(--paper);border-radius:12px;max-width:520px;width:100%;padding:14px;border:1px solid var(--line);box-shadow:var(--shadow-md)}
-  .dialog h3{margin:0 0 10px 0}
-  .grid{display:grid;gap:8px}
+  .title{font-weight:700}
+  .meta{font-size:var(--fs-sm); color:var(--muted)}
+  .chips{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px}
+  .chip{border:1px solid var(--line); background:#fff; color:#111; padding:3px 8px; border-radius:999px; font-size:12px; height:24px; display:inline-flex; align-items:center}
+  .chip.active{background:#e0e7ff; border-color:#a5b4fc; color:#3730a3; font-weight:600}
 
-  /* ลด motion สำหรับผู้ใช้ที่ตั้งค่าลดแอนิเมชัน */
-  @media (prefers-reduced-motion: reduce){
-    *{transition:none !important}
-  }
+  /* เพจเจอร์ */
+  .pager{display:flex;gap:6px;justify-content:center;align-items:center; padding:12px 0}
+  #pageInfo{font-size:12.5px; background:#eef2ff; color:#1e40af; padding:6px 10px; border-radius:8px}
 
-  /* รีสปอนซีฟ */
-  @media (max-width:640px){
-    .wrap{padding:10px}
-    .card{grid-template-columns:40px 1fr}
-    :root{ --thumb:40px; }
-    .title{font-size:0.95rem}
+  /* มือถือ: ซ่อนบางคอลัมน์เพื่อความแน่น */
+  @media (max-width:720px){
+    .col-owner,.col-views{display:none}
+    .col-id{width:60px}
+    th,td{padding:7px 8px; font-size:13px}
   }
 </style>
 </head>
 <body>
-
 <header>
   <div class="wrap">
     <div class="toolbar">
       <div class="search">
-        <input id="q" type="search" placeholder="ค้นหาเรื่อง..." />
+        <input id="q" type="search" placeholder="ค้นหาเรื่อง…"/>
         <select id="catFilter">
           <option value="">ทุกหมวด</option>
         </select>
         <button class="ghost" id="btnSearch" aria-label="ค้นหา">ค้นหา</button>
       </div>
       <div class="sign">
-        <img id="avatar" class="avatar" src="" alt="" style="display:none">
+        <img id="avatar" class="avatar" alt="">
+        <!-- IMPORTANT: container นี้ห้ามหาย เพื่อให้ GIS render ปุ่มได้ -->
         <div id="signin"></div>
         <button id="btnSignOut" class="ghost" style="display:none">ออก</button>
         <button id="btnAdd" disabled>เพิ่ม</button>
@@ -131,86 +96,113 @@
   </div>
 </header>
 
-<main class="wrap" role="main">
-  <div id="list" class="list" aria-live="polite"></div>
-  <div class="pager">
-    <button id="prev">ย้อนกลับ</button>
-    <div id="pageInfo" class="ghost"></div>
-    <button id="next">ถัดไป</button>
+<main class="wrap">
+  <div class="table-wrap">
+    <div class="scroll-x">
+      <table aria-live="polite">
+        <thead>
+          <tr>
+            <th class="col-id">รหัส</th>
+            <th class="col-title">เรื่อง</th>
+            <th class="col-owner">โดย</th>
+            <th class="col-latest">ล่าสุด</th>
+            <th class="col-replies" title="ตอบ">ตอบ</th>
+            <th class="col-views" title="อ่าน">อ่าน</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <!-- เติมด้วย JS -->
+        </tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <button id="prev">ย้อนกลับ</button>
+      <div id="pageInfo"></div>
+      <button id="next">ถัดไป</button>
+    </div>
   </div>
 </main>
 
-<!-- Dialog -->
-<div id="dlg" class="dialog-backdrop" role="dialog" aria-modal="true">
-  <div class="dialog">
-    <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
-      <h3 id="dlgTitle">เพิ่มข้อมูล</h3>
-      <button id="closeDlg" class="ghost" aria-label="ปิดหน้าต่าง">ปิด</button>
+<!-- Dialog เพิ่ม/แก้ไข (คงไว้ตามเดิม แต่ย่อคอนโทรล) -->
+<div id="dlg" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.4);padding:12px;z-index:60">
+  <div style="background:var(--paper);border:1px solid var(--line);border-radius:10px;max-width:520px;width:100%;padding:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <h3 id="dlgTitle" style="margin:0">เพิ่มข้อมูล</h3>
+      <button id="closeDlg" class="ghost">ปิด</button>
     </div>
-    <div class="grid">
-      <input id="title" type="text" placeholder="หัวข้อ"/>
-      <textarea id="body" rows="5" placeholder="รายละเอียด"></textarea>
-      <select id="postCategory"><option value="">(กำลังโหลดหมวด…)</option></select>
-      <input id="file" type="file" accept="image/*"/>
+    <div style="display:grid;gap:8px;margin-top:10px">
+      <input id="title" type="text" placeholder="หัวข้อ" style="height:32px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:#fafafa">
+      <textarea id="body" rows="5" placeholder="รายละเอียด" style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fafafa"></textarea>
+      <select id="postCategory" style="height:32px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:#fafafa"><option value="">(กำลังโหลดหมวด…)</option></select>
+      <input id="file" type="file" accept="image/*">
       <button id="save">บันทึก</button>
     </div>
   </div>
 </div>
 
 <script>
-  // ======= ตั้งค่าให้ตรงโปรเจ็คของคุณ =======
+  /* ===== ตั้งค่าของคุณ ===== */
   const WEB_APP_BASE = 'https://script.google.com/macros/s/AKfycbySSYD2QpQxWsX7Len5J2k_PlFdgdqZyZV7q-TiBXXj9bkg93hfsZYCT9DBvlWi7slMJg/exec';
-  const CLIENT_ID = '986811661821-d65agv1s2rmdcq743nif06a3ek0a01b5.apps.googleusercontent.com';
-  // ===========================================
+  const CLIENT_ID   = '986811661821-d65agv1s2rmdcq743nif06a3ek0a01b5.apps.googleusercontent.com';
+  /* ======================== */
 
-  let idToken = '';
-  let me = null;
-  let page = 1;
-  const pageSize = 10;
-  let editingId = null;
+  let idToken='', me=null, page=1; const pageSize=10; let editingId=null;
+  const EMOJIS=['👍','❤️','😂','👏'];
 
-  const EMOJIS = ['👍','❤️','😂','👏'];
-
-  /* Utilities */
   const $ = (id)=>document.getElementById(id);
-  function toQS(obj){return Object.entries(obj).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&')}
-  function showError(msg, extra){ console.error('[ERROR]', msg, extra||''); Swal.fire({icon:'error',title:msg,text:extra||''}); }
-  function showSuccess(msg){ Swal.fire({icon:'success',title:msg,showConfirmButton:false,timer:1200}); }
+  const toQS = (o)=>Object.entries(o).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&');
+  const showError=(t,m)=>Swal.fire({icon:'error',title:t,text:m||''});
+  const showSuccess=(t)=>Swal.fire({icon:'success',title:t,showConfirmButton:false,timer:1200});
 
   function setSignedInUI(on){
-    const avatar = $('avatar'), signin=$('signin'), btnAdd=$('btnAdd'), btnSignOut=$('btnSignOut');
+    const avatar=$('avatar'), signin=$('signin'), btnAdd=$('btnAdd'), btnSignOut=$('btnSignOut');
     if(on){
-      signin.style.display='none'; btnSignOut.style.display='inline-block'; btnAdd.disabled=false;
+      signin.style.display='none';
+      btnSignOut.style.display='inline-block';
+      btnAdd.disabled=false;
       avatar.style.display = me && me.picture ? 'block' : 'none';
       if(me && me.picture) avatar.src = me.picture;
     }else{
-      signin.style.display='block'; btnSignOut.style.display='none'; btnAdd.disabled=true; avatar.style.display='none';
+      signin.style.display='block'; // << สำคัญ: ให้ปุ่ม Google โชว์
+      btnSignOut.style.display='none';
+      btnAdd.disabled=true;
+      avatar.style.display='none';
     }
   }
 
-  /* Google Identity */
-  window.onload = async function(){
+  // ===== Google Sign-In (GIS Button) =====
+  window.onload = async () => {
     try{
-      const savedToken = localStorage.getItem('idToken');
-      const savedMe = localStorage.getItem('me');
+      const savedToken=localStorage.getItem('idToken');
+      const savedMe=localStorage.getItem('me');
       if(savedToken) idToken=savedToken;
       if(savedMe) me=JSON.parse(savedMe);
-      if(idToken && me && me.email) setSignedInUI(true);
+      setSignedInUI(!!(idToken && me && me.email));
     }catch(e){}
-    google.accounts.id.initialize({ client_id: CLIENT_ID, callback: handleCredentialResponse, auto_select:false });
-    google.accounts.id.renderButton($('signin'), { theme:"outline", size:"medium", text:"signin_with", locale:"th" });
+
+    // render ปุ่มทุกครั้ง (container ต้องชื่อ #signin)
+    if(window.google?.accounts?.id){
+      google.accounts.id.initialize({ client_id: CLIENT_ID, callback: handleCredentialResponse, auto_select:false });
+      google.accounts.id.renderButton($('signin'), { theme:"outline", size:"medium", text:"signin_with", locale:"th" });
+    }else{
+      // กันกรณี script ยังโหลดไม่ทัน
+      const iv=setInterval(()=>{
+        if(window.google?.accounts?.id){
+          clearInterval(iv);
+          google.accounts.id.initialize({ client_id: CLIENT_ID, callback: handleCredentialResponse, auto_select:false });
+          google.accounts.id.renderButton($('signin'), { theme:"outline", size:"medium", text:"signin_with", locale:"th" });
+        }
+      },120);
+    }
 
     await loadCategoriesToUI();
-
-    if(idToken){
-      try{ await fetchMe(); if(me && me.email){ setSignedInUI(true); loadList(); } else setSignedInUI(false); }
-      catch(e){ setSignedInUI(false); }
-    }
+    if(idToken){ try{ await fetchMe(); setSignedInUI(!!(me && me.email)); }catch(e){} }
+    if(me && me.email) loadList();
   };
 
   async function handleCredentialResponse(resp){
-    if(!resp || !resp.credential){ showError('Sign in ไม่สำเร็จ: ไม่พบ credential'); return; }
-    idToken = resp.credential;
+    if(!resp || !resp.credential){ showError('Sign in ไม่สำเร็จ','ไม่พบ credential'); return; }
+    idToken=resp.credential;
     await fetchMe();
     if(me && me.email){
       localStorage.setItem('idToken', idToken);
@@ -221,191 +213,133 @@
 
   $('btnSignOut').addEventListener('click', ()=>{
     try{ google.accounts.id.disableAutoSelect(); }catch(e){}
-    idToken=''; me=null;
-    localStorage.removeItem('idToken'); localStorage.removeItem('me');
-    setSignedInUI(false); $('list').innerHTML=''; $('pageInfo').textContent='';
+    idToken=''; me=null; localStorage.removeItem('idToken'); localStorage.removeItem('me');
+    setSignedInUI(false); $('tbody').innerHTML=''; $('pageInfo').textContent='';
   });
 
+  // ===== Data =====
   async function fetchMe(){
-    const url = WEB_APP_BASE + '?' + toQS({action:'me', idToken});
-    const r = await fetch(url);
-    const j = await r.json().catch(()=>null);
+    const r=await fetch(WEB_APP_BASE+'?'+toQS({action:'me', idToken}));
+    const j=await r.json().catch(()=>null);
     if(!r.ok || (j && j.error)){ me=null; return; }
-    me = j || null;
+    me=j||null;
   }
 
-  /* Categories */
   async function loadCategoriesToUI(){
     try{
-      const url = WEB_APP_BASE + '?' + toQS({action:'categories', idToken: idToken || 'dummy'});
-      const r = await fetch(url);
-      const j = await r.json().catch(()=>null);
-      if(!r.ok || !j || j.error) throw new Error(j ? JSON.stringify(j) : 'Cannot load categories');
+      const r=await fetch(WEB_APP_BASE+'?'+toQS({action:'categories', idToken:idToken||'dummy'}));
+      const j=await r.json().catch(()=>null);
+      if(!r.ok || !j || j.error) throw new Error(j?JSON.stringify(j):'cannot load categories');
 
-      const filterSel = $('catFilter'); j.categories.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; filterSel.appendChild(o); });
+      const filterSel=$('catFilter'); filterSel.innerHTML='<option value="">ทุกหมวด</option>';
+      j.categories.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; filterSel.appendChild(o); });
       filterSel.addEventListener('change', ()=>{ page=1; loadList(); });
 
-      const catSel = $('postCategory'); catSel.innerHTML=''; j.categories.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; catSel.appendChild(o); });
+      const postSel=$('postCategory'); if(postSel){ postSel.innerHTML=''; j.categories.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; postSel.appendChild(o); }); }
     }catch(err){ showError('โหลดหมวดไม่สำเร็จ', err.message); }
   }
 
-  /* Reactions */
   async function fetchReactions(postId){
-    const url = WEB_APP_BASE + '?' + toQS({action:'reactions', idToken, postId});
-    const r = await fetch(url); const j = await r.json().catch(()=>null);
+    const r=await fetch(WEB_APP_BASE+'?'+toQS({action:'reactions', idToken, postId}));
+    const j=await r.json().catch(()=>null);
     if(!r.ok || !j || j.error) throw new Error(j?JSON.stringify(j):'');
-    EMOJIS.forEach(e=>{ if(typeof j.counts[e] !== 'number') j.counts[e]=0; });
+    EMOJIS.forEach(e=>{ if(typeof j.counts[e]!=='number') j.counts[e]=0; });
     return j;
-  }
-  async function sendReaction(postId, emoji){
-    const form = new URLSearchParams();
-    form.set('action','react'); form.set('idToken', idToken); form.set('postId', postId); form.set('emoji', emoji);
-    const r = await fetch(WEB_APP_BASE, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:form.toString()});
-    const j = await r.json().catch(()=>null);
-    if(!r.ok || !j || j.error) throw new Error(j?JSON.stringify(j):'');
-    EMOJIS.forEach(e=>{ if(typeof j.counts[e] !== 'number') j.counts[e]=0; });
-    return j;
-  }
-  function renderReactions(container, postId, data){
-    container.innerHTML='';
-    EMOJIS.forEach(e=>{
-      const b=document.createElement('button');
-      b.className='chip'+(data.mine===e?' active':''); b.textContent=`${e} ${data.counts[e]||0}`;
-      b.addEventListener('click', async (evt)=>{
-        const all=evt.target.closest('.actions').querySelectorAll('.chip'); all.forEach(c=>c.disabled=true);
-        try{ const updated=await sendReaction(postId, e); renderReactions(container, postId, updated); }
-        catch(err){ showError('แสดงความรู้สึกไม่สำเร็จ', String(err)); }
-        finally{ const news=evt.target.closest('.actions').querySelectorAll('.chip'); news.forEach(c=>c.disabled=false); }
-      });
-      container.appendChild(b);
-    });
   }
 
-  /* List / Render */
+  async function sendReaction(postId, emoji){
+    const form=new URLSearchParams(); form.set('action','react'); form.set('idToken', idToken); form.set('postId', postId); form.set('emoji', emoji);
+    const r=await fetch(WEB_APP_BASE,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form.toString()});
+    const j=await r.json().catch(()=>null);
+    if(!r.ok || !j || j.error) throw new Error(j?JSON.stringify(j):'');
+    EMOJIS.forEach(e=>{ if(typeof j.counts[e]!=='number') j.counts[e]=0; });
+    return j;
+  }
+
   async function loadList(){
     if(!idToken){ showError('ยังไม่ได้ลงชื่อเข้าใช้'); return; }
-    const listEl=$('list');
-    listEl.innerHTML='<div style="text-align:center;padding:16px;color:var(--muted);font-size:13px">กำลังโหลด...</div>';
-
     const q=$('q').value.trim(); const category=$('catFilter').value||'';
-    const url = WEB_APP_BASE + '?' + toQS({action:'list', idToken, q, page, pageSize, category});
-    try{
-      const r=await fetch(url); const j=await r.json().catch(()=>null);
-      if(!r.ok || !j || j.error) throw new Error(j ? JSON.stringify(j) : 'Response not OK');
-      renderList(j);
-    }catch(err){
-      listEl.innerHTML=''; showError('ไม่สามารถโหลดรายการได้', err.message);
-    }
+    const r=await fetch(WEB_APP_BASE+'?'+toQS({action:'list', idToken, q, page, pageSize, category}));
+    const j=await r.json().catch(()=>null);
+    if(!r.ok || !j || j.error){ showError('โหลดรายการไม่สำเร็จ', j?.error||''); return; }
+    renderTable(j);
   }
 
-  function renderList(data){
-    const list=$('list'); list.innerHTML='';
-    if(!data.items || data.items.length===0){
-      list.innerHTML='<div style="text-align:center;padding:16px;color:var(--muted);font-size:13px">ไม่พบข้อมูล</div>';
-    }
-    (data.items||[]).forEach(item=>{
-      const card=document.createElement('div'); card.className='card';
+  function renderTable(data){
+    const tb=$('tbody'); tb.innerHTML='';
+    (data.items||[]).forEach((item,idx)=>{
+      const tr=document.createElement('tr');
 
-      const img=document.createElement('img');
-      img.className='thumb'; img.loading='lazy'; img.decoding='async';
-      img.width=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--thumb'))||48;
-      img.height=img.width;
-      img.src = item.imageUrl ? item.imageUrl : (item.imageId ? ('https://lh3.googleusercontent.com/d/'+item.imageId) : 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=');
-      img.alt='';
-
-      const right=document.createElement('div');
-      const h=document.createElement('h4'); h.className='title'; h.textContent=item.title||'(ไม่มีหัวข้อ)';
-
+      const tdId=document.createElement('td'); tdId.className='col-id'; tdId.textContent=item.id || (idx+1);
+      const tdTitle=document.createElement('td'); tdTitle.className='col-title';
+      const title=document.createElement('div'); title.className='title'; title.textContent=item.title || '(ไม่มีหัวข้อ)';
       const meta=document.createElement('div'); meta.className='meta';
-      const owner=item.ownerEmail?` • โดย ${item.ownerEmail}`:''; const cat=item.category?` • หมวด ${item.category}`:'';
-      meta.textContent=(item.createdAt ? new Date(item.createdAt).toLocaleString() : '') + owner + cat;
-
-      const body=document.createElement('div'); body.className='body';
-      const text=(item.body||''); body.textContent = text.length>160 ? text.slice(0,160)+'…' : text;
-
-      const actions=document.createElement('div'); actions.className='actions';
+      meta.textContent = (item.category?`หมวด: ${item.category} • `:'') + (item.ownerEmail?`โดย ${item.ownerEmail}`:'');
+      const chips=document.createElement('div'); chips.className='chips';
       const reacts=document.createElement('div'); reacts.style.display='flex'; reacts.style.gap='6px';
-      (async()=>{ try{ const rx=await fetchReactions(item.id); renderReactions(reacts, item.id, rx);}catch(e){} })();
-      actions.appendChild(reacts);
+      (async()=>{ try{ const rx=await fetchReactions(item.id); renderReacts(reacts,item.id,rx);}catch(e){} })();
+      chips.appendChild(reacts);
+      tdTitle.appendChild(title); tdTitle.appendChild(meta); tdTitle.appendChild(chips);
 
-      if(me && item.ownerEmail && me.email===item.ownerEmail){
-        const btnGroup=document.createElement('div'); btnGroup.style.marginLeft='auto'; btnGroup.style.display='flex'; btnGroup.style.gap='6px';
-        const editBtn=document.createElement('button'); editBtn.className='ghost'; editBtn.textContent='แก้ไข'; editBtn.addEventListener('click', ()=>openEdit(item));
-        const delBtn=document.createElement('button'); delBtn.className='danger'; delBtn.textContent='ลบ'; delBtn.addEventListener('click', ()=>doDelete(item.id));
-        btnGroup.appendChild(editBtn); btnGroup.appendChild(delBtn); actions.appendChild(btnGroup);
-      }
+      const tdOwner=document.createElement('td'); tdOwner.className='col-owner'; tdOwner.textContent=item.ownerEmail||'-';
+      const tdLatest=document.createElement('td'); tdLatest.className='col-latest'; tdLatest.textContent=item.createdAt ? new Date(item.createdAt).toLocaleString() : '-';
+      const tdReplies=document.createElement('td'); tdReplies.className='col-replies'; tdReplies.textContent = item.replies ?? '0';
+      const tdViews=document.createElement('td'); tdViews.className='col-views'; tdViews.textContent = item.views ?? '0';
 
-      right.appendChild(h); right.appendChild(meta); right.appendChild(body); right.appendChild(actions);
-      card.appendChild(img); card.appendChild(right); list.appendChild(card);
+      tr.appendChild(tdId); tr.appendChild(tdTitle); tr.appendChild(tdOwner); tr.appendChild(tdLatest); tr.appendChild(tdReplies); tr.appendChild(tdViews);
+      tb.appendChild(tr);
     });
 
     $('pageInfo').textContent = `หน้า ${data.page} / ${data.totalPages} – ทั้งหมด ${data.total} รายการ`;
     $('prev').disabled = data.page<=1; $('next').disabled = data.page>=data.totalPages;
   }
 
-  /* Search & Pager (debounce เล็กน้อย) */
-  let searchTimer=null;
+  function renderReacts(container, postId, data){
+    container.innerHTML='';
+    EMOJIS.forEach(e=>{
+      const b=document.createElement('button');
+      b.className='chip'+(data.mine===e?' active':''); b.textContent=`${e} ${data.counts[e]||0}`;
+      b.addEventListener('click', async (evt)=>{
+        const row=evt.currentTarget.closest('tr'); row.querySelectorAll('.chip').forEach(c=>c.disabled=true);
+        try{ const updated=await sendReaction(postId, e); renderReacts(container, postId, updated); }
+        catch(err){ showError('แสดงความรู้สึกไม่สำเร็จ', String(err)); }
+        finally{ row.querySelectorAll('.chip').forEach(c=>c.disabled=false); }
+      });
+      container.appendChild(b);
+    });
+  }
+
+  /* ค้นหา/เพจเจอร์ */
   $('btnSearch').addEventListener('click', ()=>{ page=1; loadList(); });
-  $('q').addEventListener('input', ()=>{
-    clearTimeout(searchTimer); searchTimer=setTimeout(()=>{ page=1; loadList(); }, 350);
-  });
   $('q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); page=1; loadList(); }});
   $('prev').addEventListener('click', ()=>{ if(page>1){ page--; loadList(); }});
   $('next').addEventListener('click', ()=>{ page++; loadList(); });
 
   /* Dialog */
-  const dlg=$('dlg'), dlgTitle=$('dlgTitle');
-  $('btnAdd').addEventListener('click', openCreate);
-  $('closeDlg').addEventListener('click', ()=> dlg.style.display='none');
+  const dlg=$('dlg'); $('btnAdd').addEventListener('click', openCreate); $('closeDlg').addEventListener('click', ()=> dlg.style.display='none');
+  function openCreate(){ editingId=null; $('dlgTitle').textContent='เพิ่มข้อมูล'; $('title').value=''; $('body').value=''; $('file').value=''; const s=$('postCategory'); if(s&&s.options.length) s.selectedIndex=0; dlg.style.display='flex'; }
+  function openEdit(item){ editingId=item.id; $('dlgTitle').textContent='แก้ไขโพสต์'; $('title').value=item.title||''; $('body').value=item.body||''; $('file').value=''; const s=$('postCategory'); if(s){ const ix=[...s.options].findIndex(o=>o.value===item.category); s.selectedIndex= ix>=0?ix:0; } dlg.style.display='flex'; }
 
-  function openCreate(){
-    editingId=null; dlgTitle.textContent='เพิ่มข้อมูล';
-    $('title').value=''; $('body').value=''; $('file').value='';
-    const catSel=$('postCategory'); if(catSel && catSel.options.length) catSel.selectedIndex=0;
-    dlg.style.display='flex';
-  }
-  function openEdit(item){
-    editingId=item.id; dlgTitle.textContent='แก้ไขโพสต์';
-    $('title').value=item.title||''; $('body').value=item.body||''; $('file').value='';
-    const catSel=$('postCategory'); if(catSel){ const ix=[...catSel.options].findIndex(o=>o.value===item.category); catSel.selectedIndex= ix>=0 ? ix : 0; }
-    dlg.style.display='flex';
-  }
-
-  $('save').addEventListener('click', async (evt)=>{
+  $('save').addEventListener('click', savePost);
+  async function savePost(evt){
     if(!idToken){ showError('กรุณาลงชื่อเข้าใช้'); return; }
     const title=$('title').value.trim(); const body=$('body').value.trim(); const file=$('file').files[0];
     const category=($('postCategory')?.value||'').trim();
     if(!title){ showError('กรุณากรอกหัวข้อ'); return; }
-
-    const saveBtn=evt.target; const text=saveBtn.textContent; saveBtn.disabled=true; saveBtn.textContent='กำลังบันทึก…';
+    const btn=evt.target; const t=btn.textContent; btn.disabled=true; btn.textContent='กำลังบันทึก…';
     try{
       let imageData=''; if(file) imageData=await fileToDataURL(file);
       const form=new URLSearchParams(); form.set('idToken', idToken); form.set('title', title); form.set('body', body);
       if(category) form.set('category', category); if(imageData) form.set('imageData', imageData);
-      if(editingId){ form.set('action','update'); form.set('id', editingId);} else { form.set('action','create'); }
+      if(editingId){ form.set('action','update'); form.set('id', editingId); } else { form.set('action','create'); }
       const r=await fetch(WEB_APP_BASE,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form.toString()});
       const j=await r.json().catch(()=>null); if(!r.ok || (j && j.error)) throw new Error(j?JSON.stringify(j):'Save failed');
-      dlg.style.display='none'; showSuccess('บันทึกข้อมูลสำเร็จ!'); page=1; loadList();
-    }catch(err){ showError(`${editingId?'แก้ไข':'สร้าง'} ข้อมูลไม่สำเร็จ`, err.message); }
-    finally{ saveBtn.disabled=false; saveBtn.textContent=text; }
-  });
-
-  async function doDelete(id){
-    if(!idToken){ showError('กรุณาลงชื่อเข้าใช้'); return; }
-    const result=await Swal.fire({title:'ยืนยันการลบ?',text:'ข้อมูลในชีตและรีแอคชันจะถูกลบอย่างถาวร!',icon:'warning',showCancelButton:true,confirmButtonColor:'#d33',cancelButtonColor:'#3085d6',confirmButtonText:'ใช่, ลบเลย!',cancelButtonText:'ยกเลิก'});
-    if(result.isConfirmed){
-      try{
-        const form=new URLSearchParams(); form.set('action','delete'); form.set('idToken', idToken); form.set('id', id);
-        const r=await fetch(WEB_APP_BASE,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form.toString()});
-        const j=await r.json().catch(()=>null); if(!r.ok || (j && j.error)) throw new Error(j?JSON.stringify(j):'Delete failed');
-        showSuccess('ลบโพสต์สำเร็จ'); loadList();
-      }catch(err){ showError('เกิดข้อผิดพลาดในการลบ', err.message); }
-    }
+      dlg.style.display='none'; showSuccess('บันทึกสำเร็จ!'); page=1; loadList();
+    }catch(err){ showError(`${editingId?'แก้ไข':'สร้าง'} ไม่สำเร็จ`, err.message); }
+    finally{ btn.disabled=false; btn.textContent=t; }
   }
 
-  function fileToDataURL(file){
-    return new Promise((resolve,reject)=>{ const fr=new FileReader(); fr.onload=()=>resolve(fr.result); fr.onerror=reject; fr.readAsDataURL(file); });
-  }
+  function fileToDataURL(file){ return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); }); }
 </script>
 </body>
 </html>
