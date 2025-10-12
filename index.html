@@ -1,572 +1,157 @@
 <!doctype html>
 <html lang="th">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>กระทู้/บทความ – รายการ + ค้นหา + เพิ่มข้อมูล (Stable+SweetAlert2)</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Music Chadok</title>
 
-<!-- Google Identity Services -->
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- ฟอนต์ไทยอ่านสบาย -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
 
-<!-- SweetAlert2 -->
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <!-- สำคัญ: อย่าใส่ COOP/COEP ที่เคร่ง เช่น same-origin/require-corp เพราะจะบล็อก postMessage ของ OAuth popup -->
+  <!-- ถ้าจำเป็นต้องใช้ popup จริงๆ ให้ (แต่ไม่แนะนำ) ใช้: <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups"> -->
 
-<style>
-  :root{
-    --bg:#fffdf7; --ink:#0f172a; --muted:#6b7280; --line:#e5e7eb;
-    --brand:#2563eb; --brand-ink:#ffffff; --paper:#ffffff; --radius:14px;
-    --danger:#ef4444; --ok:#16a34a; --ghost:#eef2ff;
-  }
-  *{box-sizing:border-box}
-  html,body{
-    margin:0;background:var(--bg);color:var(--ink);
-    font-family:"Sarabun", system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Thai", Arial, sans-serif
-  }
-
-  header{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:1px solid var(--line);backdrop-filter:saturate(1.2) blur(6px)}
-  .wrap{max-width:960px;margin:auto;padding:14px}
-
-  .toolbar{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
-  .search{display:flex;gap:8px}
-  input[type="search"]{flex:1;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#fafafa}
-  select{padding:11px;border:1px solid var(--line);border-radius:12px;background:#fafafa}
-  button{
-    border:0;border-radius:12px;padding:10px 14px;background:var(--brand);color:var(--brand-ink);
-    cursor:pointer; display:inline-flex; gap:8px; align-items:center; justify-content:center;
-    box-shadow:0 8px 22px -12px rgba(37,99,235,.55);
-    transition:transform .06s ease, filter .2s ease;
-  }
-  button:hover{transform:translateY(-1px)}
-  button[disabled]{opacity:.6;cursor:not-allowed;filter:grayscale(.2)}
-  .btn-ghost{background:#f3f4f6;color:#111;box-shadow:none}
-  .btn-danger{background:var(--danger);box-shadow:0 8px 22px -12px rgba(239,68,68,.55)}
-  .btn-outline{background:#fff;color:#1e40af;border:1px solid #c7d2fe;box-shadow:none}
-
-  .list{display:grid;gap:12px;margin-top:14px}
-  .card{
-    background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:12px;
-    display:grid;grid-template-columns:72px 1fr;gap:12px;
-    box-shadow:0 12px 30px -22px rgba(0,0,0,.25);
-  }
-  .thumb{width:72px;height:72px;border-radius:12px;object-fit:cover;background:#eee}
-  .title{font-weight:700;margin:0 0 4px 0; line-height:1.25}
-  .meta{font-size:12px;color:var(--muted)}
-  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-  .chip{border:1px solid var(--line);background:#fff;color:#111;padding:6px 10px;border-radius:999px;font-size:13px;cursor:pointer}
-  .chip.active{background:#eef2ff;border-color:#c7d2fe}
-  .chip[disabled]{opacity:.5;cursor:not-allowed}
-
-  .pager{display:flex;gap:8px;justify-content:center;margin:16px 0}
-  .pageInfo{padding:10px 12px;border-radius:10px;background:#eef2ff;color:#1e3a8a}
-
-  /* Dialog */
-  .dialog-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:16px;z-index:30}
-  .dialog{background:var(--paper);border-radius:16px;max-width:560px;width:100%;padding:16px;border:1px solid var(--line)}
-  .dialog h3{margin:0 0 8px 0}
-  .grid{display:grid;gap:10px}
-  textarea, input[type="text"], input[type="file"], select{
-    width:100%;padding:10px;border:1px solid var(--line);border-radius:12px;background:#fafafa
-  }
-
-  /* Loading Overlay */
-  .overlay{position:fixed;inset:0;display:none;place-items:center;background:rgba(255,255,255,.65);z-index:40}
-  .spinner{width:42px;height:42px;border-radius:50%;border:4px solid #c7d2fe;border-top-color:#2563eb;animation:spin 1s linear infinite}
-  @keyframes spin{to{transform:rotate(360deg)}}
-
-  /* Skeleton */
-  .skeleton{display:grid;grid-template-columns:72px 1fr;gap:12px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:12px}
-  .sk-thumb{width:72px;height:72px;border-radius:12px;background:linear-gradient(90deg,#eee,#f5f5f5,#eee);background-size:200% 100%;animation:shimmer 1.2s infinite}
-  .sk-line{height:12px;border-radius:8px;background:linear-gradient(90deg,#eee,#f5f5f5,#eee);background-size:200% 100%;animation:shimmer 1.2s infinite}
-  .sk-line.wide{height:16px}
-  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-
-  /* Avatars */
-  .avatar{width:28px;height:28px;border-radius:50%;object-fit:cover;display:none}
-  .sign{display:flex;gap:8px;align-items:center;justify-content:flex-end}
-  @media (max-width:540px){
-    .toolbar{grid-template-columns:1fr}
-    .card{grid-template-columns:56px 1fr}
-    .thumb{width:56px;height:56px}
-  }
-</style>
+  <style>
+    :root{
+      --bg:#fffdf7; --paper:#ffffff; --ink:#1b2430; --muted:#6b7280;
+      --brand:#2f6fea; --brand-ink:#ffffff; --line:#eceff3; --radius:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0; background:var(--bg); color:var(--ink); font-family:"Sarabun",system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Thai",Arial,sans-serif}
+    a{color:var(--brand); text-decoration:none}
+    header{
+      position:sticky; top:0; z-index:10; backdrop-filter:saturate(180%) blur(8px);
+      background:rgba(255,253,247,.75); border-bottom:1px solid var(--line);
+    }
+    .wrap{max-width:960px; margin:0 auto; padding:16px}
+    .brand{display:flex; align-items:center; gap:10px}
+    .brand b{font-size:20px}
+    main{padding:20px 0}
+    .card{
+      background:var(--paper); border:1px solid var(--line); border-radius:var(--radius);
+      box-shadow:0 8px 24px -12px rgba(0,0,0,.12);
+      padding:16px; margin:12px 0;
+    }
+    .btn{
+      display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px;
+      background:var(--brand); color:var(--brand-ink); border:0; cursor:pointer; font-weight:600;
+    }
+    .btn.secondary{background:#e5e7eb; color:#111827}
+    .grid{
+      display:grid; grid-template-columns:1fr; gap:12px;
+    }
+    @media (min-width:600px){ .grid{ grid-template-columns:1fr 1fr; } }
+    footer{color:var(--muted); font-size:13px; padding:24px 0}
+    .muted{color:var(--muted)}
+    .hide{display:none !important}
+  </style>
 </head>
 <body>
+  <header>
+    <div class="wrap brand">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3l7 4v10l-7 4l-7-4V7l7-4Zm0 2.3L6.5 8v8l5.5 2.7L17.5 16V8L12 5.3Z"/></svg>
+      <b>Music Chadok</b>
+      <span class="muted">• GitHub Pages</span>
+      <span style="margin-left:auto"></span>
+      <!-- ปุ่มล็อกอิน (แสดงเมื่อเปิดใช้ Firebase ด้านล่าง) -->
+      <button id="btnLogin" class="btn hide">Sign in with Google</button>
+      <button id="btnLogout" class="btn secondary hide">Sign out</button>
+    </div>
+  </header>
 
-<header>
-  <div class="wrap">
-    <div class="toolbar">
-      <div class="search">
-        <input id="q" type="search" placeholder="ค้นหาเรื่อง..."/>
-        <select id="catFilter"><option value="">ทุกหมวด</option></select>
-        <button class="btn-outline" id="btnSearch">ค้นหา</button>
+  <main class="wrap">
+    <section class="card">
+      <h2 style="margin:6px 0 10px">ยินดีต้อนรับ 🎵</h2>
+      <p class="muted">นี่คือหน้า <code>index.html</code> ที่ปรับแล้วสำหรับ GitHub Pages — เปิดได้ที่
+        <code>https://tontakankeawpang321-glitch.github.io/musicchadok/</code>
+      </p>
+      <ul>
+        <li>วางไฟล์อื่นๆ (เช่น <code>style.css</code>, รูปภาพ) ไว้ข้างๆ <code>index.html</code> (root)</li>
+        <li>เพิ่มไฟล์เปล่า <code>.nojekyll</code> ที่ root เพื่อปิด Jekyll</li>
+        <li>หากใช้ Google/Firebase OAuth: ใช้ <b>redirect flow</b> เพื่อลดปัญหา COOP/postMessage</li>
+      </ul>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h3 style="margin-top:0">ทดสอบลิงก์ภายใน</h3>
+        <p class="muted">ตัวอย่างลิงก์แบบ relative (ทำงานได้ภายใต้โฟลเดอร์ <code>/musicchadok</code>)</p>
+        <p><a href="./about.html" target="_blank" rel="noopener">เปิด about.html</a></p>
       </div>
-      <div class="sign">
-        <img id="avatar" class="avatar" alt="">
-        <div id="signin"></div>
-        <button id="btnSignOut" class="btn-ghost" style="display:none">ลงชื่อออก</button>
-        <button id="btnAdd" disabled>เพิ่มข้อมูล</button>
+      <div class="card">
+        <h3 style="margin-top:0">สถานะผู้ใช้</h3>
+        <div id="authState" class="muted">ยังไม่ได้ลงชื่อเข้าใช้</div>
       </div>
-    </div>
-  </div>
-</header>
+    </section>
+  </main>
 
-<main class="wrap">
-  <div id="list" class="list"></div>
-  <div class="pager">
-    <button id="prev" class="btn-ghost">ย้อนกลับ</button>
-    <div id="pageInfo" class="pageInfo"></div>
-    <button id="next">ถัดไป</button>
-  </div>
-</main>
+  <footer class="wrap">
+    <div>© <span id="y"></span> Music Chadok — จัดทำเพื่อการศึกษา/อ้างอิง</div>
+  </footer>
 
-<!-- Dialog เพิ่ม/แก้ไข -->
-<div id="dlg" class="dialog-backdrop" role="dialog" aria-modal="true">
-  <div class="dialog">
-    <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
-      <h3 id="dlgTitle">เพิ่มข้อมูล</h3>
-      <button id="closeDlg" class="btn-ghost">ปิด</button>
-    </div>
-    <div class="grid">
-      <input id="title" type="text" placeholder="หัวข้อ"/>
-      <textarea id="body" rows="5" placeholder="รายละเอียด"></textarea>
-      <select id="postCategory"><option value="">(กำลังโหลดหมวด…)</option></select>
-      <input id="file" type="file" accept="image/*"/>
-      <button id="save"><span id="saveSpin" class="spinner" style="width:18px;height:18px;border-width:3px;display:none"></span>บันทึก</button>
-    </div>
-  </div>
-</div>
+  <!-- ====== Firebase (Redirect Flow) — เปิดใช้ตามต้องการ ======
+       1) เติม firebaseConfig ของโปรเจ็กต์คุณ
+       2) ยกเลิกคอมเมนต์สคริปต์นี้ทั้งหมด
+       3) ตั้งค่าใน Google Cloud / Firebase
+          - Authorized JavaScript origins: https://tontakankeawpang321-glitch.github.io
+          - Authorized redirect URIs:     https://tontakankeawpang321-glitch.github.io/musicchadok
+             (หรือ /musicchadok/auth.html ถ้าคุณมีหน้า callback แยก)
 
-<!-- Loading Overlay -->
-<div id="overlay" class="overlay"><div class="spinner"></div></div>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut }
+      from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
 
-<script>
-  // ===== CONFIG (ใส่ของโปรเจกต์คุณ) =====
-  const WEB_APP_BASE = 'https://script.google.com/macros/s/AKfycbySSYD2QpQxWsX7Len5J2k_PlFdgdqZyZV7q-TiBXXj9bkg93hfsZYCT9DBvlWi7slMJg/exec';
-  const CLIENT_ID    = '986811661821-d65agv1s2rmdcq743nif06a3ek0a01b5.apps.googleusercontent.com';
-  // =======================================
-
-  let idToken = '';
-  let me = null;
-  let page = 1;
-  const pageSize = 10;
-  let editingId = null;
-  let isBusy = false; // ล็อก global action (อัปโหลด/ลบ)
-  const EMOJIS = ['👍','❤️','😂','👏'];
-
-  // ควบคุม fetch ล่าสุด (สำหรับ list/search)
-  let listController = null;
-
-  // serialize คิวรีแอคชันต่อโพสต์ (ป้องกันกดรัว)
-  const reactQueues = new Map(); // postId -> promise chain
-
-  // ===== Utilities =====
-  const $ = (id)=>document.getElementById(id);
-  const qs = (o)=>Object.entries(o).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&');
-  const showOverlay = (on)=>{ $('overlay').style.display = on ? 'grid' : 'none'; };
-  const showDlg = (on)=>{ $('dlg').style.display = on ? 'flex' : 'none'; };
-  const toast = (icon, title)=> Swal.fire({toast:true, position:'top-end', icon, title, showConfirmButton:false, timer:1800, timerProgressBar:true});
-  const ask = (title, text, icon='warning')=> Swal.fire({title, text, icon, showCancelButton:true, confirmButtonText:'ตกลง', cancelButtonText:'ยกเลิก'});
-
-  function swalError(message, extra=''){
-    console.error('[ERROR]', message, extra);
-    Swal.fire({icon:'error', title:'เกิดข้อผิดพลาด', text: message});
-  }
-
-  function guardSignedIn(){
-    if (!idToken) { Swal.fire({icon:'info', title:'กรุณาลงชื่อเข้าใช้'}); return false; }
-    return true;
-  }
-
-  function setSignedInUI(on){
-    const avatar = $('avatar');
-    const signin = $('signin');
-    const btnAdd = $('btnAdd');
-    const btnSignOut = $('btnSignOut');
-    if (on) {
-      signin.style.display = 'none';
-      btnSignOut.style.display = 'inline-flex';
-      btnAdd.disabled = false;
-      avatar.style.display = (me && me.picture) ? 'block' : 'none';
-      if (me && me.picture) avatar.src = me.picture;
-    } else {
-      signin.style.display = 'block';
-      btnSignOut.style.display = 'none';
-      btnAdd.disabled = true;
-      avatar.style.display = 'none';
-    }
-  }
-
-  // ===== GIS =====
-  window.onload = async function(){
-    try {
-      const savedToken = localStorage.getItem('idToken');
-      const savedMe = localStorage.getItem('me');
-      if (savedToken) idToken = savedToken;
-      if (savedMe) me = JSON.parse(savedMe);
-      if (idToken && me && me.email) setSignedInUI(true);
-    } catch(e){}
-
-    google.accounts.id.initialize({
-      client_id: CLIENT_ID,
-      callback: handleCredentialResponse,
-      auto_select: false
-    });
-    google.accounts.id.renderButton(
-      $('signin'),
-      { theme:"outline", size:"large", text:"signin_with", locale:"th" }
-    );
-
-    await loadCategoriesToUI();
-
-    if (idToken) {
-      try { await fetchMe(); if (me && me.email) { setSignedInUI(true); loadList(); } else setSignedInUI(false); }
-      catch(e){ setSignedInUI(false); }
-    } else {
-      renderSkeletons(6);
-    }
-  };
-
-  async function handleCredentialResponse(resp){
-    if (!resp || !resp.credential) { swalError('ลงชื่อเข้าใช้ไม่สำเร็จ'); return; }
-    idToken = resp.credential;
-    await fetchMe();
-    if (me && me.email) {
-      localStorage.setItem('idToken', idToken);
-      localStorage.setItem('me', JSON.stringify(me));
-      setSignedInUI(true);
-      toast('success','ลงชื่อเข้าใช้แล้ว');
-      loadList();
-    } else {
-      setSignedInUI(false);
-      swalError('ตรวจสอบตัวตนไม่ผ่าน');
-    }
-  }
-
-  $('btnSignOut').addEventListener('click', ()=>{
-    try { google.accounts.id.disableAutoSelect(); } catch(e){}
-    idToken=''; me=null; localStorage.removeItem('idToken'); localStorage.removeItem('me');
-    setSignedInUI(false);
-    $('list').innerHTML = '';
-    $('pageInfo').textContent = '';
-    toast('success','ออกจากระบบแล้ว');
-  });
-
-  async function fetchMe(){
-    const url = WEB_APP_BASE + '?' + qs({ action:'me', idToken });
-    const r = await fetch(url);
-    let j = null; try{ j = await r.json(); }catch(_){}
-    if (!r.ok || (j && j.error)) { me=null; return; }
-    me = j || null;
-  }
-
-  // ===== Categories =====
-  async function loadCategoriesToUI(){
-    const url = WEB_APP_BASE + '?' + qs({ action:'categories', idToken: idToken || 'dummy' });
-    try{
-      const r = await fetch(url);
-      const j = await r.json();
-      if (!r.ok || !j || j.error) throw new Error(j?JSON.stringify(j):'');
-      const filterSel = $('catFilter');
-      j.categories.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; filterSel.appendChild(o); });
-      filterSel.addEventListener('change', ()=>{ page=1; loadList(); });
-
-      const catSel = $('postCategory');
-      catSel.innerHTML = '';
-      j.categories.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; catSel.appendChild(o); });
-    }catch(e){
-      swalError('โหลดหมวดไม่สำเร็จ');
-    }
-  }
-
-  // ===== Reactions (with queue & retry) =====
-  async function fetchReactions(postId){
-    const url = WEB_APP_BASE + '?' + qs({ action:'reactions', idToken, postId });
-    const r = await fetch(url);
-    const j = await r.json().catch(()=>null);
-    if (!r.ok || !j || j.error) throw new Error(j?JSON.stringify(j):'');
-    EMOJIS.forEach(e=>{ if(typeof j.counts[e] !== 'number') j.counts[e]=0; });
-    return j;
-  }
-
-  function withReactQueue(postId, fn){
-    const prev = reactQueues.get(postId) || Promise.resolve();
-    const next = prev.then(()=>fn()).catch(()=>{}); // swallow error to not break chain
-    reactQueues.set(postId, next);
-    return next;
-  }
-
-  async function sendReaction(postId, emoji){
-    // retry 2 ครั้งแบบ backoff
-    const exec = async ()=>{
-      const form = new URLSearchParams();
-      form.set('action','react'); form.set('idToken', idToken);
-      form.set('postId', postId); form.set('emoji', emoji);
-      const r = await fetch(WEB_APP_BASE, {
-        method:'POST',
-        headers:{'Content-Type':'application/x-www-form-urlencoded'},
-        body: form.toString()
-      });
-      const j = await r.json().catch(()=>null);
-      if (!r.ok || !j || j.error) throw new Error(j?JSON.stringify(j):'react failed');
-      EMOJIS.forEach(e=>{ if(typeof j.counts[e] !== 'number') j.counts[e]=0; });
-      return j;
+    // TODO: ใส่ config ของคุณเอง
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      appId: "YOUR_APP_ID"
     };
 
-    let attempt = 0, delay = 300;
-    while (true){
-      try { return await exec(); }
-      catch(e){
-        attempt++;
-        if (attempt>2) throw e;
-        await new Promise(rs=>setTimeout(rs, delay));
-        delay *= 2;
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    const $ = (id)=>document.getElementById(id);
+    const btnLogin  = $("btnLogin");
+    const btnLogout = $("btnLogout");
+    const authState = $("authState");
+
+    // แสดงปุ่มเมื่อเปิดใช้ auth
+    btnLogin.classList.remove("hide");
+    btnLogout.classList.remove("hide");
+
+    btnLogin.addEventListener("click", () => {
+      // ใช้ Redirect flow เพื่อลดปัญหา COOP/popup
+      signInWithRedirect(auth, provider);
+    });
+
+    btnLogout.addEventListener("click", async () => {
+      await signOut(auth);
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        authState.textContent = `ลงชื่อเข้าใช้: ${user.displayName || user.email || user.uid}`;
+      } else {
+        authState.textContent = "ยังไม่ได้ลงชื่อเข้าใช้";
       }
-    }
-  }
-
-  function renderReactions(container, postId, data){
-    container.innerHTML = '';
-    EMOJIS.forEach(e=>{
-      const b = document.createElement('button');
-      b.className = 'chip' + (data.mine === e ? ' active' : '');
-      b.textContent = `${e} ${data.counts[e]||0}`;
-      b.addEventListener('click', ()=>{
-        if (!guardSignedIn()) return;
-        // ถ้ามี overlay (กำลังอัปโหลด/ลบ) ปิดการกด
-        if (isBusy) return;
-
-        // disable chips ชั่วคราวจนจบ
-        [...container.querySelectorAll('button')].forEach(x=>x.disabled=true);
-        withReactQueue(postId, async ()=>{
-          try {
-            const updated = await sendReaction(postId, e);
-            renderReactions(container, postId, updated);
-          } catch(err){
-            swalError('ส่งรีแอคชันไม่สำเร็จ');
-            // เปิดปุ่มกลับ
-            [...container.querySelectorAll('button')].forEach(x=>x.disabled=false);
-          }
-        });
-      });
-      container.appendChild(b);
-    });
-  }
-
-  // ===== List / Render =====
-  function renderSkeletons(n=6){
-    const list = $('list'); list.innerHTML='';
-    for(let i=0;i<n;i++){
-      const sk = document.createElement('div'); sk.className='skeleton';
-      const t = document.createElement('div'); t.className='sk-thumb';
-      const r = document.createElement('div');
-      const l1 = document.createElement('div'); l1.className='sk-line wide';
-      const l2 = document.createElement('div'); l2.className='sk-line'; l2.style.width='70%';
-      const l3 = document.createElement('div'); l3.className='sk-line'; l3.style.width='45%';
-      r.appendChild(l1); r.appendChild(l2); r.appendChild(l3);
-      sk.appendChild(t); sk.appendChild(r);
-      list.appendChild(sk);
-    }
-    $('pageInfo').textContent = 'กำลังโหลด...';
-    $('prev').disabled = true; $('next').disabled = true;
-  }
-
-  async function loadList(){
-    if (!idToken) { renderSkeletons(4); return; }
-    if (listController) listController.abort();
-    listController = new AbortController();
-
-    const q = $('q').value.trim();
-    const category = $('catFilter').value || '';
-    const url = WEB_APP_BASE + '?' + qs({ action:'list', idToken, q, page, pageSize, category });
-
-    renderSkeletons(6);
-    try{
-      const r = await fetch(url, { signal: listController.signal });
-      const j = await r.json().catch(()=>null);
-      if (!r.ok || !j || j.error) throw new Error(j?JSON.stringify(j):'LIST error');
-      renderList(j);
-    }catch(e){
-      if (e.name === 'AbortError') return;
-      swalError('โหลดรายการไม่สำเร็จ');
-    }
-  }
-
-  function renderList(data){
-    const list = $('list'); list.innerHTML='';
-    (data.items || []).forEach(item=>{
-      const card = document.createElement('div'); card.className='card';
-      const img = document.createElement('img'); img.className='thumb';
-      img.src = item.imageUrl ? item.imageUrl : (item.imageId ? ('https://lh3.googleusercontent.com/d/'+item.imageId) : '');
-      img.alt='';
-
-      const right = document.createElement('div');
-      const h = document.createElement('div'); h.className='title'; h.textContent = item.title || '(ไม่มีหัวข้อ)';
-      const meta = document.createElement('div'); meta.className='meta';
-      const owner = item.ownerEmail ? ` • โดย ${item.ownerEmail}` : '';
-      const cat = item.category ? ` • หมวด ${item.category}` : '';
-      meta.textContent = (item.createdAt ? new Date(item.createdAt).toLocaleString() : '') + owner + cat;
-      const body = document.createElement('div');
-      body.textContent = (item.body || '').slice(0, 180) + ((item.body||'').length>180?'...':'');
-
-      const actions = document.createElement('div'); actions.className='actions';
-      const reacts = document.createElement('div');
-      // โหลดรีแอคชันแบบแยก และ render
-      (async()=>{
-        try{
-          const rx = await fetchReactions(item.id);
-          renderReactions(reacts, item.id, rx);
-        }catch(_){}
-      })();
-      actions.appendChild(reacts);
-
-      if (me && item.ownerEmail && me.email === item.ownerEmail){
-        const editBtn = document.createElement('button'); editBtn.className='btn-ghost'; editBtn.textContent='แก้ไข';
-        editBtn.addEventListener('click', ()=>openEdit(item));
-        const delBtn = document.createElement('button'); delBtn.className='btn-danger'; delBtn.textContent='ลบ';
-        delBtn.addEventListener('click', ()=>doDelete(item.id));
-        actions.appendChild(editBtn); actions.appendChild(delBtn);
-      }
-
-      right.appendChild(h); right.appendChild(meta); right.appendChild(body); right.appendChild(actions);
-      card.appendChild(img); card.appendChild(right);
-      list.appendChild(card);
     });
 
-    $('pageInfo').textContent = `หน้า ${data.page} / ${data.totalPages} – ทั้งหมด ${data.total} รายการ`;
-    $('prev').disabled = data.page <= 1;
-    $('next').disabled = data.page >= data.totalPages;
-  }
-
-  // Search & Pager
-  $('btnSearch').addEventListener('click', ()=>{ page=1; loadList(); });
-  $('q').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ page=1; loadList(); } });
-  $('prev').addEventListener('click', ()=>{ if(page>1){ page--; loadList(); }});
-  $('next').addEventListener('click', ()=>{ page++; loadList(); });
-
-  // Dialog Add/Edit
-  const dlgTitle = $('dlgTitle');
-  $('btnAdd').addEventListener('click', openCreate);
-  $('closeDlg').addEventListener('click', ()=> showDlg(false));
-
-  function openCreate(){
-    if (!guardSignedIn()) return;
-    editingId = null;
-    dlgTitle.textContent = 'เพิ่มข้อมูล';
-    $('title').value = ''; $('body').value = ''; $('file').value = '';
-    const catSel = $('postCategory'); if (catSel && catSel.options.length) catSel.selectedIndex = 0;
-    showDlg(true);
-  }
-  function openEdit(item){
-    editingId = item.id;
-    dlgTitle.textContent = 'แก้ไขโพสต์';
-    $('title').value = item.title || ''; $('body').value = item.body || ''; $('file').value = '';
-    const catSel = $('postCategory');
-    if (catSel) {
-      const ix = [...catSel.options].findIndex(o=>o.value===item.category);
-      catSel.selectedIndex = ix>=0 ? ix : 0;
-    }
-    showDlg(true);
-  }
-
-  $('save').addEventListener('click', doSave);
-
-  async function doSave(){
-    if (!guardSignedIn()) return;
-    if (isBusy) return;
-    const title = $('title').value.trim();
-    const body  = $('body').value.trim();
-    const file  = $('file').files[0];
-    const category = ($('postCategory')?.value || '').trim();
-    if (!title) { Swal.fire({icon:'info', title:'กรอกหัวข้อก่อนนะ'}); return; }
-
-    // ล็อกการกระทำ (กันกดอีโมจิ/กดซ้ำ)
-    isBusy = true; showOverlay(true); $('saveSpin').style.display='inline-block';
-
-    try{
-      let imageData = '';
-      if (file){
-        const compressed = await compressImage(file, 1280);
-        imageData = await fileToDataURL(compressed);
-      }
-      const form = new URLSearchParams();
-      form.set('idToken', idToken);
-      form.set('title', title);
-      form.set('body', body);
-      if (category) form.set('category', category);
-      if (imageData) form.set('imageData', imageData);
-      if (editingId) { form.set('action','update'); form.set('id', editingId); }
-      else { form.set('action','create'); }
-
-      const r = await fetch(WEB_APP_BASE, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: form.toString() });
-      const j = await r.json().catch(()=>null);
-      if (!r.ok || (j && j.error)) throw new Error(j?JSON.stringify(j):'save failed');
-
-      showDlg(false);
-      page = 1;
-      await loadList();
-      toast('success', editingId ? 'แก้ไขสำเร็จ' : 'เพิ่มข้อมูลสำเร็จ');
-    }catch(e){
-      swalError('บันทึกไม่สำเร็จ');
-    }finally{
-      isBusy = false; showOverlay(false); $('saveSpin').style.display='none';
-    }
-  }
-
-  async function doDelete(id){
-    if (!guardSignedIn()) return;
-    const ret = await ask('ยืนยันลบโพสต์นี้?', 'ข้อมูลในชีตและรีแอคชันที่เกี่ยวข้องจะถูกลบด้วย', 'warning');
-    if (!ret.isConfirmed) return;
-    if (isBusy) return;
-
-    isBusy = true; showOverlay(true);
-    try{
-      const form = new URLSearchParams();
-      form.set('action','delete'); form.set('idToken', idToken); form.set('id', id);
-      const r = await fetch(WEB_APP_BASE, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: form.toString() });
-      const j = await r.json().catch(()=>null);
-      if (!r.ok || (j && j.error)) throw new Error(j?JSON.stringify(j):'delete failed');
-      await loadList();
-      toast('success','ลบแล้ว');
-    }catch(e){
-      swalError('ลบไม่สำเร็จ');
-    }finally{
-      isBusy = false; showOverlay(false);
-    }
-  }
-
-  // ===== Image helpers =====
-  function fileToDataURL(file){
-    return new Promise((resolve,reject)=>{
-      const fr = new FileReader();
-      fr.onload = ()=>resolve(fr.result);
-      fr.onerror = reject;
-      fr.readAsDataURL(file);
+    // รองรับผลลัพธ์หลัง redirect (optional)
+    getRedirectResult(auth).catch((err)=>{
+      console.error(err);
     });
-  }
+  </script>
+  ====== จบส่วน Firebase ====== -->
 
-  async function compressImage(file, maxSide=1280){
-    // ย่อรูปด้วย canvas (รักษา EXIF orientation แบบง่ายๆ: ไม่หมุน)
-    const img = await new Promise((res,rej)=>{
-      const i = new Image();
-      i.onload = ()=>res(i);
-      i.onerror = rej;
-      i.src = URL.createObjectURL(file);
-    });
-    const {width, height} = img;
-    const scale = Math.min(1, maxSide / Math.max(width, height));
-    if (scale === 1) return file;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(width * scale);
-    canvas.height = Math.round(height * scale);
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise(res=> canvas.toBlob(res, 'image/jpeg', 0.85));
-    return new File([blob], file.name.replace(/\.\w+$/, '.jpg'), {type:'image/jpeg'});
-  }
-
-  // Bind basic actions
-  $('btnSearch').addEventListener('click', ()=>{ page=1; loadList(); });
-</script>
+  <script>
+    // ปีปัจจุบันใน footer
+    document.getElementById('y').textContent = new Date().getFullYear();
+  </script>
 </body>
 </html>
