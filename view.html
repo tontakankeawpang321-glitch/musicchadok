@@ -2,8 +2,15 @@
 <html lang="th">
 <head>
 <meta charset="utf-8"/>
-<meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' https://accounts.google.com;">
-
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' https://accounts.google.com https://connect.facebook.net;
+  connect-src 'self' https://script.google.com https://oauth2.googleapis.com https://accounts.google.com https://apis.google.com;
+  img-src 'self' data: https://lh3.googleusercontent.com https://scontent.xx.fbcdn.net;
+  style-src 'self' 'unsafe-inline';
+  frame-src https://www.facebook.com;
+  child-src https://www.facebook.com;
+">
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>อ่านกระทู้</title>
 <style>
