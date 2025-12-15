@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>มาราคัสจำลอง + บันทึกเสียง (Maracas Simulator + Rec)</title>
+    <style>
+        /* รีเซ็ตการตั้งค่าพื้นฐาน */
+        * {
+            box-sizing: border-box;
+            user-select: none; /* ห้ามคลุมดำ */
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent; /* ลบสีไฮไลท์เวลากดบนมือถือ */
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #2c3e50;
+            background-image: radial-gradient(circle at center, #34495e 0%, #2c3e50 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden; /* ห้ามสกรอลล์ */
+            touch-action: none; /* ห้าม gesture ของ browser */
+        }
+
+        /* ส่วนหัวข้อ */
+        header {
+            position: absolute;
+            top: 20px;
+            color: white;
+            text-align: center;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            color: #f1c40f;
+        }
+
+        p {
+            margin: 5px 0 0;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        /* พื้นที่วางมาราคัส */
+        .stage {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px; /* ระยะห่างระหว่างมาราคัส */
+            width: 100%;
+            height: 100%;
+            padding: 20px;
+            padding-bottom: 80px; /* เว้นที่ให้ปุ่มอัดเสียง */
+        }
+
+        /* ตัวมาราคัส */
+        .maraca-container {
+            position: relative;
+            width: 40vw; /* ความกว้างสัมพันธ์กับจอ */
+            max-width: 200px;
+            height: 60vh;
+            max-height: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .maraca {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transform-origin: center bottom; /* จุดหมุนอยู่ที่ด้ามจับ */
+        }
+
+        /* ส่วนหัวมาราคัส */
+        .head {
+            width: 100%;
+            height: 65%;
+            background: radial-gradient(circle at 30% 30%, #e74c3c, #c0392b);
+            border-radius: 50% 50% 45% 45%;
+            position: relative;
+            z-index: 2;
+            box-shadow: 
+                inset -10px -10px 20px rgba(0,0,0,0.3),
+                5px 5px 15px rgba(0,0,0,0.4);
+            border: 4px solid #c0392b;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* ลวดลายตกแต่ง */
+        .pattern-stripe {
+            position: absolute;
+            width: 110%;
+            height: 20px;
+            background-color: #f1c40f;
+            transform: rotate(-10deg);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .pattern-stripe.top { top: 30%; }
+        .pattern-stripe.bottom { top: 60%; background-color: #2ecc71; }
+
+        /* ด้ามจับ */
+        .handle {
+            width: 25%;
+            height: 40%;
+            background: linear-gradient(90deg, #8e44ad, #9b59b6, #8e44ad);
+            margin-top: -10%; /* ให้ซ้อนเข้าไปในหัวนิดหน่อย */
+            border-radius: 0 0 15px 15px;
+            z-index: 1;
+            box-shadow: 2px 5px 10px rgba(0,0,0,0.5);
+            position: relative;
+        }
+        /* ลายไม้ที่ด้าม */
+        .handle::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 2px, transparent 2px, transparent 4px);
+            border-radius: 0 0 15px 15px;
+        }
+
+        /* Animation class */
+        .shaking .maraca {
+            animation: shake-anim 0.15s ease-in-out;
+        }
+
+        .shaking .head {
+            filter: brightness(1.1); /* สว่างขึ้นตอนเขย่า */
+        }
+
+        @keyframes shake-anim {
+            0% { transform: rotate(0deg) translateY(0); }
+            25% { transform: rotate(-10deg) translateY(-10px); }
+            50% { transform: rotate(10deg) translateY(0); }
+            75% { transform: rotate(-5deg) translateY(-5px); }
+            100% { transform: rotate(0deg) translateY(0); }
+        }
+
+        /* หน้าจอเริ่ม (Overlay) */
+        #start-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: white;
+            transition: opacity 0.5s;
+        }
+
+        .btn-start {
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* ส่วนควบคุมการบันทึกเสียง */
+        #recording-controls {
+            position: absolute;
+            bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            z-index: 20;
+        }
+
+        .rec-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 3px solid white;
+            background-color: rgba(0, 0, 0, 0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .rec-inner {
+            width: 25px;
+            height: 25px;
+            background-color: #e74c3c;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+
+        /* สถานะกำลังอัด */
+        .is-recording .rec-btn {
+            border-color: #e74c3c;
+            background-color: rgba(231, 76, 60, 0.1);
+        }
+        
+        .is-recording .rec-inner {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px; /* เปลี่ยนเป็นสี่เหลี่ยมเมื่อหยุด */
+            background-color: #e74c3c;
+            animation: blink 1s infinite;
+        }
+
+        .rec-status {
+            color: white;
+            font-size: 0.9rem;
+            background: rgba(0,0,0,0.5);
+            padding: 4px 10px;
+            border-radius: 10px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .is-recording + .rec-status {
+            opacity: 1;
+        }
+
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* สำหรับมือถือแนวนอน */
+        @media (max-height: 500px) {
+            .maraca-container {
+                height: 70vh;
+                width: 30vw;
+            }
+            h1 { font-size: 1.2rem; }
+            .stage { padding-bottom: 20px; }
+            #recording-controls {
+                right: 20px;
+                bottom: auto;
+                top: 50%;
+                transform: translateY(-50%);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>MARACAS</h1>
+        <p>แตะเขย่า & บันทึกเสียง</p>
+    </header>
+
+    <!-- พื้นที่แสดงผล -->
+    <div class="stage">
+        <!-- มาราคัสซ้าย -->
+        <div class="maraca-container" id="maraca-left">
+            <div class="maraca">
+                <div class="head">
+                    <div class="pattern-stripe top"></div>
+                    <div class="pattern-stripe bottom"></div>
+                </div>
+                <div class="handle"></div>
+            </div>
+        </div>
+
+        <!-- มาราคัสขวา -->
+        <div class="maraca-container" id="maraca-right">
+            <div class="maraca">
+                <div class="head" style="background: radial-gradient(circle at 30% 30%, #f1c40f, #f39c12); border-color: #f39c12;">
+                    <div class="pattern-stripe top" style="background-color: #e74c3c;"></div>
+                    <div class="pattern-stripe bottom" style="background-color: #3498db;"></div>
+                </div>
+                <div class="handle"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ปุ่มควบคุมการอัดเสียง -->
+    <div id="recording-controls">
+        <div id="rec-toggle-btn" class="rec-btn">
+            <div class="rec-inner"></div>
+        </div>
+        <div class="rec-status">กำลังบันทึก...</div>
+    </div>
+
+    <!-- ปุ่มเริ่ม (เพื่อเปิด AudioContext) -->
+    <div id="start-overlay">
+        <div style="text-align: center;">
+            <div style="font-size: 3rem; margin-bottom: 20px;">🎶</div>
+            <button class="btn-start" id="start-btn">แตะเพื่อเริ่มเล่น</button>
+            <p style="margin-top: 15px; color: #aaa;">เปิดเสียงอุปกรณ์ของคุณด้วยนะครับ</p>
+        </div>
+    </div>
+
+    <script>
+        // --- ส่วนจัดการเสียง (Web Audio API) ---
+        let audioCtx;
+        let masterGainNode; // Node รวมเสียงทั้งหมดก่อนส่งออก
+        let destForRecording; // Node สำหรับส่งเสียงไปบันทึก
+        let mediaRecorder; // ตัวบันทึกเสียง
+        let recordedChunks = []; // เก็บข้อมูลเสียงที่บันทึก
+        let isRecording = false;
+        
+        // สร้างเสียง Noise (เสียงซ่า) ใส่ Buffer ไว้ล่วงหน้าเพื่อความเร็ว
+        let noiseBuffer;
+
+        function initAudio() {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+
+            // 1. สร้าง Master Gain เพื่อรวมเสียงทุกอย่าง
+            masterGainNode = audioCtx.createGain();
+            masterGainNode.gain.value = 1.0;
+
+            // 2. ต่อ Master Gain ไปที่ลำโพง (เพื่อให้เราได้ยินเสียง)
+            masterGainNode.connect(audioCtx.destination);
+
+            // 3. เตรียมการบันทึกเสียง (Stream Destination)
+            destForRecording = audioCtx.createMediaStreamDestination();
+            masterGainNode.connect(destForRecording); // ต่อ Master ไปที่ตัวบันทึกด้วย
+
+            // 4. Setup MediaRecorder
+            try {
+                mediaRecorder = new MediaRecorder(destForRecording.stream);
+                
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) {
+                        recordedChunks.push(e.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    // สร้าง Blob ไฟล์เสียง
+                    const blob = new Blob(recordedChunks, { 'type' : 'audio/webm' });
+                    recordedChunks = []; // เคลียร์ buffer
+                    
+                    // สร้าง Link ดาวน์โหลด
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    document.body.appendChild(a);
+                    a.style = 'display: none';
+                    a.href = url;
+                    a.download = 'my-maracas-song.webm'; // ชื่อไฟล์
+                    a.click();
+                    
+                    // Cleanup
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                };
+            } catch (err) {
+                console.error("MediaRecorder not supported or error:", err);
+                alert("อุปกรณ์นี้อาจไม่รองรับการบันทึกเสียง");
+            }
+
+            // สร้าง White Noise 2 วินาที
+            const bufferSize = audioCtx.sampleRate * 2; 
+            noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+        }
+
+        // ฟังก์ชันสร้างเสียงเขย่า 1 ครั้ง
+        function playShakeSound(panVal = 0) {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const t = audioCtx.currentTime;
+
+            // 1. แหล่งกำเนิดเสียง (Noise)
+            const source = audioCtx.createBufferSource();
+            source.buffer = noiseBuffer;
+
+            // 2. Filter
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = "bandpass";
+            filter.frequency.value = 4000 + (Math.random() * 1000);
+            filter.Q.value = 1;
+
+            // 3. Gain (Envelope)
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0, t);
+            gainNode.gain.linearRampToValueAtTime(0.8 + (Math.random() * 0.2), t + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+
+            // 4. Stereo Panner
+            const panner = audioCtx.createStereoPanner();
+            panner.pan.value = panVal;
+
+            // เชื่อมต่อกราฟเสียง: Source -> Filter -> Gain -> Panner -> MASTER GAIN
+            // (เปลี่ยนจาก connect(destination) เป็น connect(masterGainNode))
+            source.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(panner);
+            panner.connect(masterGainNode); // สำคัญ! ต้องต่อเข้า Master เพื่อให้เสียงถูกบันทึก
+
+            // เล่นเสียง
+            source.start(t);
+            source.stop(t + 0.2);
+        }
+
+
+        // --- ส่วนจัดการ UI และ Event Listeners ---
+        const leftMaraca = document.getElementById('maraca-left');
+        const rightMaraca = document.getElementById('maraca-right');
+        const startOverlay = document.getElementById('start-overlay');
+        const startBtn = document.getElementById('start-btn');
+        const recToggleBtn = document.getElementById('rec-toggle-btn');
+        const recordingControls = document.getElementById('recording-controls');
+
+        // ฟังก์ชันเขย่า
+        function triggerShake(element, pan) {
+            // เล่นเสียง
+            playShakeSound(pan);
+
+            // เล่น Animation
+            element.classList.remove('shaking');
+            void element.offsetWidth; // Trigger reflow
+            element.classList.add('shaking');
+
+            // สั่นมือถือ
+            if (navigator.vibrate) {
+                navigator.vibrate(15); 
+            }
+        }
+
+        // เริ่มต้นแอป
+        startBtn.addEventListener('click', () => {
+            initAudio();
+            startOverlay.style.opacity = '0';
+            setTimeout(() => {
+                startOverlay.style.display = 'none';
+            }, 500);
+        });
+
+        // ฟังก์ชันสลับการอัดเสียง
+        recToggleBtn.addEventListener('click', () => {
+            if (!audioCtx) {
+                alert("กรุณากดปุ่มเริ่มเล่นก่อนครับ");
+                return;
+            }
+
+            if (!isRecording) {
+                // เริ่มอัด
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                mediaRecorder.start();
+                isRecording = true;
+                recordingControls.classList.add('is-recording');
+            } else {
+                // หยุดอัด
+                mediaRecorder.stop();
+                isRecording = false;
+                recordingControls.classList.remove('is-recording');
+            }
+        });
+
+        // จัดการ Touch/Click Events
+        function addInteraction(element, pan) {
+            element.addEventListener('contextmenu', e => e.preventDefault());
+            element.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                triggerShake(element, pan);
+            });
+        }
+
+        addInteraction(leftMaraca, -0.8);
+        addInteraction(rightMaraca, 0.8);
+
+        // Keyboard Support
+        document.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            if (e.key === 'ArrowLeft' || e.key === 'a') {
+                triggerShake(leftMaraca, -0.8);
+            }
+            if (e.key === 'ArrowRight' || e.key === 'd') {
+                triggerShake(rightMaraca, 0.8);
+            }
+        });
+
+    </script>
+</body>
+</html>

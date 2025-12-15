@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>คาวเบลจำลอง (Ultimate Cowbell)</title>
+    <style>
+        /* รีเซ็ตค่าพื้นฐาน */
+        * {
+            box-sizing: border-box;
+            touch-action: none; /* ป้องกันการเลื่อน/ซูมบนมือถือ */
+            user-select: none; /* ป้องกันการเลือกข้อความ */
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* พื้นหลังที่มีการไล่เฉดสี */
+        .bg-gradient {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #333 0%, #000 100%);
+            z-index: -1;
+        }
+
+        /* คอนเทนเนอร์หลัก */
+        #app-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* ปุ่มควบคุมการบันทึก */
+        .controls-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+        }
+
+        .record-btn {
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #555;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s;
+        }
+
+        .record-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #888;
+        }
+
+        .record-btn.recording {
+            background: rgba(231, 76, 60, 0.2);
+            border-color: #e74c3c;
+            color: #e74c3c;
+        }
+
+        .indicator {
+            width: 12px;
+            height: 12px;
+            background-color: #e74c3c;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .recording .indicator {
+            animation: blink 1s infinite;
+            background-color: #e74c3c;
+            box-shadow: 0 0 10px #e74c3c;
+            border-radius: 2px; /* เปลี่ยนเป็นสี่เหลี่ยมเมื่ออัด (Stop icon style) */
+        }
+
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+
+        /* ตัวคาวเบล (วาดด้วย CSS ล้วนๆ เพื่อความคมชัด) */
+        .cowbell-wrapper {
+            position: relative;
+            width: 300px;
+            height: 380px;
+            cursor: pointer;
+            transition: transform 0.05s ease-out;
+            transform-origin: center top;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+        }
+
+        .cowbell-top {
+            width: 160px;
+            height: 60px;
+            background: linear-gradient(90deg, #555, #888, #555);
+            margin: 0 auto;
+            border-radius: 10px 10px 0 0;
+            position: relative;
+            z-index: 2;
+            box-shadow: inset 0 -5px 10px rgba(0,0,0,0.3);
+        }
+
+        /* หูหิ้ว */
+        .cowbell-handle {
+            width: 80px;
+            height: 40px;
+            border: 8px solid #aaa;
+            border-bottom: none;
+            position: absolute;
+            top: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 20px 20px 0 0;
+            z-index: 1;
+            background: transparent;
+        }
+
+        .cowbell-body {
+            width: 260px;
+            height: 280px;
+            background: linear-gradient(135deg, #2c2c2c 0%, #4a4a4a 50%, #222 100%);
+            margin: 0 auto;
+            clip-path: polygon(15% 0, 85% 0, 100% 100%, 0% 100%);
+            position: relative;
+            top: -1px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding-bottom: 20px;
+        }
+
+        /* เงาและไฮไลท์เพื่อให้ดูเป็นโลหะ 3 มิติ */
+        .cowbell-body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 20%;
+            width: 60%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+            pointer-events: none;
+        }
+
+        .cowbell-body::after {
+            content: '';
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            height: 2px;
+            background: rgba(0,0,0,0.5);
+        }
+
+        /* ปากระฆัง (ส่วนเปิด) */
+        .cowbell-opening {
+            width: 260px;
+            height: 40px;
+            background: #111;
+            margin: 0 auto;
+            border-radius: 0 0 10px 10px; /* ลดความโค้งลง */
+            position: relative;
+            top: -2px;
+            box-shadow: inset 0 10px 15px rgba(0,0,0,0.8);
+            clip-path: polygon(0 0, 100% 0, 95% 100%, 5% 100%); /* ทำให้ปากสอบเข้าเล็กน้อย */
+        }
+        
+        /* สัญลักษณ์หรือโลโก้ */
+        .logo {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.15);
+            font-size: 2rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            pointer-events: none;
+        }
+
+        /* ข้อความแนะนำ */
+        .hint {
+            margin-top: 30px;
+            color: #888;
+            font-size: 1.2rem;
+            animation: pulse 2s infinite;
+            text-align: center;
+        }
+
+        /* ปุ่มเริ่ม (Overlay) */
+        #start-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.5s;
+        }
+
+        .start-btn {
+            padding: 20px 40px;
+            font-size: 1.5rem;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(231, 76, 60, 0.5);
+            animation: bounce 1s infinite alternate;
+        }
+
+        /* เอฟเฟกต์ตอนตี */
+        .hit-anim {
+            animation: shake 0.1s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        /* Visual Ripple Effect */
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.4);
+            transform: scale(0);
+            animation: ripple-anim 0.6s linear;
+            pointer-events: none;
+        }
+
+        @keyframes ripple-anim {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0) rotate(-2deg); }
+            20%, 80% { transform: translate3d(4px, 0, 0) rotate(2deg); }
+            30%, 50%, 70% { transform: translate3d(-8px, 0, 0) rotate(-4deg); }
+            40%, 60% { transform: translate3d(8px, 0, 0) rotate(4deg); }
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+        
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-10px); }
+        }
+
+        /* Responsive สำหรับมือถือ */
+        @media (max-width: 600px) {
+            .cowbell-wrapper {
+                transform: scale(0.8);
+            }
+            .hint {
+                font-size: 1rem;
+            }
+            .controls-container {
+                top: 10px;
+                right: 10px;
+            }
+            .record-btn {
+                padding: 8px 15px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="bg-gradient"></div>
+
+    <!-- ปุ่มควบคุมการบันทึก -->
+    <div class="controls-container">
+        <button id="record-btn" class="record-btn">
+            <span class="indicator"></span>
+            <span id="record-text">บันทึกเสียง</span>
+        </button>
+    </div>
+
+    <!-- หน้าจอเริ่ม (จำเป็นสำหรับ Web Audio API) -->
+    <div id="start-overlay">
+        <h1>Cowbell Simulator</h1>
+        <p style="margin-bottom: 20px; color: #ccc;">More Cowbell?</p>
+        <button class="start-btn" id="start-btn">แตะเพื่อเริ่มตี!</button>
+    </div>
+
+    <div id="app-container">
+        <div class="cowbell-wrapper" id="cowbell">
+            <div class="cowbell-handle"></div>
+            <div class="cowbell-top"></div>
+            <div class="cowbell-body">
+                <span class="logo">MORE BELL</span>
+            </div>
+            <div class="cowbell-opening"></div>
+        </div>
+        <div class="hint">แตะที่ระฆังเพื่อตี! (รองรับมัลติทัช)</div>
+    </div>
+
+    <script>
+        // --- ส่วนจัดการเสียง (Audio Engine) ---
+        
+        // ใช้ Web Audio API เพื่อสังเคราะห์เสียง
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        let masterGain; // Master node เพื่อรวมเสียงทั้งหมด (ใช้สำหรับการบันทึก)
+        
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+                
+                // สร้าง Master Gain เพื่อเป็นจุดรวมเสียงก่อนส่งออกลำโพง
+                masterGain = audioCtx.createGain();
+                masterGain.connect(audioCtx.destination);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        /**
+         * สร้างเสียง Cowbell สังเคราะห์
+         */
+        function playCowbellSound(velocity = 1.0) {
+            if (!audioCtx) return;
+
+            const t = audioCtx.currentTime;
+            
+            // สร้าง Oscillator 1 (เสียงหลัก High)
+            const osc1 = audioCtx.createOscillator();
+            const gain1 = audioCtx.createGain();
+            osc1.type = 'square';
+            osc1.frequency.setValueAtTime(800, t);
+            osc1.connect(gain1);
+            // เชื่อมต่อไปยัง Master Gain แทน destination โดยตรง
+            gain1.connect(masterGain);
+
+            // สร้าง Oscillator 2 (เสียงรอง Low)
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.type = 'sawtooth';
+            osc2.frequency.setValueAtTime(540, t);
+            osc2.connect(gain2);
+            gain2.connect(masterGain); // เชื่อมต่อ Master Gain
+
+            // Filter
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 1200;
+            filter.Q.value = 1;
+
+            osc1.disconnect();
+            osc2.disconnect();
+            osc1.connect(filter);
+            osc2.connect(filter);
+            // เชื่อม filter กลับเข้า gain1 (ซึ่งต่อกับ masterGain แล้ว)
+            filter.connect(gain1); 
+
+            // Envelope (ADSR)
+            gain1.gain.setValueAtTime(0, t);
+            gain1.gain.linearRampToValueAtTime(velocity * 0.8, t + 0.005);
+            gain1.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+
+            // เริ่มและหยุด
+            osc1.start(t);
+            osc2.start(t);
+            osc1.stop(t + 0.4);
+            osc2.stop(t + 0.4);
+        }
+
+        // --- ส่วนการบันทึกเสียง (Recording) ---
+        let mediaRecorder;
+        let recordedChunks = [];
+        let isRecording = false;
+        let recordingDest;
+
+        const recordBtn = document.getElementById('record-btn');
+        const recordText = document.getElementById('record-text');
+
+        function toggleRecording() {
+            if (!isAudioReady) return;
+
+            if (!isRecording) {
+                // เริ่มบันทึก
+                startRecording();
+            } else {
+                // หยุดบันทึก
+                stopRecording();
+            }
+        }
+
+        function startRecording() {
+            // สร้าง Destination สำหรับบันทึกเสียงจาก Web Audio API
+            recordingDest = audioCtx.createMediaStreamDestination();
+            masterGain.connect(recordingDest); // ต่อเสียงจาก Master เข้าเครื่องบันทึก
+
+            // ตรวจสอบประเภทไฟล์ที่รองรับ
+            let mimeType = 'audio/webm'; // Default for Chrome/Firefox
+            if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                mimeType = 'audio/mp4'; // Safari
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(recordingDest.stream, { mimeType });
+            } catch (e) {
+                // Fallback ถ้า option ไม่ผ่าน
+                mediaRecorder = new MediaRecorder(recordingDest.stream);
+            }
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    recordedChunks.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
+                const url = URL.createObjectURL(blob);
+                
+                // สร้างลิงก์ดาวน์โหลด
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                const ext = mimeType.includes('mp4') ? 'm4a' : 'webm';
+                a.download = `cowbell-session-${Date.now()}.${ext}`;
+                document.body.appendChild(a);
+                a.click();
+                
+                // คืนค่าหน่วยความจำ
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+                
+                // ล้างข้อมูล
+                recordedChunks = [];
+                // ตัดการเชื่อมต่อเครื่องบันทึกเพื่อประหยัดทรัพยากร
+                masterGain.disconnect(recordingDest);
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            
+            // อัปเดต UI
+            recordBtn.classList.add('recording');
+            recordText.innerText = "หยุดบันทึก";
+        }
+
+        function stopRecording() {
+            mediaRecorder.stop();
+            isRecording = false;
+            
+            // อัปเดต UI
+            recordBtn.classList.remove('recording');
+            recordText.innerText = "บันทึกเสียง";
+        }
+
+        recordBtn.addEventListener('click', toggleRecording);
+        // ป้องกัน event ชนกันบนมือถือ
+        recordBtn.addEventListener('touchstart', (e) => {
+            e.stopPropagation(); // หยุดไม่ให้ตีกลองตอนกดปุ่ม
+        });
+        recordBtn.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+        });
+
+
+        // --- ส่วนจัดการหน้าจอและการโต้ตอบ (UI & Interaction) ---
+
+        const cowbell = document.getElementById('cowbell');
+        const startOverlay = document.getElementById('start-overlay');
+        const startBtn = document.getElementById('start-btn');
+        let isAudioReady = false;
+
+        // ฟังก์ชันเริ่มแอป (ปลดล็อก AudioContext)
+        function startApp() {
+            initAudio();
+            isAudioReady = true;
+            startOverlay.style.opacity = '0';
+            setTimeout(() => {
+                startOverlay.style.display = 'none';
+            }, 500);
+        }
+
+        startBtn.addEventListener('click', startApp);
+        startBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault(); 
+            startApp();
+        });
+
+        // ฟังก์ชันตีระฆัง
+        function triggerBell(e) {
+            if (!isAudioReady) return;
+
+            // 1. เล่นเสียง
+            const velocity = 0.8 + Math.random() * 0.2; 
+            playCowbellSound(velocity);
+
+            // 2. เอฟเฟกต์ภาพ (สั่น)
+            cowbell.classList.remove('hit-anim');
+            void cowbell.offsetWidth; 
+            cowbell.classList.add('hit-anim');
+
+            // 3. สร้าง Ripple effect
+            createRipple(e);
+        }
+
+        function createRipple(e) {
+            const rect = cowbell.getBoundingClientRect();
+            let clientX, clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            const circle = document.createElement('span');
+            circle.classList.add('ripple');
+            const diameter = Math.max(rect.width, rect.height) / 2;
+            const radius = diameter / 2;
+
+            circle.style.width = circle.style.height = `${diameter}px`;
+            circle.style.left = `${x - radius}px`;
+            circle.style.top = `${y - radius}px`;
+
+            cowbell.appendChild(circle);
+
+            setTimeout(() => {
+                circle.remove();
+            }, 600);
+        }
+
+        cowbell.addEventListener('pointerdown', (e) => {
+            e.preventDefault(); 
+            triggerBell(e);
+            cowbell.style.transform = 'scale(0.95) rotate(' + (Math.random() * 2 - 1) + 'deg)';
+        });
+
+        cowbell.addEventListener('pointerup', () => {
+             cowbell.style.transform = 'scale(1) rotate(0deg)';
+        });
+        
+        cowbell.addEventListener('pointerleave', () => {
+             cowbell.style.transform = 'scale(1) rotate(0deg)';
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if ((e.code === 'Space' || e.code === 'Enter') && isAudioReady) {
+                const mockEvent = {
+                    clientX: cowbell.getBoundingClientRect().left + 150,
+                    clientY: cowbell.getBoundingClientRect().top + 150
+                };
+                triggerBell(mockEvent);
+                cowbell.style.transform = 'scale(0.95)';
+            }
+        });
+
+        document.addEventListener('keyup', () => {
+            cowbell.style.transform = 'scale(1)';
+        });
+
+    </script>
+</body>
+</html>

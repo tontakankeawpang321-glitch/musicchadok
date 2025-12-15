@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>เครื่องเล่นแมนโดลินจำลอง (Virtual Mandolin)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #2d3748;
+            color: white;
+            overflow: hidden; /* Prevent scrolling on mobile */
+            touch-action: none; /* Disable default touch actions */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Wood Texture for the Neck */
+        .fretboard {
+            background: linear-gradient(90deg, #5D4037 0%, #3E2723 100%);
+            box-shadow: inset 0 0 20px #000;
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        /* Frets (Metal bars) */
+        .fret-line {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(to right, #999, #fff, #999);
+            box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        /* Inlay Markers (Dots) */
+        .inlay {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: radial-gradient(circle, #fff, #ccc);
+            border-radius: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.8;
+            pointer-events: none;
+            z-index: 5;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+
+        /* Strings */
+        .string-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .string-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 2px; /* Base thickness */
+            background: linear-gradient(to bottom, #d4d4d4, #888);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            z-index: 20;
+            pointer-events: none;
+            transition: transform 0.05s ease;
+        }
+
+        /* Animation class for vibration */
+        .vibrating {
+            animation: vibrate 0.1s infinite;
+        }
+
+        @keyframes vibrate {
+            0% { transform: translateY(0); }
+            25% { transform: translateY(1px); }
+            50% { transform: translateY(0); }
+            75% { transform: translateY(-1px); }
+            100% { transform: translateY(0); }
+        }
+
+        /* Interaction Zone (The clickable area between frets) */
+        .note-zone {
+            height: 100%;
+            border-right: 1px solid rgba(255,255,255,0.05);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.1s;
+        }
+
+        .note-zone:active, .note-zone.active {
+            background-color: rgba(255, 215, 0, 0.3); /* Gold highlight */
+        }
+        
+        /* Visual cue for note press */
+        .finger-dot {
+            width: 20px;
+            height: 20px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            display: none;
+            box-shadow: 0 0 10px white;
+            z-index: 25;
+        }
+
+        .note-zone.active .finger-dot {
+            display: block;
+        }
+
+        /* Note Labels */
+        .note-label {
+            position: absolute;
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(0,0,0,0.4);
+            padding: 1px 4px;
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 22;
+            opacity: 0; /* Hidden by default */
+            transition: opacity 0.3s;
+        }
+
+        /* Toggle class to show notes */
+        .show-notes-active .note-label {
+            opacity: 1;
+        }
+
+        /* Start Overlay */
+        #start-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+        }
+
+        .glow-btn {
+            box-shadow: 0 0 15px rgba(234, 179, 8, 0.6);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(234, 179, 8, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0); }
+        }
+        
+        /* Recording Animation */
+        @keyframes recordPulse {
+            0% { background-color: #ef4444; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            50% { background-color: #ff0000; box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+            100% { background-color: #ef4444; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        
+        .recording-active {
+            animation: recordPulse 1.5s infinite;
+            border-color: white !important;
+        }
+
+        /* Nut (The left bar) */
+        .nut {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 12px;
+            background: #eee; /* Bone color */
+            z-index: 30;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+        }
+
+        /* Responsive adjustments */
+        .rotate-msg {
+            display: none;
+        }
+        @media screen and (orientation: portrait) {
+            .rotate-msg {
+                display: block;
+                color: #fbbf24;
+                font-size: 0.8rem;
+                margin-top: 10px;
+            }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-center bg-gray-900">
+
+    <!-- Start Overlay -->
+    <div id="start-overlay">
+        <h1 class="text-4xl font-bold text-yellow-500 mb-2">Mandolin Simulator</h1>
+        <p class="text-gray-300 mb-8 text-xl">เครื่องเล่นแมนโดลินจำลอง</p>
+        <button id="start-btn" class="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-4 px-10 rounded-full text-2xl glow-btn transition transform hover:scale-105">
+            แตะเพื่อเริ่มเล่น (Start)
+        </button>
+        <p class="mt-4 text-gray-400 text-sm">แนะนำ: เล่นในแนวนอน (Landscape) เพื่อความถนัด</p>
+    </div>
+
+    <!-- Main Interface -->
+    <div class="w-full max-w-6xl p-2 flex flex-col h-full justify-center">
+        
+        <!-- Header Controls -->
+        <div class="flex justify-between items-center mb-2 px-4">
+            <div>
+                <h2 class="text-2xl font-bold text-yellow-100">Mandolin <span class="text-yellow-500">Thai</span></h2>
+                <p class="text-xs text-gray-400">G3 - D4 - A4 - E5 (Standard Tuning)</p>
+            </div>
+            
+            <div class="flex gap-3 items-center">
+                <!-- Record Button -->
+                <button id="record-btn" class="bg-red-600 hover:bg-red-700 text-white text-xs py-2 px-4 rounded border border-red-500 transition flex items-center gap-2">
+                    <div id="record-dot" class="w-2 h-2 rounded-full bg-white"></div>
+                    <span id="record-text">อัดเสียง (REC)</span>
+                </button>
+
+                <button id="toggle-notes-btn" class="bg-gray-700 hover:bg-gray-600 text-white text-xs py-2 px-4 rounded border border-gray-500 transition">
+                    แสดงโน้ต
+                </button>
+                <div class="text-right hidden sm:block">
+                    <div class="text-xs text-gray-400 rotate-msg">แนะนำ: หมุนจอเป็นแนวนอน</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fretboard Area -->
+        <div id="fretboard" class="fretboard w-full flex-grow border-4 border-gray-800 relative select-none">
+            <div class="nut"></div>
+            <!-- Dynamic Content Generated by JS -->
+        </div>
+
+    </div>
+
+    <script>
+        // Audio Context Setup
+        let audioCtx;
+        let dest; // MediaStreamDestination for recording
+        let mediaRecorder;
+        let recordedChunks = [];
+        let isRecording = false;
+
+        const startBtn = document.getElementById('start-btn');
+        const startOverlay = document.getElementById('start-overlay');
+        const fretboard = document.getElementById('fretboard');
+        const toggleNotesBtn = document.getElementById('toggle-notes-btn');
+        const recordBtn = document.getElementById('record-btn');
+        const recordText = document.getElementById('record-text');
+        const recordDot = document.getElementById('record-dot');
+
+        // Configuration
+        const numStrings = 4;
+        const numFrets = 13; // 0 (Open) + 12 frets
+        // Standard Mandolin Tuning: G3, D4, A4, E5
+        const openStringFreqs = [196.00, 293.66, 440.00, 659.25].reverse(); // E (high) to G (low)
+        // Note calculation helper
+        const chromaticScale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const stringBaseNoteIndices = [4, 9, 2, 7]; // E, A, D, G indices in chromaticScale
+
+        let isAudioStarted = false;
+        let notesVisible = false;
+
+        async function initAudio() {
+            if (isAudioStarted) return;
+            
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            
+            // Unlock audio on iOS/Chrome
+            if (audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+            }
+
+            // Create Media Stream Destination for recording
+            dest = audioCtx.createMediaStreamDestination();
+
+            // Master compressor to prevent clipping when strumming hard
+            const compressor = audioCtx.createDynamicsCompressor();
+            compressor.threshold.setValueAtTime(-24, audioCtx.currentTime);
+            compressor.knee.setValueAtTime(30, audioCtx.currentTime);
+            compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+            compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+            compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+            
+            // Connect: Compressor -> Speakers
+            compressor.connect(audioCtx.destination);
+            // Connect: Compressor -> Recorder
+            compressor.connect(dest);
+            
+            // Master Gain
+            window.masterGain = audioCtx.createGain();
+            window.masterGain.gain.value = 0.6;
+            window.masterGain.connect(compressor);
+
+            isAudioStarted = true;
+            startOverlay.style.opacity = '0';
+            setTimeout(() => startOverlay.style.display = 'none', 500);
+        }
+
+        startBtn.addEventListener('click', initAudio);
+        startBtn.addEventListener('touchstart', initAudio);
+
+        // Toggle Notes
+        toggleNotesBtn.addEventListener('click', () => {
+            notesVisible = !notesVisible;
+            if (notesVisible) {
+                fretboard.classList.add('show-notes-active');
+                toggleNotesBtn.classList.remove('bg-gray-700');
+                toggleNotesBtn.classList.add('bg-yellow-600');
+            } else {
+                fretboard.classList.remove('show-notes-active');
+                toggleNotesBtn.classList.add('bg-gray-700');
+                toggleNotesBtn.classList.remove('bg-yellow-600');
+            }
+        });
+
+        // --- Recording Logic ---
+        recordBtn.addEventListener('click', () => {
+            if (!isAudioStarted) return;
+
+            if (!isRecording) {
+                // Start Recording
+                recordedChunks = [];
+                // Check format support
+                let mimeType = 'audio/webm';
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    mimeType = 'audio/ogg'; // Fallback
+                }
+                
+                try {
+                    mediaRecorder = new MediaRecorder(dest.stream, { mimeType: mimeType });
+                } catch (e) {
+                    alert('Browser not supporting MediaRecorder. Try Chrome or Firefox.');
+                    return;
+                }
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: mimeType });
+                    const url = URL.createObjectURL(blob);
+                    
+                    // Create Download Link
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    const timestamp = new Date().toLocaleTimeString('th-TH').replace(/:/g, '-');
+                    a.download = `mandolin-recording-${timestamp}.${mimeType === 'audio/webm' ? 'webm' : 'ogg'}`;
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Cleanup
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                    }, 100);
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                
+                // UI Update
+                recordBtn.classList.add('recording-active');
+                recordText.innerText = 'หยุด/บันทึก';
+                recordDot.classList.add('bg-red-600'); 
+                recordDot.classList.remove('bg-white');
+
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+
+                // UI Update
+                recordBtn.classList.remove('recording-active');
+                recordText.innerText = 'อัดเสียง (REC)';
+                recordDot.classList.remove('bg-red-600');
+                recordDot.classList.add('bg-white');
+            }
+        });
+
+
+        // --- Sound Synthesis Engine ---
+        function playNote(freq, stringIndex) {
+            if (!audioCtx) return;
+
+            const now = audioCtx.currentTime;
+            
+            // Create two oscillators for the "Double String" mandolin effect
+            // Mandolin strings are in pairs.
+            const osc1 = audioCtx.createOscillator();
+            const osc2 = audioCtx.createOscillator();
+            
+            // Use Sawtooth for brightness, filtered down later
+            osc1.type = 'sawtooth';
+            osc2.type = 'sawtooth'; // or triangle for softer sound
+
+            // Detune slightly for chorus/natural effect
+            const detuneAmount = 6; // cents
+            osc1.frequency.value = freq;
+            osc2.frequency.value = freq;
+            osc1.detune.value = -detuneAmount;
+            osc2.detune.value = detuneAmount;
+
+            // Filter (Lowpass) to simulate the wood body resonance
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 3000; // Bright pluck
+            filter.Q.value = 1;
+
+            // Envelope (ADSR)
+            const gainNode = audioCtx.createGain();
+            
+            // Connect
+            osc1.connect(filter);
+            osc2.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(window.masterGain);
+
+            // Envelope Logic: Fast attack, sharp decay
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(0.8, now + 0.01); // Pluck Attack
+            gainNode.gain.exponentialRampToValueAtTime(0.1, now + 0.3); // Decay body
+            gainNode.gain.exponentialRampToValueAtTime(0.001, now + 1.5); // Long ring
+
+            osc1.start(now);
+            osc2.start(now);
+            
+            // Stop oscillators after sound is inaudible to save CPU
+            osc1.stop(now + 2);
+            osc2.stop(now + 2);
+
+            // Trigger Visual String Vibration
+            const stringEl = document.getElementById(`string-line-${stringIndex}`);
+            if(stringEl) {
+                // Remove and re-add class to restart animation
+                stringEl.classList.remove('vibrating');
+                void stringEl.offsetWidth; // trigger reflow
+                stringEl.classList.add('vibrating');
+                setTimeout(() => stringEl.classList.remove('vibrating'), 200);
+            }
+        }
+
+        // --- UI Generation ---
+        function createFretboard() {
+            // Calculated Fret Distances (Roughly mimicking spacing but optimized for touch)
+            // We use flexbox for equal spacing to make it playable on screens
+            
+            for (let s = 0; s < numStrings; s++) {
+                const stringRow = document.createElement('div');
+                stringRow.className = 'string-container flex w-full relative';
+                stringRow.style.height = `${100 / numStrings}%`;
+
+                // The visual string line
+                const stringLine = document.createElement('div');
+                stringLine.className = 'string-line';
+                stringLine.id = `string-line-${s}`;
+                // Thicker strings for lower pitch (Higher index in our reversed array loop, but visually bottom)
+                // Let's adjust thickness based on index. s=0 is High E (thin), s=3 is Low G (thick)
+                stringLine.style.height = `${1.5 + (s * 0.8)}px`; 
+                stringRow.appendChild(stringLine);
+
+                // Create Frets/Notes for this string
+                for (let f = 0; f < numFrets; f++) {
+                    const noteZone = document.createElement('div');
+                    noteZone.className = 'note-zone';
+                    
+                    // Width logic: Open string (f=0) is usually the "Nut" area, but here we treat column 0 as open string play
+                    // We distribute widths. 
+                    noteZone.style.flex = f === 0 ? '0.8' : '1'; 
+                    noteZone.dataset.string = s;
+                    noteZone.dataset.fret = f;
+                    
+                    // Calculate Frequency: f = f0 * 2^(n/12)
+                    const baseFreq = openStringFreqs[s];
+                    const freq = baseFreq * Math.pow(2, f / 12);
+                    noteZone.dataset.freq = freq;
+
+                    // Markers (Inlays) on frets 3, 5, 7, 10, 12
+                    if (s === 1 || s === 2) { // Middle of board
+                        if ([3, 5, 7, 10].includes(f)) {
+                            // Single dot
+                            if (s===1) { // Put marker between string 1 and 2 visually, usually markers are centered
+                                // Hacky way to center markers: putting them in noteZone logic would duplicate.
+                                // We'll handle markers via absolute positioning in the main loop later or simplified here.
+                            }
+                        }
+                    }
+
+                    // Touch/Click Feedback element
+                    const dot = document.createElement('div');
+                    dot.className = 'finger-dot';
+                    noteZone.appendChild(dot);
+
+                    // Note Name Label
+                    const noteIndex = (stringBaseNoteIndices[s] + f) % 12;
+                    const noteName = chromaticScale[noteIndex];
+                    
+                    const labelDiv = document.createElement('div');
+                    labelDiv.className = 'note-label';
+                    labelDiv.innerText = noteName;
+                    noteZone.appendChild(labelDiv);
+                    
+                    // Always show open string names distinctly? (Optional, existing code had a fixed label)
+                    // Let's keep the yellow fixed label for open strings for clarity
+                    if (f === 0) {
+                        const openLabel = document.createElement('span');
+                        openLabel.innerText = chromaticScale[stringBaseNoteIndices[s]]; // Or use predefined array
+                        openLabel.className = "text-yellow-500 font-bold text-sm absolute left-2 z-30 pointer-events-none";
+                        // Override the hidden class logic for open string if desired? 
+                        // No, let's let the toggler handle all notes, but keep this permanent indicator
+                        noteZone.appendChild(openLabel);
+                        noteZone.style.background = 'rgba(0,0,0,0.2)'; // Darker for nut area
+                        
+                        // Hide the dynamic label on open string to avoid duplication
+                        labelDiv.style.display = 'none';
+                    }
+
+                    // Attach Events (Pointer events cover mouse and touch)
+                    noteZone.addEventListener('pointerdown', (e) => {
+                        e.preventDefault(); // Prevent text selection
+                        noteZone.setPointerCapture(e.pointerId);
+                        handleInput(noteZone);
+                    });
+                    
+                    noteZone.addEventListener('pointerenter', (e) => {
+                        // For sliding fingers (glissando)
+                        if (e.buttons > 0) { // If mouse/touch is held down
+                             handleInput(noteZone);
+                        }
+                    });
+
+                    noteZone.addEventListener('pointerup', (e) => {
+                        noteZone.classList.remove('active');
+                        noteZone.releasePointerCapture(e.pointerId);
+                    });
+                     noteZone.addEventListener('pointerleave', (e) => {
+                        noteZone.classList.remove('active');
+                    });
+
+                    stringRow.appendChild(noteZone);
+                }
+                fretboard.appendChild(stringRow);
+            }
+
+            // Draw Fret Bars (Visual Only) - Absolute positioning over the rows
+            const rowWidth = fretboard.clientWidth;
+            // Since we used Flexbox, getting exact pixel positions is tricky for absolute lines.
+            // Instead, we used border-right on note-zone.
+            // But let's add Inlay Dots absolutely.
+            addInlays();
+        }
+
+        function addInlays() {
+            // We need to wait for layout or use percentages based on flex ratio
+            // Frets: 3, 5, 7, 10, 12
+            // Since flex is mostly 1, we can approximate percentage
+            // Total units = 0.8 (open) + 12 * 1 = 12.8
+            const unit = 100 / 12.8;
+            
+            const markers = [3, 5, 7, 10, 12];
+            markers.forEach(m => {
+                const dot = document.createElement('div');
+                dot.className = 'inlay';
+                // Calculate position: (0.8 + (m-1) + 0.5) * unit -> Center of the fret
+                const pos = (0.8 + (m - 1) + 0.5) * unit;
+                dot.style.left = `${pos}%`;
+                
+                if (m === 12) {
+                    // Double dot at 12th fret
+                    const dot2 = dot.cloneNode();
+                    dot.style.top = '33%';
+                    dot2.style.top = '66%';
+                    dot2.style.left = `${pos}%`;
+                    dot2.className = 'inlay';
+                    fretboard.appendChild(dot);
+                    fretboard.appendChild(dot2);
+                } else {
+                    fretboard.appendChild(dot);
+                }
+            });
+        }
+
+        function handleInput(element) {
+            if (!isAudioStarted) return;
+            
+            // Visual feedback
+            element.classList.add('active');
+            
+            // Audio feedback
+            const freq = parseFloat(element.dataset.freq);
+            const stringIdx = element.dataset.string;
+            playNote(freq, stringIdx);
+        }
+
+        // Initialize UI
+        window.addEventListener('load', () => {
+            createFretboard();
+        });
+
+        // Resize handler for Inlays (Simplified: just reload or accept CSS %)
+        window.addEventListener('resize', () => {
+            // Optional: Re-calculate strict positions if needed
+        });
+
+    </script>
+</body>
+</html>

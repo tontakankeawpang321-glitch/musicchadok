@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mobile Piano Pro (Downloadable)</title>
+    <!-- Tailwind CSS for layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #1a1a1a;
+            touch-action: none;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .piano-container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            height: 55vh; /* Adjusted for extra buttons */
+            margin-top: 10px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        /* White Keys */
+        .key-white {
+            flex: 1;
+            height: 100%;
+            background: linear-gradient(to bottom, #ffffff 0%, #f0f0f0 100%);
+            border: 1px solid #ccc;
+            border-radius: 0 0 5px 5px;
+            position: relative;
+            cursor: pointer;
+            z-index: 1;
+            transition: background 0.1s, transform 0.05s;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 15px;
+            color: #555;
+            font-weight: 600;
+            font-size: 0.9rem;
+            box-shadow: inset 0 -5px 10px rgba(0,0,0,0.1);
+        }
+        
+        .key-white:active, .key-white.active {
+            background: linear-gradient(to bottom, #f0f0f0 0%, #dcdcdc 100%);
+            transform: scaleY(0.98);
+            transform-origin: top;
+            box-shadow: inset 0 -2px 5px rgba(0,0,0,0.2);
+        }
+
+        /* Black Keys */
+        .key-black {
+            width: 8%;
+            height: 60%;
+            background: linear-gradient(to bottom, #333 0%, #000 100%);
+            position: absolute;
+            z-index: 2;
+            border-radius: 0 0 3px 3px;
+            cursor: pointer;
+            transition: background 0.1s, transform 0.05s;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+        }
+
+        .key-black:active, .key-black.active {
+            background: #111;
+            transform: scaleY(0.98);
+            transform-origin: top;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+        }
+
+        .hide-labels .note-label {
+            display: none;
+        }
+
+        .control-btn {
+            transition: all 0.2s;
+        }
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* Disabled state */
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .recording-dot {
+            width: 12px;
+            height: 12px;
+            background-color: #ef4444;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col items-center justify-between text-white">
+
+    <!-- Header -->
+    <div class="w-full p-3 bg-gray-900 flex justify-between items-center shadow-md z-10">
+        <div>
+            <h1 class="text-lg font-bold text-yellow-500">🎹 Piano Pro</h1>
+            <div id="statusText" class="text-xs text-gray-400">พร้อมใช้งาน</div>
+        </div>
+        
+        <label class="flex items-center space-x-2 cursor-pointer select-none">
+            <span class="text-xs">โน้ต</span>
+            <div class="relative">
+                <input type="checkbox" id="toggleLabels" class="sr-only" checked>
+                <div class="block bg-gray-600 w-8 h-5 rounded-full"></div>
+                <div class="dot absolute left-1 top-1 bg-white w-3 h-3 rounded-full transition transform translate-x-3"></div>
+            </div>
+        </label>
+    </div>
+
+    <!-- Piano Keys -->
+    <div class="w-full flex-grow flex items-center justify-center bg-gray-800 relative overflow-hidden">
+        <div id="piano" class="piano-container w-full max-w-4xl px-2">
+            <!-- Keys injected by JS -->
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="w-full bg-gray-900 p-4 pb-8 flex justify-center space-x-3 shadow-top z-10">
+        
+        <button id="btnRecord" class="control-btn bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-xl font-bold flex items-center shadow-lg text-sm sm:text-base">
+            <span id="recordIcon" class="mr-2">●</span> อัดเสียง
+        </button>
+
+        <button id="btnPlay" class="control-btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl font-bold flex items-center shadow-lg disabled:bg-gray-700 text-sm sm:text-base" disabled>
+            <span>▶</span>&nbsp; ฟัง
+        </button>
+
+        <button id="btnDownload" class="control-btn bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-xl font-bold flex items-center shadow-lg disabled:bg-gray-700 text-sm sm:text-base" disabled>
+            <span>⬇</span>&nbsp; โหลดไฟล์
+        </button>
+
+    </div>
+
+    <!-- Hidden audio element for playback check (optional) -->
+    <audio id="audioPreview" style="display:none;"></audio>
+
+    <script>
+        // --- Audio System Setup ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = new AudioContext();
+        
+        // Master Gain Node (to control overall volume and record output)
+        const masterGain = audioCtx.createGain();
+        masterGain.gain.value = 0.8;
+        masterGain.connect(audioCtx.destination);
+
+        // Recording Stream Destination
+        const dest = audioCtx.createMediaStreamDestination();
+        masterGain.connect(dest); // Connect master output to recorder
+
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob = null;
+
+        // Note Data
+        const notes = [
+            { note: 'C',  freq: 261.63, type: 'white', label: 'C' },
+            { note: 'C#', freq: 277.18, type: 'black', pos: 14.3 },
+            { note: 'D',  freq: 293.66, type: 'white', label: 'D' },
+            { note: 'D#', freq: 311.13, type: 'black', pos: 28.6 },
+            { note: 'E',  freq: 329.63, type: 'white', label: 'E' },
+            { note: 'F',  freq: 349.23, type: 'white', label: 'F' },
+            { note: 'F#', freq: 369.99, type: 'black', pos: 57.1 },
+            { note: 'G',  freq: 392.00, type: 'white', label: 'G' },
+            { note: 'G#', freq: 415.30, type: 'black', pos: 71.4 },
+            { note: 'A',  freq: 440.00, type: 'white', label: 'A' },
+            { note: 'A#', freq: 466.16, type: 'black', pos: 85.7 },
+            { note: 'B',  freq: 493.88, type: 'white', label: 'B' },
+            { note: 'C2', freq: 523.25, type: 'white', label: 'C' } 
+        ];
+
+        const pianoEl = document.getElementById('piano');
+        
+        // --- State ---
+        let isRecording = false;
+        let recordedNoteEvents = []; // For in-app visual playback
+        let startTime = 0;
+        let isPlayingBack = false;
+
+        // --- UI ---
+        const btnRecord = document.getElementById('btnRecord');
+        const btnPlay = document.getElementById('btnPlay');
+        const btnDownload = document.getElementById('btnDownload');
+        const statusText = document.getElementById('statusText');
+        const toggleLabels = document.getElementById('toggleLabels');
+
+        // --- Sound Generation ---
+        function playTone(freq) {
+            // Ensure context is running (fixes "no sound" on mobile)
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            const osc = audioCtx.createOscillator();
+            const noteGain = audioCtx.createGain();
+
+            osc.type = 'triangle'; 
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+            // ADSR Envelope
+            noteGain.gain.setValueAtTime(0, audioCtx.currentTime);
+            noteGain.gain.linearRampToValueAtTime(0.6, audioCtx.currentTime + 0.01);
+            noteGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.5);
+
+            // Connect: Osc -> NoteGain -> MasterGain -> (Speakers & Recorder)
+            osc.connect(noteGain);
+            noteGain.connect(masterGain);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 1.5);
+        }
+
+        // --- Logic ---
+        function handleNoteTrigger(index) {
+            playTone(notes[index].freq);
+
+            // If recording, save visual event
+            if (isRecording) {
+                const time = Date.now() - startTime;
+                recordedNoteEvents.push({ noteIndex: index, time: time });
+            }
+        }
+
+        function renderKeys() {
+            notes.forEach((n, index) => {
+                const key = document.createElement('div');
+                key.dataset.index = index;
+
+                if (n.type === 'white') {
+                    key.className = 'key-white';
+                    key.innerHTML = `<span class="note-label mb-2 pointer-events-none">${n.label}</span>`;
+                    pianoEl.appendChild(key);
+                } else {
+                    key.className = 'key-black';
+                    key.style.left = `calc(${n.pos}% - 4%)`;
+                    pianoEl.appendChild(key);
+                }
+
+                // Events
+                const start = (e) => {
+                    if(e) { e.preventDefault(); e.stopPropagation(); }
+                    if (key.classList.contains('active')) return;
+                    key.classList.add('active');
+                    handleNoteTrigger(index);
+                };
+                const end = (e) => {
+                    if(e) e.preventDefault();
+                    key.classList.remove('active');
+                };
+
+                key.addEventListener('mousedown', start);
+                key.addEventListener('mouseup', end);
+                key.addEventListener('mouseleave', end);
+                key.addEventListener('touchstart', start, {passive: false});
+                key.addEventListener('touchend', end);
+            });
+        }
+
+        // --- Recording System ---
+        function startRecording() {
+            // Check browser support
+            if (!MediaRecorder) {
+                alert("Browser ของคุณไม่รองรับการอัดเสียง");
+                return;
+            }
+
+            audioChunks = [];
+            recordedNoteEvents = [];
+            startTime = Date.now();
+            
+            // Try different mime types
+            let options = { mimeType: 'audio/webm' };
+            if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                options = { mimeType: 'audio/mp4' }; 
+                if(!MediaRecorder.isTypeSupported('audio/mp4')) {
+                    options = undefined; // Let browser choose
+                }
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(dest.stream, options);
+            } catch (err) {
+                mediaRecorder = new MediaRecorder(dest.stream); // Fallback
+            }
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                // Enable download
+                btnDownload.disabled = false;
+                btnPlay.disabled = false; // Enable visual playback
+                statusText.innerText = "บันทึกเสร็จสิ้น พร้อมดาวน์โหลด";
+                statusText.className = "text-green-400";
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            
+            // UI Update
+            btnRecord.innerHTML = `<span class="recording-dot"></span> หยุด`;
+            btnRecord.classList.replace('bg-red-600', 'bg-gray-600');
+            btnRecord.classList.replace('hover:bg-red-700', 'hover:bg-gray-700');
+            btnPlay.disabled = true;
+            btnDownload.disabled = true;
+            statusText.innerText = "กำลังอัดเสียง...";
+            statusText.className = "text-red-400 font-bold animate-pulse";
+        }
+
+        function stopRecording() {
+            if(mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            isRecording = false;
+
+            // UI Update
+            btnRecord.innerHTML = `<span class="mr-2">●</span> อัดใหม่`;
+            btnRecord.classList.replace('bg-gray-600', 'bg-red-600');
+            btnRecord.classList.replace('hover:bg-gray-700', 'hover:bg-red-700');
+        }
+
+        function downloadRecording() {
+            if (!audioBlob) return;
+            const url = URL.createObjectURL(audioBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `piano-recording-${Date.now()}.webm`; // Default to webm
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            statusText.innerText = "ดาวน์โหลดเรียบร้อย!";
+        }
+
+        function playVisualPlayback() {
+            if (recordedNoteEvents.length === 0) return;
+            
+            // NOTE: This plays the synth again for visual feedback
+            // It does NOT play the recorded audio blob (user can download for that)
+            // But we can synchronize it.
+            
+            isPlayingBack = true;
+            btnPlay.disabled = true;
+            btnRecord.disabled = true;
+            statusText.innerText = "กำลังเล่นทวน...";
+
+            recordedNoteEvents.forEach((event, i) => {
+                setTimeout(() => {
+                    playTone(notes[event.noteIndex].freq);
+                    
+                    // Visuals
+                    const keyEl = Array.from(pianoEl.children).find(el => parseInt(el.dataset.index) === event.noteIndex);
+                    if(keyEl) {
+                        keyEl.classList.add('active');
+                        setTimeout(() => keyEl.classList.remove('active'), 200);
+                    }
+
+                    if (i === recordedNoteEvents.length - 1) {
+                        setTimeout(() => {
+                            isPlayingBack = false;
+                            btnPlay.disabled = false;
+                            btnRecord.disabled = false;
+                            statusText.innerText = "พร้อมใช้งาน";
+                            statusText.className = "text-gray-400";
+                        }, 500);
+                    }
+                }, event.time);
+            });
+        }
+
+        // --- Event Listeners ---
+        btnRecord.addEventListener('click', () => {
+            if (isPlayingBack) return;
+            if (!isRecording) startRecording();
+            else stopRecording();
+        });
+
+        btnDownload.addEventListener('click', downloadRecording);
+        btnPlay.addEventListener('click', playVisualPlayback);
+
+        // Toggle Labels Logic
+        toggleLabels.addEventListener('change', () => {
+            const toggleBg = toggleLabels.nextElementSibling;
+            const dot = toggleBg.nextElementSibling;
+            
+            if (toggleLabels.checked) {
+                pianoEl.classList.remove('hide-labels');
+                toggleBg.classList.add('bg-green-500');
+                toggleBg.classList.remove('bg-gray-600');
+                dot.classList.add('translate-x-3');
+            } else {
+                pianoEl.classList.add('hide-labels');
+                toggleBg.classList.add('bg-gray-600');
+                toggleBg.classList.remove('bg-green-500');
+                dot.classList.remove('translate-x-3');
+            }
+        });
+
+        // Setup visual state for toggle
+        if(toggleLabels.checked) {
+             const toggleBg = toggleLabels.nextElementSibling;
+             const dot = toggleBg.nextElementSibling;
+             toggleBg.classList.add('bg-green-500');
+             toggleBg.classList.remove('bg-gray-600');
+        }
+
+        // Init
+        renderKeys();
+        
+        // Mobile "No Sound" Fix: Resume AudioContext on first touch anywhere
+        document.body.addEventListener('touchstart', function() {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }, { once: true });
+        document.body.addEventListener('click', function() {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }, { once: true });
+
+    </script>
+</body>
+</html>

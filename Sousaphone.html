@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sousaphone Simulator</title>
+    <style>
+        :root {
+            --brass-gold: linear-gradient(135deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
+            --brass-dark: linear-gradient(135deg, #a67c00, #bf953f, #5e4600);
+            --piston-color: #e0e0e0;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none; /* Prevent scrolling on mobile */
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #1a1a1a;
+            font-family: 'Sarabun', sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Container imitating the instrument body */
+        #instrument-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            max-width: 600px;
+            background: radial-gradient(circle at 50% 30%, #443300 0%, #1a1a1a 70%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+        }
+
+        /* The Bell (Visual Decoration) */
+        .bell-bg {
+            position: absolute;
+            top: 5%;
+            width: 80vw;
+            height: 80vw;
+            max-width: 300px;
+            max-height: 300px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #222 10%, #bf953f 40%, #8a6e2f 60%, #4a3b19 100%);
+            border: 8px solid #d4af37;
+            box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);
+            z-index: 0;
+            opacity: 0.8;
+            pointer-events: none;
+        }
+        
+        .bell-inner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70%;
+            height: 70%;
+            border-radius: 50%;
+            background: radial-gradient(circle, #000 0%, #332200 60%, #5e4600 100%);
+        }
+
+        /* Controls Panel (Record/Play) */
+        .controls-panel {
+            z-index: 10;
+            width: 95%;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #d4af37;
+            border-radius: 15px;
+            padding: 10px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin-top: 10px;
+            color: #fff;
+            backdrop-filter: blur(5px);
+        }
+
+        .btn-control {
+            background: var(--brass-gold);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            color: #3e2723;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: transform 0.1s, filter 0.2s;
+        }
+
+        .btn-control:active {
+            transform: scale(0.95);
+        }
+
+        .btn-control.recording {
+            background: #ff4444;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        .btn-control:disabled {
+            background: #555;
+            color: #888;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
+        }
+
+        /* Note Buttons Area */
+        .notes-container {
+            z-index: 10;
+            width: 100%;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            padding-bottom: 20px;
+        }
+
+        .note-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .valve-btn {
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            background: var(--brass-gold);
+            border: 4px solid #5e4600;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 18px;
+            color: #3e2723;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.5), inset 0 5px 10px rgba(255,255,255,0.5);
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.05s, box-shadow 0.05s;
+        }
+
+        /* Styling for pressed state */
+        .valve-btn.active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.5), inset 0 2px 5px rgba(0,0,0,0.3);
+            background: linear-gradient(135deg, #aa771c, #d4af37);
+        }
+
+        .valve-btn span {
+            pointer-events: none;
+        }
+
+        .status-display {
+            font-size: 12px;
+            color: #d4af37;
+            margin-top: 5px;
+            text-shadow: 0 1px 2px black;
+        }
+
+        #audio-playback {
+            display: none;
+            margin-top: 5px;
+            width: 100%;
+            height: 30px;
+        }
+
+        /* Layout adjustment for smaller screens */
+        @media (max-height: 600px) {
+            .valve-btn { width: 55px; height: 55px; font-size: 14px; }
+            .bell-bg { width: 200px; height: 200px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="instrument-container">
+        <!-- Visual Bell -->
+        <div class="bell-bg">
+            <div class="bell-inner"></div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls-panel">
+            <button id="btn-record" class="btn-control">🔴 อัดเสียง</button>
+            <button id="btn-stop" class="btn-control" disabled>⏹ หยุด</button>
+            <button id="btn-play" class="btn-control" disabled>▶️ เล่น</button>
+            <a id="link-download" style="display:none"></a>
+            <button id="btn-download" class="btn-control" disabled>⬇️ โหลด</button>
+        </div>
+        <div class="status-display" id="status-text">พร้อมใช้งาน (แตะเพื่อเริ่มเสียง)</div>
+        <audio id="audio-player" controls style="display:none;"></audio>
+
+        <!-- Note Buttons -->
+        <!-- Arranged like a typical scale for easy playability on mobile -->
+        <div class="notes-container">
+            <!-- Upper row -->
+            <div class="note-row">
+                <div class="valve-btn" data-note="G3">G</div>
+                <div class="valve-btn" data-note="A3">A</div>
+                <div class="valve-btn" data-note="B3">B</div>
+                <div class="valve-btn" data-note="C4">C</div>
+            </div>
+            <!-- Lower row (Lower pitch) -->
+            <div class="note-row">
+                <div class="valve-btn" data-note="C3">C</div>
+                <div class="valve-btn" data-note="D3">D</div>
+                <div class="valve-btn" data-note="E3">E</div>
+                <div class="valve-btn" data-note="F3">F</div>
+            </div>
+            <!-- Bass row -->
+            <div class="note-row">
+                <div class="valve-btn" data-note="G2">Low G</div>
+                <div class="valve-btn" data-note="A2">Low A</div>
+                <div class="valve-btn" data-note="B2">Low B</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Audio Context & Synth Logic ---
+        let audioCtx;
+        let masterGain;
+        let compressor;
+        let dest; // MediaStreamDestination for recording
+        let mediaRecorder;
+        let recordedChunks = [];
+        let audioBlob;
+        let audioUrl;
+
+        // Frequencies for Sousaphone (Concert Pitch)
+        // Sousaphone is usually in Bb, but we label notes in Concert Pitch for ease of use
+        const frequencies = {
+            'G2': 98.00, 'A2': 110.00, 'B2': 123.47,
+            'C3': 130.81, 'D3': 146.83, 'E3': 164.81, 'F3': 174.61,
+            'G3': 196.00, 'A3': 220.00, 'B3': 246.94, 'C4': 261.63
+        };
+
+        const activeOscillators = {};
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // Master output chain
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.8;
+
+                // Compressor to prevent clipping and add "punch"
+                compressor = audioCtx.createDynamicsCompressor();
+                compressor.threshold.value = -24;
+                compressor.knee.value = 30;
+                compressor.ratio.value = 12;
+                compressor.attack.value = 0.003;
+                compressor.release.value = 0.25;
+
+                // Stream destination for recording
+                dest = audioCtx.createMediaStreamDestination();
+
+                // Connections
+                masterGain.connect(compressor);
+                compressor.connect(audioCtx.destination); // To speakers
+                compressor.connect(dest); // To recorder
+
+                document.getElementById('status-text').innerText = "ระบบเสียงทำงาน";
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playNote(noteName) {
+            initAudio();
+            if (activeOscillators[noteName]) return; // Prevent double trigger
+
+            const freq = frequencies[noteName];
+            const now = audioCtx.currentTime;
+
+            // Oscillator (Sawtooth for Brass)
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, now);
+
+            // Filter (Lowpass for muffled brass sound)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            // Brass gets brighter as it gets louder/starts, then mellows
+            filter.frequency.setValueAtTime(400, now);
+            filter.frequency.exponentialRampToValueAtTime(freq * 3, now + 0.05); // Attack "blart" sound
+            filter.frequency.exponentialRampToValueAtTime(freq * 1.5, now + 0.5); // Sustain brightness
+
+            // Envelope (Gain)
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(1.0, now + 0.05); // Fast attack
+            gainNode.gain.exponentialRampToValueAtTime(0.7, now + 0.2); // Decay to sustain
+
+            // Connect graph
+            osc.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(masterGain);
+
+            osc.start(now);
+            
+            // Store reference to stop later
+            activeOscillators[noteName] = { osc, gainNode, filter };
+        }
+
+        function stopNote(noteName) {
+            if (!activeOscillators[noteName]) return;
+
+            const { osc, gainNode, filter } = activeOscillators[noteName];
+            const now = audioCtx.currentTime;
+
+            // Release envelope
+            gainNode.gain.cancelScheduledValues(now);
+            gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.2); // Short release
+
+            // Filter closes down
+            filter.frequency.cancelScheduledValues(now);
+            filter.frequency.exponentialRampToValueAtTime(100, now + 0.2);
+
+            osc.stop(now + 0.25);
+            
+            delete activeOscillators[noteName];
+        }
+
+        // --- Interaction Logic (Touch & Mouse) ---
+        const buttons = document.querySelectorAll('.valve-btn');
+
+        buttons.forEach(btn => {
+            const note = btn.dataset.note;
+
+            // Touch events
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // Prevent scroll/zoom
+                btn.classList.add('active');
+                playNote(note);
+            }, { passive: false });
+
+            btn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                btn.classList.remove('active');
+                stopNote(note);
+            });
+            
+            // Handle slide off
+            btn.addEventListener('touchcancel', (e) => {
+                btn.classList.remove('active');
+                stopNote(note);
+            });
+
+            // Mouse events (for desktop testing)
+            btn.addEventListener('mousedown', () => {
+                btn.classList.add('active');
+                playNote(note);
+            });
+
+            btn.addEventListener('mouseup', () => {
+                btn.classList.remove('active');
+                stopNote(note);
+            });
+            
+            btn.addEventListener('mouseleave', () => {
+                if(btn.classList.contains('active')){
+                   btn.classList.remove('active');
+                   stopNote(note);
+                }
+            });
+        });
+
+        // --- Recording Logic ---
+        const btnRecord = document.getElementById('btn-record');
+        const btnStop = document.getElementById('btn-stop');
+        const btnPlay = document.getElementById('btn-play');
+        const btnDownload = document.getElementById('btn-download');
+        const audioPlayer = document.getElementById('audio-player');
+        const statusText = document.getElementById('status-text');
+
+        btnRecord.addEventListener('click', () => {
+            initAudio();
+            recordedChunks = [];
+            // Choose mimeType based on support
+            let options = { mimeType: 'audio/webm' };
+            if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                options = { mimeType: 'audio/mp4' }; // Fallback for Safari sometimes
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(dest.stream, options);
+            } catch (e) {
+                // Fallback if no options work (browser default)
+                mediaRecorder = new MediaRecorder(dest.stream);
+            }
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    recordedChunks.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+                audioUrl = URL.createObjectURL(audioBlob);
+                audioPlayer.src = audioUrl;
+                btnPlay.disabled = false;
+                btnDownload.disabled = false;
+                statusText.innerText = "บันทึกเสร็จสิ้น";
+            };
+
+            mediaRecorder.start();
+            
+            btnRecord.classList.add('recording');
+            btnRecord.disabled = true;
+            btnStop.disabled = false;
+            btnPlay.disabled = true;
+            btnDownload.disabled = true;
+            statusText.innerText = "กำลังอัดเสียง...";
+        });
+
+        btnStop.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                btnRecord.classList.remove('recording');
+                btnRecord.disabled = false;
+                btnStop.disabled = true;
+            }
+        });
+
+        btnPlay.addEventListener('click', () => {
+            audioPlayer.play();
+            statusText.innerText = "กำลังเล่นเสียงที่อัดไว้...";
+            audioPlayer.onended = () => {
+                 statusText.innerText = "พร้อมใช้งาน";
+            };
+        });
+
+        btnDownload.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.href = audioUrl;
+            link.download = 'my_sousaphone_song.webm';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+    </script>
+</body>
+</html>

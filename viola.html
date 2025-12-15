@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>เครื่องเล่นไวโอล่าเสมือนจริง (Virtual Viola)</title>
+    <style>
+        :root {
+            --wood-dark: #3e2723;
+            --wood-light: #5d4037;
+            --fingerboard: #1a1a1a;
+            --string-c: #a8a8a8; /* เงินหนา */
+            --string-g: #b0b0b0;
+            --string-d: #c0c0c0;
+            --string-a: #e0e0e0; /* เงินบาง */
+            --highlight: #ffd700;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #121212;
+            font-family: 'Sarabun', sans-serif;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        header {
+            text-align: center;
+            padding: 10px;
+            background: rgba(0,0,0,0.5);
+            width: 100%;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: #deb887;
+        }
+
+        p {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin: 5px 0 0 0;
+        }
+
+        button {
+            border: none;
+            padding: 10px 20px;
+            font-size: 1rem;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: transform 0.1s, background-color 0.2s;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        #start-btn {
+            background: #deb887;
+            color: #3e2723;
+            font-size: 1.2rem;
+        }
+
+        #record-btn {
+            background: #444;
+            color: white;
+            border: 2px solid #666;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #record-btn.recording {
+            background: #ff4444;
+            border-color: #ff0000;
+            color: white;
+            animation: pulse-red 1.5s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* พื้นที่ตัวไวโอล่า */
+        .viola-neck {
+            position: relative;
+            width: 90%;
+            max-width: 400px;
+            flex-grow: 1;
+            margin: 20px 0;
+            background: linear-gradient(to bottom, #1a1a1a 0%, #2c2c2c 100%);
+            border-radius: 10px 10px 40px 40px;
+            border: 4px solid #3e2723;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8), 0 10px 30px rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: space-around;
+            padding: 0 10px;
+            overflow: hidden;
+        }
+
+        /* เส้นนำสายตา (Frets - แม้ไวโอล่าจะไม่มีเฟร็ตจริง แต่ช่วยในการเล็ง) */
+        .guide-line {
+            position: absolute;
+            width: 100%;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+            pointer-events: none;
+        }
+
+        /* สายไวโอล่า */
+        .string-container {
+            position: relative;
+            width: 20%;
+            height: 100%;
+            cursor: pointer;
+            z-index: 2;
+        }
+
+        .string {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(to right, #888, #fff, #888);
+            box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+            pointer-events: none; /* ให้คลิกผ่านไปยัง container */
+            transition: box-shadow 0.1s;
+        }
+
+        /* ความหนาของสาย */
+        .string-c .string { width: 6px; background: linear-gradient(to right, #666, #aaa, #666); } /* C3 - หนาสุด */
+        .string-g .string { width: 5px; } /* G3 */
+        .string-d .string { width: 4px; } /* D4 */
+        .string-a .string { width: 3px; background: linear-gradient(to right, #999, #eee, #999); } /* A4 - บางสุด */
+
+        /* เอฟเฟกต์ตอนเล่น */
+        .string-active {
+            animation: vibrate 0.1s infinite;
+            box-shadow: 0 0 15px var(--highlight) !important;
+            background: #fff !important;
+        }
+
+        .finger-marker {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: rgba(255, 215, 0, 0.6);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            display: none;
+            box-shadow: 0 0 10px gold;
+        }
+
+        @keyframes vibrate {
+            0% { transform: translateX(-50%) translateX(-1px); }
+            50% { transform: translateX(-50%) translateX(1px); }
+            100% { transform: translateX(-50%) translateX(-1px); }
+        }
+
+        .controls-hint {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            max-width: 400px;
+            margin-bottom: 20px;
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+        
+        .key-hint {
+            text-align: center;
+            width: 20%;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1>🎻 Viola Simulator</h1>
+            <p>เครื่องเล่นไวโอล่าเสมือนจริง</p>
+        </div>
+        <button id="start-btn">🔊 คลิกเพื่อเริ่มเล่น / เปิดเสียง</button>
+        <button id="record-btn" class="hidden">🔴 บันทึกการเล่น</button>
+    </header>
+
+    <div class="viola-neck" id="neck">
+        <!-- เส้นนำสายตา (สมมติว่าเป็นตำแหน่งนิ้ว 1, 2, 3, 4) -->
+        <div class="guide-line" style="top: 15%"></div>
+        <div class="guide-line" style="top: 28%"></div>
+        <div class="guide-line" style="top: 40%"></div>
+        <div class="guide-line" style="top: 50%"></div>
+
+        <!-- สาย C (C3) -->
+        <div class="string-container string-c" data-string="0" data-base-freq="130.81">
+            <div class="string"></div>
+            <div class="finger-marker"></div>
+        </div>
+        
+        <!-- สาย G (G3) -->
+        <div class="string-container string-g" data-string="1" data-base-freq="196.00">
+            <div class="string"></div>
+            <div class="finger-marker"></div>
+        </div>
+
+        <!-- สาย D (D4) -->
+        <div class="string-container string-d" data-string="2" data-base-freq="293.66">
+            <div class="string"></div>
+            <div class="finger-marker"></div>
+        </div>
+
+        <!-- สาย A (A4) -->
+        <div class="string-container string-a" data-string="3" data-base-freq="440.00">
+            <div class="string"></div>
+            <div class="finger-marker"></div>
+        </div>
+    </div>
+
+    <div class="controls-hint">
+        <div class="key-hint">Z...M<br>(สาย C)</div>
+        <div class="key-hint">A...K<br>(สาย G)</div>
+        <div class="key-hint">Q...I<br>(สาย D)</div>
+        <div class="key-hint">1...8<br>(สาย A)</div>
+    </div>
+
+    <script>
+        // --- Audio Engine ---
+        let audioCtx;
+        let recordingDest; // ตัวรับสัญญาณสำหรับบันทึกเสียง
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        
+        const activeOscillators = {}; // เก็บสถานะเสียงที่กำลังเล่น
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // สร้าง Destination สำหรับบันทึกเสียง (Stream)
+                recordingDest = audioCtx.createMediaStreamDestination();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // ฟังก์ชันสร้างเสียงไวโอล่า (Synthesis)
+        function playTone(frequency, stringIndex) {
+            if (!audioCtx) return;
+
+            const now = audioCtx.currentTime;
+
+            // 1. Oscillators: ใช้ Sawtooth เพื่อความเสียดทานแบบสาย
+            const osc = audioCtx.createOscillator();
+            const osc2 = audioCtx.createOscillator(); // ตัวที่ 2 เพื่อทำ Detune ให้เสียงหนาขึ้น
+            
+            osc.type = 'sawtooth';
+            osc2.type = 'sawtooth';
+
+            osc.frequency.value = frequency;
+            osc2.frequency.value = frequency;
+            osc2.detune.value = 5; // เพี้ยนเล็กน้อยให้เสียงมีความกว้าง (Chorus effect)
+
+            // 2. Filter: Lowpass เพื่อตัดเสียงแหลมที่บาดหูออก (จำลองไม้)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 2000; // Cutoff frequency
+            filter.Q.value = 1;
+
+            // 3. Gain (Envelope): ADSR (Attack, Decay, Sustain, Release)
+            const gainNode = audioCtx.createGain();
+            
+            // การสี (Bowing) จะมี Attack ช้ากว่าเปียโนเล็กน้อย
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(0.4, now + 0.1); // Attack
+            gainNode.gain.exponentialRampToValueAtTime(0.3, now + 0.3); // Decay -> Sustain
+            
+            // 4. Vibrato (LFO): การสั่นนิ้ว
+            const lfo = audioCtx.createOscillator();
+            lfo.frequency.value = 5; // 5Hz vibrato speed
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = 3; // ความกว้างของการสั่น
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+            lfoGain.connect(osc2.frequency);
+
+            // เชื่อมต่อระบบ
+            osc.connect(filter);
+            osc2.connect(filter);
+            filter.connect(gainNode);
+            
+            // เชื่อมต่อ Output ไปที่ลำโพง
+            gainNode.connect(audioCtx.destination);
+            
+            // เชื่อมต่อ Output ไปที่ตัวบันทึกเสียง (ถ้ามี)
+            if (recordingDest) {
+                gainNode.connect(recordingDest);
+            }
+
+            osc.start(now);
+            osc2.start(now);
+            lfo.start(now);
+
+            // เก็บออบเจกต์ไว้เพื่อหยุดเสียง
+            return { osc, osc2, lfo, gainNode, stop: (releaseTime = 0.2) => {
+                const stopNow = audioCtx.currentTime;
+                gainNode.gain.cancelScheduledValues(stopNow);
+                gainNode.gain.setValueAtTime(gainNode.gain.value, stopNow);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, stopNow + releaseTime);
+                
+                osc.stop(stopNow + releaseTime);
+                osc2.stop(stopNow + releaseTime);
+                lfo.stop(stopNow + releaseTime);
+                
+                // Cleanup เพื่อไม่ให้ Memory leak
+                setTimeout(() => {
+                    osc.disconnect();
+                    osc2.disconnect();
+                    filter.disconnect();
+                    gainNode.disconnect();
+                }, releaseTime * 1000 + 100);
+            }};
+        }
+
+        // --- Logic การคำนวณความถี่ ---
+        // สูตร: Freq = BaseFreq * 2^(semitones/12)
+        // เราจะแมปตำแหน่งแนวตั้ง 0-100% เป็น Semi-tones
+        function calculateFrequency(baseFreq, percentageY) {
+            // สมมติว่าความยาวคอทั้งหมดครอบคลุมประมาณ 1 Octave (12 semitones)
+            // กลับด้าน % เพราะ 0 (บนสุด) คือเสียงเปิด (Open string), 100 (ล่างสุด) คือเสียงสูง
+            const maxSemitones = 12; 
+            const semitones = (percentageY / 100) * maxSemitones; 
+            return baseFreq * Math.pow(2, semitones / 12);
+        }
+
+        // --- Interaction Handlers ---
+        const startBtn = document.getElementById('start-btn');
+        const recordBtn = document.getElementById('record-btn');
+        const strings = document.querySelectorAll('.string-container');
+        
+        startBtn.addEventListener('click', () => {
+            initAudio();
+            startBtn.classList.add('hidden');
+            recordBtn.classList.remove('hidden'); // แสดงปุ่มบันทึก
+        });
+
+        // --- Recording Logic ---
+        recordBtn.addEventListener('click', () => {
+            if (!recordingDest) return;
+
+            if (!isRecording) {
+                // เริ่มบันทึก
+                audioChunks = [];
+                // ใช้ MimeType ที่รองรับโดยทั่วไป (WebM)
+                const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
+                                ? 'audio/webm;codecs=opus' 
+                                : 'audio/webm';
+                
+                try {
+                    mediaRecorder = new MediaRecorder(recordingDest.stream, { mimeType });
+                } catch (e) {
+                    // Fallback ถ้า option ไม่รองรับ
+                    mediaRecorder = new MediaRecorder(recordingDest.stream);
+                }
+
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    
+                    // สร้าง Link เพื่อดาวน์โหลดอัตโนมัติ
+                    const link = document.createElement('a');
+                    link.href = audioUrl;
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                    link.download = `viola_solo_${timestamp}.webm`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.textContent = "⏹️ หยุดและบันทึกไฟล์";
+                recordBtn.classList.add('recording');
+            } else {
+                // หยุดบันทึก
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.textContent = "🔴 บันทึกการเล่น";
+                recordBtn.classList.remove('recording');
+            }
+        });
+
+        // จัดการ Mouse/Touch Events
+        strings.forEach((strContainer, index) => {
+            let currentSound = null;
+            const stringVisual = strContainer.querySelector('.string');
+            const marker = strContainer.querySelector('.finger-marker');
+            const baseFreq = parseFloat(strContainer.dataset.baseFreq);
+
+            const playAtPosition = (y, rectHeight) => {
+                // คำนวณตำแหน่งสัมพัทธ์ (0 ถึง 1)
+                let relativeY = y / rectHeight;
+                if (relativeY < 0) relativeY = 0;
+                if (relativeY > 1) relativeY = 1;
+
+                // อัปเดตตำแหน่ง Visual Marker
+                marker.style.display = 'block';
+                marker.style.top = (relativeY * 100) + '%';
+                marker.style.left = '50%';
+                
+                stringVisual.classList.add('string-active');
+
+                // คำนวณความถี่
+                const freq = calculateFrequency(baseFreq, relativeY * 100);
+
+                // ถ้ามีเสียงเล่นอยู่ ให้หยุดแล้วเริ่มใหม่ (Monophonic per string) 
+                // หรือถ้าอยากทำ Glissando (รูดเสียง) ต้อง update frequency ของ osc เดิม
+                if (currentSound) {
+                    // Update frequency for glissando effect
+                    currentSound.osc.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.05);
+                    currentSound.osc2.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.05);
+                } else {
+                    currentSound = playTone(freq);
+                }
+            };
+
+            const stopPlaying = () => {
+                if (currentSound) {
+                    currentSound.stop();
+                    currentSound = null;
+                }
+                stringVisual.classList.remove('string-active');
+                marker.style.display = 'none';
+            };
+
+            // Mouse Events
+            strContainer.addEventListener('mousedown', (e) => {
+                if(!audioCtx) return;
+                playAtPosition(e.offsetY, strContainer.clientHeight);
+            });
+
+            strContainer.addEventListener('mousemove', (e) => {
+                if (e.buttons === 1 && currentSound) { // คลิกลาก
+                    playAtPosition(e.offsetY, strContainer.clientHeight);
+                }
+            });
+
+            strContainer.addEventListener('mouseup', stopPlaying);
+            strContainer.addEventListener('mouseleave', stopPlaying);
+
+            // Touch Events
+            strContainer.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if(!audioCtx) return;
+                const touch = e.touches[0];
+                const rect = strContainer.getBoundingClientRect();
+                playAtPosition(touch.clientY - rect.top, rect.height);
+            }, {passive: false});
+
+            strContainer.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const rect = strContainer.getBoundingClientRect();
+                // เช็คว่านิ้วยังอยู่ในสายนี้ไหม
+                if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+                    touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+                    playAtPosition(touch.clientY - rect.top, rect.height);
+                }
+            }, {passive: false});
+
+            strContainer.addEventListener('touchend', stopPlaying);
+        });
+
+        // --- Keyboard Controls ---
+        const keyMap = {
+            // String C (แถวล่างสุด)
+            'z': {str: 0, pos: 0}, 'x': {str: 0, pos: 10}, 'c': {str: 0, pos: 20}, 'v': {str: 0, pos: 30},
+            'b': {str: 0, pos: 40}, 'n': {str: 0, pos: 50}, 'm': {str: 0, pos: 60},
+            
+            // String G
+            'a': {str: 1, pos: 0}, 's': {str: 1, pos: 10}, 'd': {str: 1, pos: 20}, 'f': {str: 1, pos: 30},
+            'g': {str: 1, pos: 40}, 'h': {str: 1, pos: 50}, 'j': {str: 1, pos: 60}, 'k': {str: 1, pos: 70},
+
+            // String D
+            'q': {str: 2, pos: 0}, 'w': {str: 2, pos: 10}, 'e': {str: 2, pos: 20}, 'r': {str: 2, pos: 30},
+            't': {str: 2, pos: 40}, 'y': {str: 2, pos: 50}, 'u': {str: 2, pos: 60}, 'i': {str: 2, pos: 70},
+
+            // String A (แถวบนสุด)
+            '1': {str: 3, pos: 0}, '2': {str: 3, pos: 10}, '3': {str: 3, pos: 20}, '4': {str: 3, pos: 30},
+            '5': {str: 3, pos: 40}, '6': {str: 3, pos: 50}, '7': {str: 3, pos: 60}, '8': {str: 3, pos: 70}
+        };
+
+        const activeKeys = {};
+
+        document.addEventListener('keydown', (e) => {
+            if (e.repeat || activeKeys[e.key]) return;
+            const data = keyMap[e.key.toLowerCase()];
+            if (data) {
+                initAudio();
+                const strContainer = strings[data.str];
+                const baseFreq = parseFloat(strContainer.dataset.baseFreq);
+                const freq = calculateFrequency(baseFreq, data.pos);
+                
+                // Visual
+                const marker = strContainer.querySelector('.finger-marker');
+                const stringVisual = strContainer.querySelector('.string');
+                marker.style.display = 'block';
+                marker.style.top = data.pos + '%';
+                marker.style.left = '50%';
+                stringVisual.classList.add('string-active');
+
+                // Audio
+                const sound = playTone(freq);
+                activeKeys[e.key] = { sound, visual: { marker, stringVisual } };
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            const keyData = activeKeys[e.key];
+            if (keyData) {
+                keyData.sound.stop();
+                keyData.visual.marker.style.display = 'none';
+                keyData.visual.stringVisual.classList.remove('string-active');
+                delete activeKeys[e.key];
+            }
+        });
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Banjo Pro - Vertical</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            touch-action: none; /* ห้าม Scroll เพื่อให้เล่นดนตรีได้ */
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden;
+            background-color: #1c1917; /* Stone 900 */
+        }
+
+        /* ลายไม้ */
+        .wood-texture {
+            background-color: #5c4033;
+            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 2px, transparent 2px, transparent 4px),
+                              linear-gradient(to right, #3e2723, #5d4037, #3e2723);
+        }
+
+        /* สายแบนโจ */
+        .string {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to right, #9ca3af, #e5e7eb, #9ca3af); /* สีเงิน */
+            box-shadow: 1px 0 2px rgba(0,0,0,0.5);
+            pointer-events: none; /* ให้ Event ทะลุไปที่ Fretboard */
+            transform-origin: center;
+            transition: transform 0.05s;
+            z-index: 10;
+        }
+
+        /* อนิเมชั่นสายสั่น */
+        .string.vibrate {
+            animation: string-vibrate 0.15s linear infinite;
+        }
+
+        @keyframes string-vibrate {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-2px); }
+            50% { transform: translateX(0); }
+            75% { transform: translateX(2px); }
+            100% { transform: translateX(0); }
+        }
+
+        /* เฟร็ต (Frets) */
+        .fret-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(to bottom, #d1d5db, #9ca3af, #6b7280);
+            box-shadow: 0 2px 2px rgba(0,0,0,0.3);
+            z-index: 5;
+        }
+
+        /* จุดมาร์คเกอร์ (Inlays) */
+        .inlay {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: rgba(255,255,255,0.8);
+            border-radius: 50%;
+            left: 50%;
+            transform: translateX(-50%);
+            box-shadow: 0 0 5px rgba(255,255,255,0.5);
+            z-index: 4;
+        }
+
+        /* พื้นที่กด (Touch Area) */
+        .fret-cell {
+            /* border: 1px solid rgba(255,255,255,0.1); Debugging */ 
+            position: absolute;
+            z-index: 20;
+        }
+        
+        .fret-cell:active {
+            background-color: rgba(255,255,255,0.1);
+        }
+
+        /* Active highlight for visual feedback */
+        .string-glow {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 10px;
+            transform: translateX(-4px);
+            background: rgba(255, 223, 0, 0);
+            transition: background 0.1s;
+            z-index: 9;
+        }
+        .string-glow.active {
+            background: rgba(255, 223, 0, 0.3);
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        /* Note Labels */
+        .note-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 12px;
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.9);
+            text-shadow: 0 1px 2px black;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 25;
+            background-color: rgba(0,0,0,0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        /* Class to toggle visibility */
+        .show-notes .note-label {
+            opacity: 1;
+        }
+
+    </style>
+</head>
+<body class="h-screen w-full flex flex-col items-center justify-center text-white">
+
+    <!-- Overlay สำหรับเริ่ม Audio Context -->
+    <div id="startOverlay" class="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center p-4">
+        <h1 class="text-4xl font-bold mb-4 text-yellow-500">Banjo Pro</h1>
+        <p class="text-gray-300 mb-8 text-center">แตะเพื่อเริ่มเล่นแบนโจแนวตั้ง<br>รองรับ Multi-touch</p>
+        <button id="startBtn" class="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition active:scale-95 text-xl">
+            <i class="fas fa-play mr-2"></i> เริ่มเล่นเลย
+        </button>
+    </div>
+
+    <!-- ส่วนหัว (Headstock Area) -->
+    <div class="w-full max-w-md h-16 bg-black flex items-center justify-between px-4 shrink-0 shadow-xl z-30 border-b-4 border-yellow-900">
+        <span class="text-yellow-500 font-bold tracking-widest text-lg">BANJO</span>
+        <div class="flex space-x-1">
+            <div class="w-2 h-2 rounded-full bg-red-500" id="audioStatus"></div>
+        </div>
+    </div>
+
+    <!-- คอแบนโจ (Fretboard Container) -->
+    <div id="fretboard" class="w-full max-w-md flex-1 relative wood-texture shadow-2xl overflow-hidden mx-auto">
+        <!-- Elements will be generated by JS -->
+    </div>
+
+    <!-- ส่วนล่าง (Control/Bridge) -->
+    <div class="w-full max-w-md h-20 bg-stone-900 flex items-center justify-around shrink-0 border-t-4 border-yellow-900 z-30 px-2">
+        <div class="text-center">
+            <div class="text-xs text-stone-400">Tuning</div>
+            <div class="font-bold text-yellow-500">Open G</div>
+        </div>
+        
+        <!-- Note Toggle Button -->
+        <div class="text-center">
+            <button onclick="toggleNotes()" id="noteBtn" class="w-10 h-10 rounded-full bg-stone-700 flex items-center justify-center active:bg-yellow-600 transition">
+               <i class="fas fa-music text-white"></i>
+           </button>
+           <div class="text-[10px] text-stone-400 mt-1">โน้ต</div>
+       </div>
+
+        <div class="text-center">
+             <button onclick="toggleMetronome()" id="metroBtn" class="w-10 h-10 rounded-full bg-stone-700 flex items-center justify-center active:bg-yellow-600 transition">
+                <i class="fas fa-clock text-white"></i>
+            </button>
+            <div class="text-[10px] text-stone-400 mt-1">จังหวะ</div>
+        </div>
+    </div>
+
+    <script>
+        // --- Audio Engine ---
+        let audioCtx;
+        const volume = 0.5;
+
+        // ความถี่สายเปล่า (Open Strings: g, D, G, B, D) - 5th string is high g
+        // String 0 (Leftmost visually) to String 4 (Rightmost)
+        // Banjo String Layout (Left to Right): 5th(High G), 4th(Low D), 3rd(Low G), 2nd(B), 1st(High D)
+        const openStrings = [
+            392.00, // String 5: G4 (Short string)
+            146.83, // String 4: D3
+            196.00, // String 3: G3
+            246.94, // String 2: B3
+            293.66  // String 1: D4
+        ];
+
+        // Chromatic Scale & Base Indices for Banjo Open G (g, D, G, B, D)
+        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        // Indices in noteNames array corresponding to Open Strings:
+        // String 0 (g) -> G -> 7
+        // String 1 (D) -> D -> 2
+        // String 2 (G) -> G -> 7
+        // String 3 (B) -> B -> 11
+        // String 4 (D) -> D -> 2
+        const stringBaseNoteIndices = [7, 2, 7, 11, 2];
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                document.getElementById('audioStatus').classList.remove('bg-red-500');
+                document.getElementById('audioStatus').classList.add('bg-green-500');
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSound(frequency, stringIndex) {
+            if (!audioCtx) return;
+
+            const t = audioCtx.currentTime;
+            
+            // 1. Create Oscillators (Mix Sawtooth + Triangle for twang)
+            const osc1 = audioCtx.createOscillator();
+            const osc2 = audioCtx.createOscillator();
+            const mainGain = audioCtx.createGain();
+            
+            osc1.type = 'sawtooth';
+            osc2.type = 'triangle';
+
+            osc1.frequency.value = frequency;
+            osc2.frequency.value = frequency;
+
+            // Detune slightly for chorus effect
+            osc2.detune.value = 5; 
+
+            // 2. Filter (Bandpass to simulate body resonance)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'highpass';
+            filter.frequency.value = 300; // Cut mud
+            
+            const peaking = audioCtx.createBiquadFilter();
+            peaking.type = 'peaking';
+            peaking.frequency.value = 2000; // Emphasize banjo twang
+            peaking.Q.value = 1;
+            peaking.gain.value = 5;
+
+            // 3. Envelope
+            // Attack: Very fast
+            // Decay: Plucked string exponential decay
+            mainGain.gain.setValueAtTime(0, t);
+            mainGain.gain.linearRampToValueAtTime(volume, t + 0.005); // Attack
+            mainGain.gain.exponentialRampToValueAtTime(0.001, t + 1.5); // Decay duration
+
+            // Connect graph
+            osc1.connect(filter);
+            osc2.connect(filter);
+            filter.connect(peaking);
+            peaking.connect(mainGain);
+            mainGain.connect(audioCtx.destination);
+
+            osc1.start(t);
+            osc2.start(t);
+            osc1.stop(t + 2);
+            osc2.stop(t + 2);
+
+            // Visual Feedback
+            animateString(stringIndex);
+        }
+
+        // --- Visual Engine ---
+        const fretboard = document.getElementById('fretboard');
+        const numStrings = 5;
+        const numFrets = 12; // 1 Octave visible usually fits well
+
+        function createFretboard() {
+            const width = fretboard.clientWidth;
+            const height = fretboard.clientHeight;
+            const stringSpacing = width / numStrings;
+            
+            // Calculate fret distances (approximate rule of 18)
+            // But for a mobile game, linear or slightly progressive is easier to hit.
+            // Let's use equal spacing for UI usability over physical accuracy
+            const fretHeight = height / (numFrets + 1.5); // +1.5 for open string area
+
+            // 1. Draw Frets
+            for (let i = 0; i <= numFrets; i++) {
+                const y = i * fretHeight + fretHeight; // Start after open string area
+                const fretLine = document.createElement('div');
+                fretLine.className = 'fret-line';
+                fretLine.style.top = `${y}px`;
+                fretboard.appendChild(fretLine);
+
+                // Add Inlays (dots)
+                if ([3, 5, 7, 10, 12].includes(i)) {
+                    const dot = document.createElement('div');
+                    dot.className = 'inlay';
+                    // Double dot at 12
+                    if (i === 12) {
+                        // Logic for double dot omitted for simplicity, centering one big dot
+                    }
+                    // Place dot in the middle of the fret space ABOVE the line
+                    dot.style.top = `${y - (fretHeight / 2) - 10}px`; 
+                    fretboard.appendChild(dot);
+                }
+                
+                // Add Fret Number
+                if (i > 0) {
+                     const num = document.createElement('div');
+                     num.innerText = i;
+                     num.className = 'absolute right-1 text-[10px] text-stone-400 opacity-50 font-bold';
+                     num.style.top = `${y - (fretHeight/2) - 6}px`;
+                     fretboard.appendChild(num);
+                }
+            }
+
+            // 2. Draw Strings & Interaction Areas
+            for (let s = 0; s < numStrings; s++) {
+                const x = (s * stringSpacing) + (stringSpacing / 2);
+                
+                // Glow effect bg
+                const glow = document.createElement('div');
+                glow.className = 'string-glow';
+                glow.id = `glow-${s}`;
+                glow.style.left = `${x}px`;
+                fretboard.appendChild(glow);
+
+                // Physical String Line
+                const str = document.createElement('div');
+                str.className = 'string';
+                str.id = `string-${s}`;
+                str.style.left = `${x}px`;
+                
+                // 5th string logic (Short string on Banjo)
+                // Starts at 5th fret usually. 
+                // For this app, to make it playable, we keep it full length but maybe color it differently?
+                // Let's keep it full length for easier playability on phone.
+                fretboard.appendChild(str);
+
+                // 3. Create Touch Zones (Cells)
+                // Row 0 = Open String (Top area)
+                // Row 1..12 = Frets
+                
+                // Open String Zone (Top part)
+                createTouchZone(s, 0, x, 0, stringSpacing, fretHeight, true);
+
+                // Fret Zones
+                for (let f = 1; f <= numFrets; f++) {
+                    const topY = f * fretHeight;
+                    // Fret 1 ends at line 1, starts at open area end
+                    // Actually let's just stack them mathematically
+                    const cellY = (f-1) * fretHeight + fretHeight; 
+                    
+                    createTouchZone(s, f, x, cellY, stringSpacing, fretHeight, false);
+                }
+            }
+        }
+
+        function createTouchZone(stringIndex, fretIndex, xCenter, yTop, width, height, isOpen) {
+            const cell = document.createElement('div');
+            cell.className = 'fret-cell';
+            cell.style.left = `${xCenter - (width/2)}px`;
+            cell.style.top = `${yTop}px`;
+            cell.style.width = `${width}px`;
+            cell.style.height = `${height}px`;
+            
+            // Store data
+            cell.dataset.string = stringIndex;
+            cell.dataset.fret = fretIndex;
+
+            // Calculate Note Name
+            const baseIndex = stringBaseNoteIndices[stringIndex];
+            const currentNoteIndex = (baseIndex + fretIndex) % 12;
+            const noteName = noteNames[currentNoteIndex];
+
+            // Create Note Label Element
+            const label = document.createElement('span');
+            label.className = 'note-label';
+            label.innerText = noteName;
+            cell.appendChild(label);
+
+            // Touch Events
+            const triggerNote = (e) => {
+                e.preventDefault(); 
+                // Calculate Frequency
+                // Formula: f = f0 * (2 ^ (n/12))
+                const baseFreq = openStrings[stringIndex];
+                const noteFreq = baseFreq * Math.pow(2, fretIndex / 12);
+                
+                playSound(noteFreq, stringIndex);
+            };
+
+            // Support both touch and mouse
+            cell.addEventListener('touchstart', triggerNote, {passive: false});
+            cell.addEventListener('mousedown', triggerNote);
+            
+            // Hover/Slide logic for mouse (optional, mainly for touch)
+            // For true sliding (glissando), we need touchmove on the container, not individual cells
+            // But distinct tapping is better for Banjo picking.
+            
+            fretboard.appendChild(cell);
+        }
+
+        function animateString(index) {
+            const str = document.getElementById(`string-${index}`);
+            const glow = document.getElementById(`glow-${index}`);
+            
+            // Reset animation
+            str.classList.remove('vibrate');
+            void str.offsetWidth; // trigger reflow
+            str.classList.add('vibrate');
+
+            glow.classList.add('active');
+
+            setTimeout(() => {
+                str.classList.remove('vibrate');
+                glow.classList.remove('active');
+            }, 300);
+        }
+
+        // --- Note Toggle Logic ---
+        let areNotesVisible = false;
+        function toggleNotes() {
+            const btn = document.getElementById('noteBtn');
+            areNotesVisible = !areNotesVisible;
+            
+            if (areNotesVisible) {
+                fretboard.classList.add('show-notes');
+                btn.classList.remove('bg-stone-700');
+                btn.classList.add('bg-blue-600'); // Different color for distinction
+            } else {
+                fretboard.classList.remove('show-notes');
+                btn.classList.add('bg-stone-700');
+                btn.classList.remove('bg-blue-600');
+            }
+        }
+
+        // --- Metronome Logic (Simple Click) ---
+        let metroInterval;
+        let isMetroOn = false;
+        function toggleMetronome() {
+            const btn = document.getElementById('metroBtn');
+            const icon = btn.querySelector('i');
+            
+            if (isMetroOn) {
+                clearInterval(metroInterval);
+                isMetroOn = false;
+                btn.classList.remove('bg-yellow-600');
+                btn.classList.add('bg-stone-700');
+                icon.classList.add('fa-clock');
+                icon.classList.remove('fa-stop');
+            } else {
+                if(!audioCtx) initAudio();
+                isMetroOn = true;
+                btn.classList.remove('bg-stone-700');
+                btn.classList.add('bg-yellow-600');
+                icon.classList.remove('fa-clock');
+                icon.classList.add('fa-stop');
+                
+                playClick();
+                metroInterval = setInterval(playClick, 600); // 100 BPM approx
+            }
+        }
+
+        function playClick() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.frequency.value = 800;
+            osc.type = 'square';
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        // --- Initialization ---
+        document.getElementById('startBtn').addEventListener('click', () => {
+            initAudio();
+            document.getElementById('startOverlay').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('startOverlay').style.display = 'none';
+            }, 500);
+        });
+        
+        // Handle Global Touch Move for "Strumming" or Gliding
+        // This is complex to get perfect, but basic slide support helps
+        fretboard.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            // Iterate through changed touches
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                
+                // If we moved into a NEW cell that isn't the one we started in? 
+                // For simplicity, let's just re-trigger if it's a fret-cell
+                // BUT we must debounce so it doesn't machine-gun fire.
+                // Current implementation: tap-based is safer for Banjo picking style.
+            }
+        }, {passive: false});
+
+        // Initialize Layout
+        window.addEventListener('load', createFretboard);
+        window.addEventListener('resize', () => {
+            fretboard.innerHTML = '';
+            createFretboard();
+        });
+
+    </script>
+</body>
+</html>

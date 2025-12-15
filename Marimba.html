@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Marimba Pro Simulator</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        :root {
+            --wood-light: #e6cfa3;
+            --wood-dark: #8b5a2b;
+            --wood-grain: #5d3a1a;
+            --bg-color: #222;
+            --key-shadow: 0 4px 6px rgba(0,0,0,0.4);
+            --key-active-shadow: 0 2px 3px rgba(0,0,0,0.6);
+            --record-red: #ff4444;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(circle at center, #333 0%, #111 100%);
+            color: white;
+            font-family: 'Sarabun', sans-serif;
+            overflow: hidden; /* Prevent scrolling */
+            touch-action: none; /* Critical for multi-touch gaming */
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Header & Controls */
+        header {
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            z-index: 10;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: #ffcc80;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        button.start-btn {
+            background: #ff9800;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            color: white;
+            font-weight: bold;
+            font-family: 'Sarabun', sans-serif;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #b36b00;
+            transition: transform 0.1s;
+        }
+
+        button.start-btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        /* Record Button Styles */
+        button.record-btn {
+            background: #444;
+            border: 1px solid #666;
+            padding: 6px 14px;
+            border-radius: 20px;
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        button.record-btn .dot {
+            width: 10px;
+            height: 10px;
+            background-color: var(--record-red);
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+
+        button.record-btn.recording {
+            background: rgba(255, 68, 68, 0.2);
+            border-color: var(--record-red);
+            color: var(--record-red);
+        }
+
+        button.record-btn.recording .dot {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.5; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .toggle-switch {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.9rem;
+        }
+
+        /* Marimba Container */
+        .marimba-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            position: relative;
+            perspective: 800px;
+        }
+
+        /* Rows */
+        .row {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            position: relative;
+        }
+
+        .row.accidentals {
+            margin-bottom: -30px; /* Overlap slightly */
+            z-index: 2;
+            pointer-events: none; /* Let clicks pass through gaps */
+        }
+
+        .row.naturals {
+            z-index: 1;
+            padding-top: 10px;
+        }
+
+        /* Keys (Bars) */
+        .key {
+            position: relative;
+            border-radius: 4px;
+            cursor: pointer;
+            pointer-events: auto; /* Re-enable pointer events for keys */
+            box-shadow: var(--key-shadow);
+            transition: transform 0.05s, background 0.1s;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding-bottom: 10px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: rgba(60, 30, 0, 0.7);
+            user-select: none;
+            /* Wood Texture */
+            background: linear-gradient(to right, 
+                var(--wood-dark) 0%, 
+                var(--wood-light) 20%, 
+                var(--wood-light) 80%, 
+                var(--wood-dark) 100%);
+            border-top: 1px solid rgba(255,255,255,0.2);
+            border-bottom: 3px solid rgba(0,0,0,0.3);
+        }
+
+        /* Accidental Keys styling */
+        .key.accidental {
+            height: 140px; /* Short keys */
+            width: 5%; /* Relative width */
+            margin: 0 1.5%; /* Spacing */
+            background: linear-gradient(to right, 
+                #3e2723 0%, 
+                #5d4037 20%, 
+                #5d4037 80%, 
+                #3e2723 100%);
+            color: rgba(255,255,255,0.5);
+            transform-origin: top center;
+        }
+        
+        /* Spacer for accidental row to align with naturals */
+        .spacer {
+            width: 8%; /* Adjust based on natural key width */
+            pointer-events: none;
+        }
+
+        /* Natural Keys styling */
+        .key.natural {
+            height: 220px;
+            width: 8%;
+            margin: 0 0.5%;
+            transform-origin: top center;
+        }
+
+        /* Length variation for realism (Lower notes are longer) */
+        .key:nth-child(1) { height: 100%; }
+        .key:nth-child(2) { height: 98%; }
+        .key:nth-child(3) { height: 96%; }
+        .key:nth-child(4) { height: 94%; }
+        /* ... continued via JS for dynamic sizing */
+
+        /* Interaction feedback */
+        .key.active {
+            transform: translateY(5px) rotateX(-2deg);
+            filter: brightness(1.2);
+            box-shadow: var(--key-active-shadow);
+        }
+        
+        .key.accidental.active {
+             background: linear-gradient(to right, #4e342e, #795548, #4e342e);
+        }
+
+        /* Mallet Hit Marker (Visual flair) */
+        .hit-marker {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.5);
+            animation: hitClick 0.3s ease-out;
+            z-index: 100;
+        }
+
+        @keyframes hitClick {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(2); }
+        }
+
+        /* Overlay for "Start Audio" */
+        #start-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            transition: opacity 0.5s;
+        }
+        
+        #start-overlay h2 {
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        #start-overlay p {
+            color: #ccc;
+            margin-bottom: 30px;
+            text-align: center;
+            max-width: 80%;
+        }
+
+        #start-overlay button {
+            font-size: 1.5rem;
+            padding: 15px 40px;
+            border-radius: 50px;
+        }
+        
+        .footer-note {
+            position: absolute;
+            bottom: 5px;
+            width: 100%;
+            text-align: center;
+            font-size: 0.7rem;
+            color: #666;
+            pointer-events: none;
+        }
+
+        /* Mobile specific adjustments */
+        @media (max-width: 768px) and (orientation: portrait) {
+            .marimba-container { transform: rotate(90deg); width: 100vh; height: 100vw; }
+            body { overflow: hidden; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Audio Start Overlay -->
+    <div id="start-overlay">
+        <h2>Marimba Simulator</h2>
+        <p>แตะปุ่มด้านล่างเพื่อเริ่มเล่น<br>(แนะนำให้เปิดเสียงและใช้แนวนอน)</p>
+        <button class="start-btn" id="init-btn">เริ่มเล่น (Start)</button>
+    </div>
+
+    <header>
+        <h1>🎵 Marimba Pro</h1>
+        <div class="controls">
+            <button id="record-btn" class="record-btn">
+                <span class="dot"></span>
+                <span class="text">บันทึกเสียง</span>
+            </button>
+            <div class="toggle-switch">
+                <input type="checkbox" id="reverb-toggle" checked>
+                <label for="reverb-toggle">Reverb</label>
+            </div>
+        </div>
+    </header>
+
+    <div class="marimba-container" id="marimba">
+        <!-- Generated by JS -->
+    </div>
+
+    <div class="footer-note">รองรับ Multi-touch - ตีพร้อมกันได้หลายปุ่ม</div>
+
+    <script>
+        // --- Audio Engine ---
+        let audioCtx;
+        let reverbNode;
+        let masterGain;
+        let compressor;
+        let recordingDest; // Node for recording stream
+        let mediaRecorder;
+        let recordedChunks = [];
+        let isRecording = false;
+
+        const activeOscillators = {};
+
+        // Note Frequencies (C4 to C6 Range)
+        // Format: { note: 'C', octave: 4, freq: 261.63, type: 'natural' }
+        const notes = [
+            { note: 'C', octave: 4, freq: 261.63, type: 'natural' },
+            { note: 'C#', octave: 4, freq: 277.18, type: 'accidental' },
+            { note: 'D', octave: 4, freq: 293.66, type: 'natural' },
+            { note: 'D#', octave: 4, freq: 311.13, type: 'accidental' },
+            { note: 'E', octave: 4, freq: 329.63, type: 'natural' },
+            { note: 'F', octave: 4, freq: 349.23, type: 'natural' },
+            { note: 'F#', octave: 4, freq: 369.99, type: 'accidental' },
+            { note: 'G', octave: 4, freq: 392.00, type: 'natural' },
+            { note: 'G#', octave: 4, freq: 415.30, type: 'accidental' },
+            { note: 'A', octave: 4, freq: 440.00, type: 'natural' },
+            { note: 'A#', octave: 4, freq: 466.16, type: 'accidental' },
+            { note: 'B', octave: 4, freq: 493.88, type: 'natural' },
+            
+            { note: 'C', octave: 5, freq: 523.25, type: 'natural' },
+            { note: 'C#', octave: 5, freq: 554.37, type: 'accidental' },
+            { note: 'D', octave: 5, freq: 587.33, type: 'natural' },
+            { note: 'D#', octave: 5, freq: 622.25, type: 'accidental' },
+            { note: 'E', octave: 5, freq: 659.25, type: 'natural' },
+            { note: 'F', octave: 5, freq: 698.46, type: 'natural' },
+            { note: 'F#', octave: 5, freq: 739.99, type: 'accidental' },
+            { note: 'G', octave: 5, freq: 783.99, type: 'natural' },
+            { note: 'G#', octave: 5, freq: 830.61, type: 'accidental' },
+            { note: 'A', octave: 5, freq: 880.00, type: 'natural' },
+            { note: 'A#', octave: 5, freq: 932.33, type: 'accidental' },
+            { note: 'B', octave: 5, freq: 987.77, type: 'natural' },
+            { note: 'C', octave: 6, freq: 1046.50, type: 'natural' }
+        ];
+
+        // --- Initialization ---
+        async function initAudio() {
+            if (audioCtx) return;
+
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+
+            // Master Setup
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.8;
+
+            // Recording Destination (A side-channel to capture audio)
+            recordingDest = audioCtx.createMediaStreamDestination();
+
+            // Compressor to prevent clipping when hitting many keys
+            compressor = audioCtx.createDynamicsCompressor();
+            compressor.threshold.value = -10;
+            compressor.knee.value = 40;
+            compressor.ratio.value = 12;
+            compressor.attack.value = 0;
+            compressor.release.value = 0.25;
+
+            // Reverb Setup (Convolution)
+            reverbNode = audioCtx.createConvolver();
+            await createReverbImpulse();
+
+            // Routing
+            masterGain.connect(compressor);
+            
+            // Connect to speakers AND recording stream
+            // We do this in updateReverbState to handle wet/dry mix logic properly
+            updateReverbState();
+
+            // Unlock audio on mobile
+            if (audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+            }
+
+            document.getElementById('start-overlay').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('start-overlay').style.display = 'none';
+            }, 500);
+        }
+
+        // Create a synthetic impulse response for reverb (concert hall style)
+        async function createReverbImpulse() {
+            const duration = 2.5;
+            const decay = 2.0;
+            const rate = audioCtx.sampleRate;
+            const length = rate * duration;
+            const impulse = audioCtx.createBuffer(2, length, rate);
+            const left = impulse.getChannelData(0);
+            const right = impulse.getChannelData(1);
+
+            for (let i = 0; i < length; i++) {
+                const n = i / length;
+                // Randomized exponential decay
+                left[i] = (Math.random() * 2 - 1) * Math.pow(1 - n, decay);
+                right[i] = (Math.random() * 2 - 1) * Math.pow(1 - n, decay);
+            }
+            reverbNode.buffer = impulse;
+        }
+
+        function updateReverbState() {
+            if (!audioCtx) return;
+            const isOn = document.getElementById('reverb-toggle').checked;
+            
+            // Disconnect old connections to avoid doubling up
+            try { compressor.disconnect(); } catch(e){}
+            try { reverbNode.disconnect(); } catch(e){}
+
+            if (isOn) {
+                // Dry Signal -> Speakers & Recorder
+                compressor.connect(audioCtx.destination);
+                compressor.connect(recordingDest);
+
+                // Wet Signal -> Reverb -> Speakers & Recorder
+                compressor.connect(reverbNode);
+                reverbNode.connect(audioCtx.destination);
+                reverbNode.connect(recordingDest);
+            } else {
+                // Dry Only -> Speakers & Recorder
+                reverbNode.disconnect();
+                compressor.connect(audioCtx.destination);
+                compressor.connect(recordingDest);
+            }
+        }
+
+        // --- Recording Logic ---
+        function toggleRecording() {
+            const btn = document.getElementById('record-btn');
+            const text = btn.querySelector('.text');
+
+            if (!isRecording) {
+                // Start Recording
+                if (!audioCtx) initAudio();
+                
+                recordedChunks = [];
+                mediaRecorder = new MediaRecorder(recordingDest.stream);
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    // Timestamped filename
+                    const date = new Date();
+                    const timestamp = `${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`;
+                    a.download = `marimba-recording-${timestamp}.webm`;
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                    }, 100);
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                btn.classList.add('recording');
+                text.innerText = 'หยุดอัด (Stop)';
+                
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                btn.classList.remove('recording');
+                text.innerText = 'บันทึกเสียง';
+            }
+        }
+
+        // --- Sound Synthesis ---
+        function playNote(frequency) {
+            if (!audioCtx) return;
+            const now = audioCtx.currentTime;
+
+            // 1. Fundamental Tone (Sine wave, creates the pitch)
+            const osc1 = audioCtx.createOscillator();
+            const gain1 = audioCtx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.value = frequency;
+
+            // 2. Harmonic Overtone
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.value = frequency * 3.99; // Slightly detuned for realism
+
+            // 3. Attack Click/Thud (Filtered Noise)
+            const noiseBufferSize = audioCtx.sampleRate * 0.05; // 50ms
+            const noiseBuffer = audioCtx.createBuffer(1, noiseBufferSize, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < noiseBufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = noiseBuffer;
+            const noiseGain = audioCtx.createGain();
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'lowpass';
+            noiseFilter.frequency.value = 1000;
+
+            // Envelopes (ADSR)
+            
+            // Gain 1 (Fundamental)
+            gain1.gain.setValueAtTime(0, now);
+            gain1.gain.linearRampToValueAtTime(0.6, now + 0.01);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 1.5); // Long decay
+
+            // Gain 2 (Harmonic - Decays faster)
+            gain2.gain.setValueAtTime(0, now);
+            gain2.gain.linearRampToValueAtTime(0.3, now + 0.01);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+            // Noise (Impact click)
+            noiseGain.gain.setValueAtTime(0.4, now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+            // Connections
+            osc1.connect(gain1);
+            gain1.connect(masterGain);
+
+            osc2.connect(gain2);
+            gain2.connect(masterGain);
+
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(masterGain);
+
+            // Start & Stop
+            osc1.start(now);
+            osc2.start(now);
+            noise.start(now);
+
+            // Garbage collection
+            setTimeout(() => {
+                osc1.stop();
+                osc2.stop();
+                noise.stop();
+                // Disconnect to free memory
+                gain1.disconnect();
+                gain2.disconnect();
+                noiseGain.disconnect();
+            }, 2000);
+        }
+
+        // --- UI Construction ---
+        const container = document.getElementById('marimba');
+        
+        function buildMarimba() {
+            // Create two rows: Accidentals (Top) and Naturals (Bottom)
+            const accidentalRow = document.createElement('div');
+            accidentalRow.className = 'row accidentals';
+            
+            const naturalRow = document.createElement('div');
+            naturalRow.className = 'row naturals';
+
+            // We need to carefully place spacers in the accidental row to align with natural keys
+            // Pattern of accidentals relative to C:
+            // C(Nat), C#(Acc), D(Nat), D#(Acc), E(Nat), F(Nat), F#(Acc), G(Nat), G#(Acc), A(Nat), A#(Acc), B(Nat)
+            
+            // Loop through notes
+            let lastType = null;
+
+            notes.forEach((noteData, index) => {
+                const key = document.createElement('div');
+                
+                // Add note label
+                const label = document.createElement('span');
+                label.innerText = noteData.note;
+                key.appendChild(label);
+
+                // Store frequency
+                key.dataset.freq = noteData.freq;
+                key.dataset.note = noteData.note + noteData.octave;
+
+                if (noteData.type === 'natural') {
+                    key.className = 'key natural';
+                    // Visual tweak: make higher pitch bars slightly shorter (simulating real marimba)
+                    const reduction = (index / notes.length) * 30; // max 30% reduction
+                    key.style.height = `calc(240px - ${reduction}px)`;
+                    naturalRow.appendChild(key);
+
+                    // Check if we skipped an accidental (between E-F and B-C)
+                    // If the previous note was natural and this is natural (and not first), we need a spacer in accidental row
+                    if (lastType === 'natural') {
+                        const spacer = document.createElement('div');
+                        spacer.className = 'spacer';
+                        accidentalRow.appendChild(spacer);
+                    }
+                } else {
+                    key.className = 'key accidental';
+                    // Short bars also get shorter
+                    const reduction = (index / notes.length) * 20;
+                    key.style.height = `calc(150px - ${reduction}px)`;
+                    accidentalRow.appendChild(key);
+                }
+
+                // Event Listeners for Interaction
+                bindInteraction(key, noteData.freq);
+
+                lastType = noteData.type;
+            });
+
+            container.appendChild(accidentalRow);
+            container.appendChild(naturalRow);
+        }
+
+        function bindInteraction(element, freq) {
+            const trigger = (e) => {
+                e.preventDefault(); // Prevent default touch actions like scroll/zoom
+                
+                // Audio check
+                if (!audioCtx) initAudio();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+
+                // Play Sound
+                playNote(freq);
+
+                // Visual Feedback
+                element.classList.add('active');
+                createHitMarker(e, element);
+
+                // Remove active class
+                setTimeout(() => {
+                    element.classList.remove('active');
+                }, 100);
+            };
+
+            // Touch events (for mobile multi-touch)
+            element.addEventListener('touchstart', trigger, { passive: false });
+            
+            // Mouse events (for desktop)
+            element.addEventListener('mousedown', trigger);
+        }
+
+        function createHitMarker(e, target) {
+            const marker = document.createElement('div');
+            marker.className = 'hit-marker';
+            
+            // Calculate position
+            let clientX, clientY;
+            if (e.touches && e.touches.length > 0) {
+                 // Use the changed touch that triggered this
+                 for(let i=0; i<e.changedTouches.length; i++) {
+                     if(e.changedTouches[i].target === target || target.contains(e.changedTouches[i].target)) {
+                         clientX = e.changedTouches[i].clientX;
+                         clientY = e.changedTouches[i].clientY;
+                         break;
+                     }
+                 }
+                 // Fallback if target match weirdness
+                 if(!clientX) {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                 }
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            marker.style.left = `${clientX}px`;
+            marker.style.top = `${clientY}px`;
+            
+            document.body.appendChild(marker);
+            
+            setTimeout(() => marker.remove(), 300);
+        }
+
+        // --- Init ---
+        buildMarimba();
+
+        document.getElementById('init-btn').addEventListener('click', initAudio);
+        document.getElementById('reverb-toggle').addEventListener('change', updateReverbState);
+        document.getElementById('record-btn').addEventListener('click', toggleRecording);
+
+        // Prevent dragging on the body
+        document.body.addEventListener('touchmove', function(e) { 
+            e.preventDefault(); 
+        }, { passive: false });
+
+    </script>
+</body>
+</html>

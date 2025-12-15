@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>กระจับปี่ จำลอง (Krajappi Simulator)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            touch-action: none; /* ป้องกันการซูมและเลื่อน */
+            overflow: hidden;
+            background-color: #1a1a1a;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* เอฟเฟกต์ไม้ */
+        .wood-texture {
+            background: #5d4037;
+            background-image: linear-gradient(90deg, rgba(255,255,255,.07) 50%, transparent 50%),
+            linear-gradient(90deg, rgba(255,255,255,.13) 50%, transparent 50%),
+            linear-gradient(90deg, transparent 50%, rgba(255,255,255,.17) 50%),
+            linear-gradient(90deg, transparent 50%, rgba(255,255,255,.19) 50%);
+            background-size: 13px, 29px, 37px, 53px;
+        }
+
+        /* สายกระจับปี่ */
+        .string {
+            position: relative;
+            height: 100%;
+            width: 4px;
+            background: linear-gradient(90deg, #aaa, #fff, #888);
+            box-shadow: 2px 0 4px rgba(0,0,0,0.5);
+            pointer-events: none; /* ให้คลิกทะลุไปยัง fret-cell */
+            z-index: 10;
+        }
+
+        /* สายทองเหลือง (2 สายล่าง) */
+        .string.gold {
+            background: linear-gradient(90deg, #d4af37, #fff, #b8860b);
+        }
+
+        .fret-wire {
+            height: 6px;
+            background: linear-gradient(180deg, #ddd, #fff, #999);
+            width: 100%;
+            position: absolute;
+            bottom: 0;
+            box-shadow: 0 2px 3px rgba(0,0,0,0.6);
+            z-index: 5;
+        }
+
+        /* จุดมุกประดับ (Inlay) */
+        .inlay {
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle, #fff, #ddd);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.8;
+            box-shadow: 0 0 5px rgba(255,255,255,0.5);
+            z-index: 1;
+        }
+
+        /* เอฟเฟกต์ตอนกด */
+        .fret-cell:active .string, .fret-cell.active .string {
+            transform: translateX(1px);
+            filter: brightness(1.5);
+        }
+        
+        .fret-cell:active::after, .fret-cell.active::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 215, 0, 0.3);
+            border-radius: 50%;
+            filter: blur(5px);
+        }
+
+        /* ซ่อน Scrollbar */
+        ::-webkit-scrollbar { display: none; }
+        
+        .control-btn {
+            transition: all 0.2s;
+        }
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        .recording-dot {
+            animation: pulse-red 1.5s infinite;
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col bg-stone-900 text-white overflow-hidden">
+
+    <!-- ส่วนหัว / แผงควบคุม -->
+    <header class="h-16 bg-stone-800 flex items-center justify-between px-4 shadow-lg z-50 border-b border-stone-700">
+        <div class="flex items-center gap-2">
+            <div class="w-8 h-8 bg-amber-700 rounded-full flex items-center justify-center border-2 border-amber-500">
+                <i class="fas fa-music text-amber-200 text-xs"></i>
+            </div>
+            <h1 class="text-lg font-bold text-amber-100">กระจับปี่</h1>
+        </div>
+
+        <div class="flex gap-3">
+            <button id="recordBtn" class="control-btn w-10 h-10 rounded-full bg-stone-700 flex items-center justify-center text-red-500 border border-stone-600 shadow-inner">
+                <i class="fas fa-microphone"></i>
+            </button>
+            <button id="playBtn" class="control-btn w-10 h-10 rounded-full bg-stone-700 flex items-center justify-center text-green-500 border border-stone-600 shadow-inner disabled:opacity-50" disabled>
+                <i class="fas fa-play"></i>
+            </button>
+            <button id="downloadBtn" class="control-btn w-10 h-10 rounded-full bg-stone-700 flex items-center justify-center text-blue-400 border border-stone-600 shadow-inner disabled:opacity-50" disabled>
+                <i class="fas fa-download"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- พื้นที่แสดงสถานะ -->
+    <div id="statusText" class="absolute top-20 left-1/2 transform -translate-x-1/2 bg-black/70 px-4 py-1 rounded-full text-xs text-amber-200 opacity-0 transition-opacity pointer-events-none z-50">
+        พร้อมใช้งาน
+    </div>
+
+    <!-- ตัวเครื่องดนตรี (Fretboard) -->
+    <main class="flex-1 wood-texture relative flex shadow-inner overflow-hidden">
+        <!-- Grid Container -->
+        <div id="fretboard" class="w-full h-full grid grid-cols-4 relative">
+            <!-- สายทั้ง 4 (Visual Overlay) -->
+            <!-- สายจะถูกวาดซ้อนอยู่ในแต่ละ cell แต่เราจะวาง Overlay ไว้เพื่อความสวยงามได้ถ้าต้องการ -->
+            
+            <!-- JavaScript จะสร้าง Fret Cells ที่นี่ -->
+        </div>
+    </main>
+
+    <!-- ส่วนล่างสุด (หัวโน้ต) -->
+    <footer class="h-8 bg-stone-800 flex justify-around items-center text-xs text-stone-400 border-t border-stone-700">
+        <span>สาย 1 (เอก)</span>
+        <span>สาย 2 (ทุ้ม)</span>
+        <span>สาย 3 (กลาง)</span>
+        <span>สาย 4 (ตรี)</span>
+    </footer>
+
+    <!-- Overlay ก่อนเริ่ม -->
+    <div id="startOverlay" class="fixed inset-0 bg-black/80 z-[100] flex flex-col items-center justify-center text-center p-6">
+        <div class="w-20 h-20 bg-amber-700 rounded-full flex items-center justify-center mb-6 shadow-2xl border-4 border-amber-500 animate-bounce">
+            <i class="fas fa-hand-pointer text-3xl text-white"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-amber-100 mb-2">แตะเพื่อเริ่มเล่น</h2>
+        <p class="text-stone-300 mb-4 text-sm">แนะนำให้เปิดเสียง และปิดโหมดเงียบ</p>
+        <button id="initAudioBtn" class="px-8 py-3 bg-amber-600 hover:bg-amber-500 text-white rounded-full font-bold shadow-lg transition transform hover:scale-105">
+            เริ่มใช้งาน
+        </button>
+    </div>
+
+    <script>
+        // --- การตั้งค่าเสียงและการปรับจูน (Thai Scale Approximation) ---
+        // กระจับปี่ปกติมี 4 สาย ตั้งคู่เสียง คู่ 5 หรือ คู่ 4
+        // สมมติการตั้งสายแบบมาตรฐาน: G2, C3, G3, C4 (ทุ้ม -> แหลม) หรือปรับให้เล่นง่ายเป็น Pentatonic
+        
+        // เราจะใช้ระบบ Grid: 4 สาย (แนวตั้ง) x 8 ช่องเสียง (แนวนอน/Fret)
+        const tuning = [
+            { note: 'G2', freq: 98.00 },  // สาย 1 (ซ้ายสุด/ทุ้มสุด)
+            { note: 'C3', freq: 130.81 }, // สาย 2
+            { note: 'E3', freq: 164.81 }, // สาย 3
+            { note: 'G3', freq: 196.00 }  // สาย 4 (ขวาสุด/แหลมสุด)
+        ];
+
+        // อัตราส่วนความถี่สำหรับ Scale ไทย (ประมาณการด้วย Chromatic/Diatonic เพื่อความคุ้นหู)
+        // 1.0, 1.122 (Whole), 1.26 (Major 3rd), 1.33 (4th), 1.5 (5th) ...
+        const intervals = [1, 1.059, 1.122, 1.259, 1.334, 1.498, 1.587, 1.681, 1.887]; 
+        
+        // --- Web Audio API Context ---
+        let audioCtx;
+        let masterGain;
+        let compressor;
+        let dest; // For recording
+        let mediaRecorder;
+        let recordedChunks = [];
+        let audioBlob;
+        let audioUrl;
+        let isRecording = false;
+
+        function initAudio() {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+
+            // Master Setup
+            compressor = audioCtx.createDynamicsCompressor();
+            compressor.threshold.setValueAtTime(-24, audioCtx.currentTime);
+            compressor.knee.setValueAtTime(30, audioCtx.currentTime);
+            compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+            compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+            compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.8;
+
+            compressor.connect(masterGain);
+            masterGain.connect(audioCtx.destination);
+
+            // Setup Recording Destination
+            dest = audioCtx.createMediaStreamDestination();
+            masterGain.connect(dest);
+
+            document.getElementById('startOverlay').classList.add('hidden');
+            showStatus("พร้อมเล่น");
+        }
+
+        // --- Sound Generation (Plucked String Synthesis) ---
+        function playSound(baseFreq, fretIndex) {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            // คำนวณความถี่ตามช่อง Fret
+            // Fret 0 = สายเปล่า
+            // ใช้สูตร F = F0 * (2^(n/12)) สำหรับสากล แต่เราจะใช้ Interval ง่ายๆ
+            let frequency = baseFreq * Math.pow(2, fretIndex / 12); 
+
+            const t = audioCtx.currentTime;
+
+            // Oscillator (ตัวกำเนิดเสียง)
+            const osc = audioCtx.createOscillator();
+            // ใช้ triangle ผสม sawtooth เพื่อให้ได้เสียงดีดที่มีเนื้อเสียง
+            osc.type = 'triangle'; 
+            
+            // Filter (ตัวกรองเสียงเพื่อให้เสียงนุ่มเหมือนสายเอ็น/ไหม)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.Q.value = 5; // ความกังวานของจุดตัด
+            filter.frequency.setValueAtTime(frequency * 4, t);
+            filter.frequency.exponentialRampToValueAtTime(frequency, t + 0.1); // Pluck effect
+
+            // Envelope (การควบคุมความดัง: ดีดแรงแล้วค่อยๆ เบา)
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0, t);
+            gainNode.gain.linearRampToValueAtTime(0.8, t + 0.01); // Attack เร็ว
+            gainNode.gain.exponentialRampToValueAtTime(0.001, t + 1.5); // Decay ยาวปานกลาง
+
+            // การเชื่อมต่อ: Osc -> Filter -> Gain -> Compressor/Master
+            osc.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(compressor);
+
+            osc.start(t);
+            osc.stop(t + 2); // หยุดหลังจาก 2 วินาที
+
+            // สร้างเสียง "ป๊อก" ของนิ้วกระทบสาย (Click noise) เล็กน้อย
+            const clickOsc = audioCtx.createOscillator();
+            const clickGain = audioCtx.createGain();
+            clickOsc.type = 'square';
+            clickOsc.frequency.value = 100;
+            clickGain.gain.setValueAtTime(0.1, t);
+            clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+            clickOsc.connect(clickGain);
+            clickGain.connect(compressor);
+            clickOsc.start(t);
+            clickOsc.stop(t + 0.05);
+        }
+
+        // --- UI Generation ---
+        const fretboard = document.getElementById('fretboard');
+        const numFrets = 7; // จำนวนช่อง (ไม่รวมสายเปล่า)
+        const noteNames = ["โด", "เร", "มี", "ฟา", "ซอล", "ลา", "ที"];
+
+        function createFretboard() {
+            // สร้าง Grid: 4 สาย (col)
+            // แต่เพื่อให้ดูง่ายในมือถือ เราจะสร้างเป็น Row (Fret) Grid (String)
+            // จริงๆ แล้ว CSS Grid ที่ set ไว้คือ grid-cols-4 หมายถึง 4 สายแนวตั้ง
+            
+            // Loop สร้าง Fret (แถว) ตั้งแต่ Fret 0 (บนสุด) ถึง Fret สุดท้าย
+            for (let f = 0; f <= numFrets; f++) {
+                // Loop สร้าง String (คอลัมน์) 1-4
+                for (let s = 0; s < 4; s++) {
+                    const cell = document.createElement('div');
+                    
+                    // Style พื้นฐาน
+                    let borderClass = (f === 0) ? "border-b-4 border-stone-400 bg-stone-800" : "border-b border-stone-600/50";
+                    if (f === numFrets) borderClass = ""; // ช่องสุดท้ายไม่มีขอบล่าง
+                    
+                    cell.className = `fret-cell relative h-[12vh] flex justify-center items-center cursor-pointer ${borderClass}`;
+                    
+                    // ข้อมูลเสียง
+                    cell.dataset.string = s;
+                    cell.dataset.fret = f;
+                    cell.dataset.note = tuning[s].note; // Simple logic, can be improved
+
+                    // สร้างสาย (String Visual)
+                    const stringLine = document.createElement('div');
+                    // สาย 0,1 เป็นสายใหญ่ (Bass), 2,3 สายเล็ก
+                    let stringThickness = (s < 2) ? 'w-[3px]' : 'w-[1.5px]'; 
+                    let stringColor = (s < 2) ? 'gold' : ''; // class gold for yellow string
+                    stringLine.className = `string ${stringColor} ${stringThickness} absolute h-full pointer-events-none`;
+                    cell.appendChild(stringLine);
+
+                    // สร้าง Fret Wire (เหล็กกั้นช่อง) เฉพาะช่องที่ไม่ใช่ 0
+                    if (f > 0) {
+                        const fretWire = document.createElement('div');
+                        fretWire.className = 'fret-wire';
+                        cell.appendChild(fretWire);
+                    }
+
+                    // Inlay (มุกประดับ) ที่ช่อง 3, 5, 7
+                    if (s === 1 && s === 2) { // วางกลางๆ
+                         // Logic inlay ซับซ้อนหน่อย ข้ามไปก่อน หรือใส่แค่บางจุด
+                    }
+                    if ((f === 3 || f === 5 || f === 7) && (s === 1 || s === 2)) {
+                         // ใส่จุดมุกตรงกลางระหว่างสาย 2-3
+                         if (s===1) {
+                             const inlay = document.createElement('div');
+                             inlay.className = 'inlay';
+                             inlay.style.right = "-10px"; // ขยับไปทับเส้นแบ่ง
+                             inlay.style.left = "auto";
+                             cell.appendChild(inlay);
+                         }
+                    }
+
+                    // Label ของ Fret 0 (สายเปล่า)
+                    if (f === 0) {
+                       const label = document.createElement('span');
+                       label.className = "text-[10px] text-stone-400 absolute top-2 pointer-events-none";
+                       label.innerText = "สายเปล่า";
+                       cell.appendChild(label);
+                    }
+
+                    // Event Listeners (Touch & Click)
+                    const triggerSound = (e) => {
+                        e.preventDefault(); // ป้องกัน double fire
+                        cell.classList.add('active');
+                        setTimeout(() => cell.classList.remove('active'), 150);
+                        
+                        playSound(tuning[s].freq, f);
+                        
+                        // Show Note bubble (Optional)
+                        // showStatus(`String ${s+1} Fret ${f}`);
+                    };
+
+                    cell.addEventListener('touchstart', triggerSound, {passive: false});
+                    cell.addEventListener('mousedown', triggerSound);
+
+                    fretboard.appendChild(cell);
+                }
+            }
+        }
+
+        // --- Recording Logic ---
+        const recordBtn = document.getElementById('recordBtn');
+        const playBtn = document.getElementById('playBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const statusText = document.getElementById('statusText');
+        let audioPlayer = new Audio();
+
+        function showStatus(text) {
+            statusText.innerText = text;
+            statusText.style.opacity = 1;
+            clearTimeout(statusText.timeout);
+            statusText.timeout = setTimeout(() => {
+                statusText.style.opacity = 0;
+            }, 2000);
+        }
+
+        recordBtn.addEventListener('click', () => {
+            if (!audioCtx) return;
+
+            if (!isRecording) {
+                // Start Recording
+                recordedChunks = [];
+                // Check mimeType support
+                let options = { mimeType: 'audio/webm' };
+                if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                     options = { mimeType: 'audio/mp4' }; // Fallback for Safari
+                     if(!MediaRecorder.isTypeSupported('audio/mp4')) {
+                         options = {}; // Default
+                     }
+                }
+
+                try {
+                    mediaRecorder = new MediaRecorder(dest.stream, options);
+                } catch (e) {
+                    alert("อุปกรณ์นี้ไม่รองรับการบันทึกเสียงในรูปแบบ WebM/MP4");
+                    return;
+                }
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                    audioUrl = URL.createObjectURL(blob);
+                    audioPlayer.src = audioUrl;
+                    playBtn.disabled = false;
+                    downloadBtn.disabled = false;
+                    showStatus("บันทึกเสร็จสิ้น");
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.innerHTML = '<i class="fas fa-stop"></i>';
+                recordBtn.classList.add('recording-dot', 'bg-red-800', 'text-white');
+                showStatus("กำลังบันทึก...");
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                recordBtn.classList.remove('recording-dot', 'bg-red-800', 'text-white');
+            }
+        });
+
+        playBtn.addEventListener('click', () => {
+            if (audioUrl) {
+                if (audioPlayer.paused) {
+                    audioPlayer.play();
+                    playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                    audioPlayer.onended = () => {
+                        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                    };
+                } else {
+                    audioPlayer.pause();
+                    playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                }
+            }
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            if (audioUrl) {
+                const a = document.createElement('a');
+                a.href = audioUrl;
+                a.download = `krajappi_recording_${new Date().getTime()}.webm`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                showStatus("กำลังดาวน์โหลด...");
+            }
+        });
+
+        // Initialize
+        createFretboard();
+        document.getElementById('initAudioBtn').addEventListener('click', initAudio);
+
+    </script>
+</body>
+</html>

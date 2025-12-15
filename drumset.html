@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>กลองชุดสมจริง (Real Drum JS)</title>
+    <style>
+        /* รีเซ็ตค่าพื้นฐาน */
+        * {
+            box-sizing: border-box;
+            touch-action: none; /* เปลี่ยนเป็น none เพื่อปิด browser gestures ทั้งหมด */
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a1a;
+            color: white;
+            font-family: 'Sarabun', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden;
+            background: radial-gradient(circle at center, #2a2a2a, #000);
+        }
+
+        header {
+            padding: 10px;
+            text-align: center;
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        /* เพิ่มสไตล์ปุ่มบันทึก */
+        .controls {
+            margin-top: 10px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .record-btn {
+            background: #2c3e50;
+            color: #e74c3c;
+            border: 2px solid #e74c3c;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s;
+            outline: none;
+        }
+
+        .record-btn.recording {
+            background: #e74c3c;
+            color: white;
+            animation: pulse-red 1s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            color: #f1c40f;
+        }
+
+        p {
+            font-size: 0.8rem;
+            color: #aaa;
+            margin: 5px 0 0 0;
+        }
+
+        /* พื้นที่วางกลอง */
+        #drum-container {
+            flex-grow: 1;
+            width: 100%;
+            max-width: 800px;
+            position: relative;
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 10px;
+            padding: 20px;
+            perspective: 800px;
+        }
+
+        /* สไตล์พื้นฐานของชิ้นส่วนกลอง */
+        .drum-pad {
+            position: relative;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5), inset 0 5px 10px rgba(255,255,255,0.1);
+            transition: transform 0.05s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            border: 4px solid #444;
+        }
+
+        /* เอฟเฟกต์ตอนตี */
+        .drum-pad.active {
+            transform: scale(0.95) translateY(5px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5), inset 0 0 15px rgba(0,0,0,0.5);
+            filter: brightness(1.2);
+        }
+
+        /* ฉลากบนกลอง */
+        .drum-label {
+            font-weight: bold;
+            font-size: 1.2rem;
+            pointer-events: none;
+            text-shadow: 0 1px 2px black;
+        }
+
+        .drum-key {
+            font-size: 0.8rem;
+            color: #ddd;
+            background: rgba(0,0,0,0.5);
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-top: 4px;
+            pointer-events: none;
+        }
+
+        /* การจัดวางตำแหน่งและสีของกลองแต่ละใบ */
+        
+        /* Crash Cymbal (ฉาบ) */
+        .crash {
+            grid-column: 1 / 3;
+            grid-row: 1 / 3;
+            background: radial-gradient(circle, #e6c200, #b8860b);
+            border-color: #8b6508;
+            clip-path: polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%); /* ทรงแปดเหลี่ยมมนๆ */
+            border-radius: 45%;
+        }
+
+        /* Ride Cymbal (ไรด์) */
+        .ride {
+            grid-column: 5 / 7;
+            grid-row: 1 / 3;
+            background: radial-gradient(circle, #d4af37, #8b6508);
+            border-color: #5e4505;
+            border-radius: 48%;
+        }
+
+        /* Hi-Hat Open/Closed (ไฮแฮท) */
+        .hihat-group {
+            grid-column: 1 / 2;
+            grid-row: 3 / 4;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .hihat {
+            flex: 1;
+            border-radius: 20px;
+            background: radial-gradient(circle, #silver, #7f8c8d);
+            background: #95a5a6;
+            border: 2px solid #7f8c8d;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+        }
+
+        /* Tom 1 (ทอม 1) */
+        .tom1 {
+            grid-column: 3 / 4;
+            grid-row: 1 / 2;
+            background: radial-gradient(circle, #fff, #ddd 30%, #a93226 70%);
+            border-color: #7b241c;
+        }
+
+        /* Tom 2 (ทอม 2) */
+        .tom2 {
+            grid-column: 4 / 5;
+            grid-row: 1 / 2;
+            background: radial-gradient(circle, #fff, #ddd 30%, #a93226 70%);
+            border-color: #7b241c;
+        }
+
+        /* Snare (สแนร์) */
+        .snare {
+            grid-column: 2 / 4;
+            grid-row: 2 / 4;
+            background: radial-gradient(circle, #fff, #eee 40%, #888 90%);
+            border-color: #555;
+            z-index: 2;
+        }
+
+        /* Floor Tom (ฟลอร์ทอม) */
+        .floor {
+            grid-column: 4 / 6;
+            grid-row: 2 / 4;
+            background: radial-gradient(circle, #fff, #ddd 30%, #a93226 70%);
+            border-color: #7b241c;
+            z-index: 2;
+        }
+
+        /* Kick Drum (กระเดื่อง) */
+        .kick {
+            grid-column: 3 / 5;
+            grid-row: 3 / 5;
+            background: radial-gradient(circle, #fff, #ddd 20%, #222 80%);
+            border-color: #000;
+            z-index: 1;
+            transform: scale(1.1);
+        }
+
+        /* Overlay สำหรับเริ่มเกม */
+        #start-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            cursor: pointer;
+        }
+        #start-btn {
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 20px #c0392b;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* Responsive สำหรับมือถือ */
+        @media (max-width: 600px) {
+            header {
+                padding: 5px;
+            }
+            h1 {
+                font-size: 1.1rem;
+            }
+            p {
+                display: none; /* ซ่อนคำอธิบาย */
+            }
+
+            #drum-container {
+                padding: 5px;
+                gap: 5px;
+                grid-template-columns: repeat(4, 1fr);
+                /* ใช้ 5 แถว เพื่อจัด Layout แบบแนวตั้งให้แน่นขึ้น */
+                grid-template-rows: repeat(5, 1fr); 
+                height: calc(100vh - 50px); /* ให้เต็มพื้นที่จอที่เหลือ */
+            }
+
+            /* แถว 1: ฉาบ (เต็มพื้นที่ด้านบน) */
+            .crash { grid-column: 1 / 3; grid-row: 1 / 2; border-radius: 20px; clip-path: none; }
+            .ride { grid-column: 3 / 5; grid-row: 1 / 2; border-radius: 20px; }
+
+            /* แถว 2: Toms (ตรงกลาง) และ Hi-Hat (ซ้ายยาวลงมา) */
+            .tom1 { grid-column: 2 / 3; grid-row: 2 / 3; }
+            .tom2 { grid-column: 3 / 4; grid-row: 2 / 3; }
+
+            /* Hi-Hat ย้ายมาอยู่ใน Grid ซ้ายสุด กินพื้นที่แถว 2-3 */
+            .hihat-group { 
+                position: static;
+                grid-column: 1 / 2; 
+                grid-row: 2 / 4; 
+                width: 100%; height: 100%;
+                left: auto; top: auto;
+            }
+
+            /* แถว 3: Snare (กลาง) และ Floor (ขวายาวลงมา) */
+            .snare { grid-column: 2 / 4; grid-row: 3 / 4; }
+            
+            /* Floor Tom อยู่ขวาสุด กินพื้นที่แถว 3-4 */
+            .floor { grid-column: 4 / 5; grid-row: 3 / 5; border-radius: 20px; }
+
+            /* แถว 4-5: Kick (ใหญ่ด้านล่าง) */
+            /* Kick กินพื้นที่คอลัมน์ 1-3 (เว้นที่ให้ Floor ด้านขวาในแถว 4) และกินแถว 4-5 */
+            .kick { 
+                grid-column: 1 / 4; 
+                grid-row: 4 / 6; 
+                transform: none; /* ยกเลิก scale เพื่อให้พอดี grid */
+                border-radius: 30px;
+            }
+
+            .drum-label { font-size: 0.9rem; }
+            .drum-key { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🥁 Realistic Drum Kit</h1>
+        <div class="controls">
+            <button id="record-btn" class="record-btn">
+                <span>🔴</span> <span id="record-text">อัดเสียง</span>
+            </button>
+        </div>
+        <p>แตะเพื่อตี หรือกดปุ่มคีย์บอร์ด</p>
+    </header>
+
+    <div id="drum-container">
+        <!-- Crash -->
+        <div class="drum-pad crash" data-key="r" data-sound="crash">
+            <span class="drum-label">Crash</span>
+            <span class="drum-key">R</span>
+        </div>
+
+        <!-- Ride -->
+        <div class="drum-pad ride" data-key="u" data-sound="ride">
+            <span class="drum-label">Ride</span>
+            <span class="drum-key">U</span>
+        </div>
+
+        <!-- Toms -->
+        <div class="drum-pad tom1" data-key="t" data-sound="tom1">
+            <span class="drum-label">Tom 1</span>
+            <span class="drum-key">T</span>
+        </div>
+        <div class="drum-pad tom2" data-key="y" data-sound="tom2">
+            <span class="drum-label">Tom 2</span>
+            <span class="drum-key">Y</span>
+        </div>
+
+        <!-- Snare -->
+        <div class="drum-pad snare" data-key="s" data-sound="snare">
+            <span class="drum-label">Snare</span>
+            <span class="drum-key">S</span>
+        </div>
+
+        <!-- Floor Tom -->
+        <div class="drum-pad floor" data-key="j" data-sound="floor">
+            <span class="drum-label">Floor</span>
+            <span class="drum-key">J</span>
+        </div>
+
+        <!-- Kick -->
+        <div class="drum-pad kick" data-key=" " data-sound="kick">
+            <span class="drum-label">Kick</span>
+            <span class="drum-key">Space</span>
+        </div>
+
+        <!-- Hi-Hats -->
+        <div class="hihat-group">
+            <div class="drum-pad hihat" data-key="d" data-sound="hihat-closed">
+                <span>HH Close</span>
+            </div>
+            <div class="drum-pad hihat" data-key="f" data-sound="hihat-open">
+                <span>HH Open</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="start-overlay">
+        <button id="start-btn">กดเพื่อเริ่มใช้งาน</button>
+        <p style="margin-top: 20px; color: #fff;">เปิดเสียงอุปกรณ์ของท่าน</p>
+    </div>
+
+    <script>
+        // --- Audio Engine (Synthesis) ---
+        // ใช้ Web Audio API เพื่อสร้างเสียงสังเคราะห์โดยไม่ต้องโหลดไฟล์ mp3 เพื่อความเร็วและความเสถียร
+        
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        let masterGain;
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+                
+                // สร้าง Master Gain เพื่อรวมเสียงทั้งหมดก่อนส่งออก
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 1.0;
+                
+                // เชื่อมต่อ Master ไปยังลำโพง (เพื่อให้เราได้ยิน)
+                masterGain.connect(audioCtx.destination);
+
+                // ตั้งค่าระบบบันทึกเสียง (เชื่อมต่อ Master ไปยัง Recorder)
+                const dest = audioCtx.createMediaStreamDestination();
+                masterGain.connect(dest);
+
+                try {
+                    mediaRecorder = new MediaRecorder(dest.stream);
+                    
+                    mediaRecorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) audioChunks.push(e.data);
+                    };
+                    
+                    mediaRecorder.onstop = saveRecording;
+                } catch (e) {
+                    console.error("Recording not supported on this browser", e);
+                }
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // ฟังก์ชันจัดการการบันทึก
+        function toggleRecording() {
+            const btn = document.getElementById('record-btn');
+            const txt = document.getElementById('record-text');
+            
+            if (!isRecording) {
+                // เริ่มอัด
+                initAudio();
+                if (!mediaRecorder) {
+                    alert("เบราว์เซอร์นี้ไม่รองรับการบันทึกเสียง");
+                    return;
+                }
+                audioChunks = [];
+                mediaRecorder.start();
+                isRecording = true;
+                btn.classList.add('recording');
+                txt.innerText = "หยุด / บันทึก";
+            } else {
+                // หยุดอัด
+                mediaRecorder.stop();
+                isRecording = false;
+                btn.classList.remove('recording');
+                txt.innerText = "อัดเสียง";
+            }
+        }
+
+        function saveRecording() {
+            const blob = new Blob(audioChunks, { type: 'audio/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            
+            // ตั้งชื่อไฟล์ตามเวลาปัจจุบัน
+            const date = new Date();
+            const timestamp = `${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`;
+            a.download = `drum-solo-${timestamp}.webm`;
+            
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+        }
+
+        // ฟังก์ชันสร้าง Noise Buffer (สำหรับ Snare และ ฉาบ)
+        function createNoiseBuffer() {
+            if (!audioCtx) return;
+            const bufferSize = audioCtx.sampleRate * 2; // 2 seconds
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            return buffer;
+        }
+
+        let noiseBuffer;
+
+        // --- Sound Generators (ปรับปรุงให้ต่อเข้า masterGain แทน destination) ---
+
+        function playKick() {
+            const t = audioCtx.currentTime;
+            
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.frequency.setValueAtTime(150, t);
+            osc.frequency.exponentialRampToValueAtTime(0.01, t + 0.5);
+            
+            gain.gain.setValueAtTime(1, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+            
+            osc.connect(gain);
+            gain.connect(masterGain); // เปลี่ยนจาก destination เป็น masterGain
+            
+            osc.start(t);
+            osc.stop(t + 0.5);
+
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.frequency.setValueAtTime(50, t);
+            gain2.gain.setValueAtTime(1, t);
+            gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+            osc2.connect(gain2);
+            gain2.connect(masterGain); // เปลี่ยนจาก destination เป็น masterGain
+            osc2.start(t);
+            osc2.stop(t + 0.05);
+        }
+
+        function playSnare() {
+            const t = audioCtx.currentTime;
+            
+            const osc = audioCtx.createOscillator();
+            const oscGain = audioCtx.createGain();
+            osc.frequency.setValueAtTime(250, t);
+            oscGain.gain.setValueAtTime(0.5, t);
+            oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+            osc.connect(oscGain);
+            oscGain.connect(masterGain); // เปลี่ยนจาก destination เป็น masterGain
+            osc.start(t);
+            osc.stop(t + 0.2);
+
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = noiseBuffer;
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'highpass';
+            noiseFilter.frequency.value = 1000;
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(1, t);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+            
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(masterGain); // เปลี่ยนจาก destination เป็น masterGain
+            noise.start(t);
+            noise.stop(t + 0.3);
+        }
+
+        function playHiHat(open = false) {
+            const t = audioCtx.currentTime;
+            const decay = open ? 0.6 : 0.1;
+            const volume = open ? 0.6 : 0.8;
+            
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = noiseBuffer;
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'highpass';
+            filter.frequency.value = 7000;
+            
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(volume, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + decay);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(masterGain); // เปลี่ยนจาก destination เป็น masterGain
+            noise.start(t);
+            noise.stop(t + decay);
+        }
+
+        function playTom(pitch) {
+            const t = audioCtx.currentTime;
+            
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.frequency.setValueAtTime(pitch, t);
+            osc.frequency.exponentialRampToValueAtTime(pitch * 0.5, t + 0.5);
+            
+            gain.gain.setValueAtTime(1, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+            
+            osc.connect(gain);
+            gain.connect(masterGain); // เปลี่ยนจาก destination เป็น masterGain
+            
+            osc.start(t);
+            osc.stop(t + 0.5);
+        }
+
+        function playCrash(isRide = false) {
+            const t = audioCtx.currentTime;
+            const decay = isRide ? 1.5 : 2.0;
+            
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = noiseBuffer;
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = isRide ? 'bandpass' : 'highpass';
+            filter.frequency.value = isRide ? 5000 : 2000;
+            
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.8, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + decay);
+            
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(masterGain); // เปลี่ยนจาก destination เป็น masterGain
+            noise.start(t);
+            noise.stop(t + decay);
+        }
+
+        // --- Controller ---
+
+        function playSound(type) {
+            initAudio(); // Ensure context is running
+            if (!noiseBuffer) noiseBuffer = createNoiseBuffer();
+
+            switch(type) {
+                case 'kick': playKick(); break;
+                case 'snare': playSnare(); break;
+                case 'hihat-closed': playHiHat(false); break;
+                case 'hihat-open': playHiHat(true); break;
+                case 'tom1': playTom(180); break;
+                case 'tom2': playTom(130); break;
+                case 'floor': playTom(90); break;
+                case 'crash': playCrash(false); break;
+                case 'ride': playCrash(true); break;
+            }
+        }
+
+        function animateDrum(element) {
+            element.classList.add('active');
+            setTimeout(() => element.classList.remove('active'), 100);
+        }
+
+        function triggerDrum(keyOrElement) {
+            let element;
+            let soundType;
+
+            if (typeof keyOrElement === 'string') {
+                // Keyboard Event
+                element = document.querySelector(`.drum-pad[data-key="${keyOrElement}"]`);
+            } else {
+                // Touch/Click Event
+                element = keyOrElement.closest('.drum-pad');
+            }
+
+            if (element) {
+                soundType = element.getAttribute('data-sound');
+                playSound(soundType);
+                animateDrum(element);
+            }
+        }
+
+        // --- Event Listeners ---
+
+        // 1. Keyboard
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            const key = e.key.toLowerCase();
+            triggerDrum(key);
+        });
+
+        // 2. Touch (Mobile - Low Latency)
+        const drumPads = document.querySelectorAll('.drum-pad');
+        drumPads.forEach(pad => {
+            pad.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // Prevent scroll/zoom
+                triggerDrum(e.target);
+            }, { passive: false });
+            
+            // Mouse click fallback
+            pad.addEventListener('mousedown', (e) => {
+                triggerDrum(e.target);
+            });
+        });
+        
+        // 3. Record Button
+        document.getElementById('record-btn').addEventListener('click', (e) => {
+            // ป้องกัน focus ติดที่ปุ่ม ซึ่งอาจทำให้กด Spacebar แล้วไปกดปุ่มนี้ซ้ำ
+            e.currentTarget.blur();
+            toggleRecording();
+        });
+
+        // 4. Start Overlay
+        document.getElementById('start-btn').addEventListener('click', () => {
+            initAudio();
+            // Pre-generate buffer
+            if (!noiseBuffer) noiseBuffer = createNoiseBuffer();
+            
+            // Play a silent sound to unlock audio engine on iOS
+            const silent = audioCtx.createBufferSource();
+            silent.buffer = audioCtx.createBuffer(1, 1, 22050);
+            silent.connect(audioCtx.destination);
+            silent.start(0);
+
+            document.getElementById('start-overlay').style.display = 'none';
+        });
+
+    </script>
+</body>
+</html>

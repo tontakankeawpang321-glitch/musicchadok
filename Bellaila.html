@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bell Lyra Simulator (เบลไลลา)</title>
+    <style>
+        :root {
+            --bg-color: #2c3e50;
+            --frame-color: #bdc3c7;
+            --bar-color: #ecf0f1;
+            --bar-shadow: #7f8c8d;
+            --accidental-color: #f1c40f; /* Gold for sharps/flats */
+            --accidental-shadow: #b7950b;
+            --holder-color: #34495e;
+            --record-red: #e74c3c;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Sarabun', sans-serif;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #header {
+            color: white;
+            text-align: center;
+            margin-bottom: 5px;
+            /* pointer-events: none; removed to allow button clicks if needed inside */
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        p {
+            margin: 2px 0 5px;
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+
+        /* --- Recording Controls --- */
+        .controls-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+            z-index: 10;
+            background: rgba(0,0,0,0.2);
+            padding: 5px 15px;
+            border-radius: 30px;
+        }
+
+        .btn-control {
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-family: 'Sarabun', sans-serif;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s;
+        }
+
+        .btn-record {
+            background-color: var(--record-red);
+            color: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+
+        .btn-record:active {
+            transform: scale(0.95);
+        }
+
+        .btn-record.recording {
+            animation: pulse-red 1.5s infinite;
+            background-color: #c0392b;
+        }
+
+        .btn-stop {
+            background-color: #7f8c8d;
+            color: white;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+        }
+
+        audio {
+            height: 30px;
+            width: 200px;
+            border-radius: 15px;
+        }
+
+        /* The Instrument Container */
+        .lyra-container {
+            position: relative;
+            width: 95vw;
+            max-width: 800px;
+            height: 60vh;
+            background: linear-gradient(180deg, #95a5a6 0%, #7f8c8d 100%);
+            border-radius: 20px 20px 40px 40px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 2px 5px rgba(255,255,255,0.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border: 4px solid #555;
+        }
+
+        /* The decorative lyre shape top */
+        .lyra-head {
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 40px;
+            background: #95a5a6;
+            border-radius: 10px 10px 0 0;
+            border: 4px solid #555;
+            border-bottom: none;
+            z-index: -1;
+        }
+
+        /* Rows of keys */
+        .keys-row {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            position: relative;
+        }
+
+        .keys-row.upper {
+            margin-bottom: -15px; /* Overlap slightly for realistic look */
+            z-index: 2;
+            padding-left: 20px; /* Offset for chromatics */
+        }
+
+        .keys-row.lower {
+            z-index: 1;
+        }
+
+        /* Individual Keys */
+        .key {
+            position: relative;
+            background: linear-gradient(to bottom, #ffffff 0%, #e0e0e0 50%, #dcdcdc 100%);
+            border-radius: 4px;
+            margin: 0 2px;
+            cursor: pointer;
+            box-shadow: 0 4px 0 var(--bar-shadow), 0 5px 10px rgba(0,0,0,0.3);
+            transition: transform 0.05s, background 0.1s;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 5px;
+            font-weight: bold;
+            font-size: 0.8rem;
+            color: #555;
+            flex-grow: 1;
+            height: 18vh;
+            border: 1px solid #ccc;
+        }
+
+        /* Chromatic Keys (Sharps/Flats) - Gold/Brass look */
+        .key.accidental {
+            background: linear-gradient(to bottom, #f1c40f 0%, #f39c12 100%);
+            box-shadow: 0 4px 0 var(--accidental-shadow), 0 5px 10px rgba(0,0,0,0.3);
+            height: 14vh;
+            color: #4e342e;
+            width: 8%; /* Slightly narrower */
+            margin: 0 4px;
+        }
+
+        /* Spacer for accidental row to align with natural keys */
+        .spacer {
+            width: 4%;
+            visibility: hidden;
+        }
+
+        /* Active State (Hit) */
+        .key.active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 var(--bar-shadow), 0 2px 5px rgba(0,0,0,0.3);
+            background: #fff;
+        }
+        
+        .key.accidental.active {
+            background: #f1c40f;
+            box-shadow: 0 0 0 var(--accidental-shadow);
+        }
+
+        /* Mallet Hit Visual Effect */
+        .hit-effect {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: hitSplash 0.3s ease-out forwards;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        @keyframes hitSplash {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; }
+        }
+
+        /* Note labels */
+        .note-name {
+            pointer-events: none;
+            font-family: monospace;
+        }
+
+        /* Start Button overlay */
+        #overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: white;
+        }
+
+        .btn-start {
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        @media (max-width: 600px) {
+             .lyra-container {
+                 width: 98vw;
+                 padding: 5px;
+             }
+             .key {
+                 font-size: 0.6rem;
+             }
+             .controls-bar {
+                width: 90%;
+                justify-content: center;
+                flex-wrap: wrap;
+             }
+             audio {
+                 width: 150px;
+             }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="header">
+        <h1>Bell Lyra (เบลไลลา)</h1>
+        <p>แตะเพื่อเล่น • รองรับหลายนิ้ว (Multitouch)</p>
+    </div>
+
+    <!-- Recording Controls -->
+    <div class="controls-bar">
+        <button id="btnRecord" class="btn-control btn-record">
+            <span>🔴</span> <span id="recordText">อัดเสียง</span>
+        </button>
+        <button id="btnStop" class="btn-control btn-stop" style="display: none;">
+            <span>⏹</span> หยุด
+        </button>
+        <audio id="audioPlayback" controls style="display: none;"></audio>
+    </div>
+
+    <div class="lyra-container">
+        <div class="lyra-head"></div>
+        
+        <!-- Upper Row (Chromatics / Black Keys) -->
+        <div class="keys-row upper" id="upperRow">
+            <!-- Will be generated by JS -->
+        </div>
+
+        <!-- Lower Row (Naturals / White Keys) -->
+        <div class="keys-row lower" id="lowerRow">
+            <!-- Will be generated by JS -->
+        </div>
+    </div>
+
+    <div id="overlay">
+        <h1>พร้อมเล่นดนตรีหรือยัง?</h1>
+        <p style="margin-bottom: 20px;">แตะปุ่มด้านล่างเพื่อเปิดเสียง</p>
+        <button class="btn-start" id="startBtn">เริ่มเล่น (Start)</button>
+    </div>
+
+    <script>
+        // --- Audio Engine (Web Audio API) ---
+        let audioCtx;
+        let mainOutput; // Main Gain Node to route audio
+        let dest;       // MediaStreamDestination for recording
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        // Define Notes (Frequencies for Bell Lyra range)
+        const notes = [
+            { note: "C5", freq: 523.25, type: "natural" },
+            { note: "C#5", freq: 554.37, type: "accidental" },
+            { note: "D5", freq: 587.33, type: "natural" },
+            { note: "D#5", freq: 622.25, type: "accidental" },
+            { note: "E5", freq: 659.25, type: "natural" },
+            { note: "F5", freq: 698.46, type: "natural" },
+            { note: "F#5", freq: 739.99, type: "accidental" },
+            { note: "G5", freq: 783.99, type: "natural" },
+            { note: "G#5", freq: 830.61, type: "accidental" },
+            { note: "A5", freq: 880.00, type: "natural" },
+            { note: "A#5", freq: 932.33, type: "accidental" },
+            { note: "B5", freq: 987.77, type: "natural" },
+            { note: "C6", freq: 1046.50, type: "natural" },
+            { note: "C#6", freq: 1108.73, type: "accidental" },
+            { note: "D6", freq: 1174.66, type: "natural" },
+            { note: "D#6", freq: 1244.51, type: "accidental" },
+            { note: "E6", freq: 1318.51, type: "natural" },
+            { note: "F6", freq: 1396.91, type: "natural" },
+            { note: "F#6", freq: 1479.98, type: "accidental" },
+            { note: "G6", freq: 1567.98, type: "natural" },
+            { note: "G#6", freq: 1661.22, type: "accidental" },
+            { note: "A6", freq: 1760.00, type: "natural" },
+            { note: "A#6", freq: 1864.66, type: "accidental" },
+            { note: "B6", freq: 1975.53, type: "natural" },
+            { note: "C7", freq: 2093.00, type: "natural" }
+        ];
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Create Master Output (Gain)
+                mainOutput = audioCtx.createGain();
+                mainOutput.gain.value = 1.0;
+                
+                // 1. Connect Master to Speakers (so user can hear)
+                mainOutput.connect(audioCtx.destination);
+
+                // 2. Connect Master to Recorder Stream
+                dest = audioCtx.createMediaStreamDestination();
+                mainOutput.connect(dest);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playNote(freq) {
+            if (!audioCtx) initAudio();
+
+            const t = audioCtx.currentTime;
+            
+            // Note Gain (Volume for this specific note instance)
+            const noteGain = audioCtx.createGain();
+            
+            // Connect Note Gain -> Main Output (which goes to both Speaker & Recorder)
+            noteGain.connect(mainOutput);
+            
+            noteGain.gain.setValueAtTime(0, t);
+            noteGain.gain.linearRampToValueAtTime(0.8, t + 0.01); // Fast attack
+            noteGain.gain.exponentialRampToValueAtTime(0.01, t + 2.5); // Long ring decay
+
+            // Oscillator 1: Fundamental
+            const osc1 = audioCtx.createOscillator();
+            osc1.type = 'sine';
+            osc1.frequency.value = freq;
+            osc1.connect(noteGain);
+
+            // Oscillator 2: Octave up (adds brightness)
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'triangle';
+            osc2.frequency.value = freq * 2;
+            const osc2Gain = audioCtx.createGain();
+            osc2Gain.gain.value = 0.3; // Lower volume for harmonic
+            osc2.connect(osc2Gain);
+            osc2Gain.connect(noteGain);
+
+            // Oscillator 3: Metallic Overtone
+            const osc3 = audioCtx.createOscillator();
+            osc3.type = 'sine';
+            osc3.frequency.value = freq * 3.5; 
+            const osc3Gain = audioCtx.createGain();
+            osc3Gain.gain.value = 0.1; // Very subtle
+            osc3Gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5); 
+            osc3.connect(osc3Gain);
+            osc3Gain.connect(noteGain);
+
+            // Start all
+            osc1.start(t);
+            osc2.start(t);
+            osc3.start(t);
+
+            // Stop all after decay
+            osc1.stop(t + 3);
+            osc2.stop(t + 3);
+            osc3.stop(t + 3);
+            
+            // Garbage collection helper
+            setTimeout(() => {
+                noteGain.disconnect();
+            }, 3000);
+        }
+
+        // --- DOM Generation & Interaction ---
+        const upperRow = document.getElementById('upperRow');
+        const lowerRow = document.getElementById('lowerRow');
+        const startBtn = document.getElementById('startBtn');
+        const overlay = document.getElementById('overlay');
+        
+        // Recording UI Elements
+        const btnRecord = document.getElementById('btnRecord');
+        const btnStop = document.getElementById('btnStop');
+        const recordText = document.getElementById('recordText');
+        const audioPlayback = document.getElementById('audioPlayback');
+
+        // Recording Logic
+        btnRecord.addEventListener('click', () => {
+            initAudio(); // Ensure audio context exists
+            
+            audioChunks = []; // Clear previous recording
+            
+            // Check browser support
+            if (!dest) {
+                alert("Browser not supported for recording.");
+                return;
+            }
+
+            mediaRecorder = new MediaRecorder(dest.stream);
+            
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    audioChunks.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                // Create Blob
+                const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                const audioURL = URL.createObjectURL(blob);
+                audioPlayback.src = audioURL;
+                audioPlayback.style.display = 'block';
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+
+            // UI Updates
+            btnRecord.classList.add('recording');
+            btnRecord.style.display = 'none';
+            btnStop.style.display = 'flex';
+            audioPlayback.style.display = 'none'; // Hide old player while recording new
+        });
+
+        btnStop.addEventListener('click', () => {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+
+                // UI Updates
+                btnRecord.classList.remove('recording');
+                btnRecord.style.display = 'flex';
+                btnStop.style.display = 'none';
+                recordText.innerText = "อัดใหม่";
+            }
+        });
+
+
+        // Build grid logic
+        let naturals = [];
+        let accidentals = [];
+
+        let naturalIndex = 0;
+        
+        // Render Lower Row (Naturals)
+        notes.forEach(n => {
+            if (n.type === 'natural') {
+                const key = createKey(n);
+                lowerRow.appendChild(key);
+            }
+        });
+
+        // Render Upper Row (Accidentals + Spacers)
+        const naturalNotes = notes.filter(n => n.type === 'natural');
+        
+        // Add initial spacer to offset slightly
+        const startSpacer = document.createElement('div');
+        startSpacer.className = 'spacer';
+        startSpacer.style.width = '2%'; 
+        upperRow.appendChild(startSpacer);
+
+        for (let i = 0; i < naturalNotes.length - 1; i++) {
+            const currentNat = naturalNotes[i];
+            const nextNat = naturalNotes[i+1];
+            
+            const idx1 = notes.indexOf(currentNat);
+            const idx2 = notes.indexOf(nextNat);
+            
+            if (idx2 - idx1 > 1) {
+                const accidentalNote = notes[idx1 + 1];
+                upperRow.appendChild(createKey(accidentalNote));
+            } else {
+                const spacer = document.createElement('div');
+                spacer.className = 'spacer';
+                upperRow.appendChild(spacer);
+            }
+        }
+
+        function createKey(noteData) {
+            const key = document.createElement('div');
+            key.className = `key ${noteData.type}`;
+            key.dataset.freq = noteData.freq;
+            key.dataset.note = noteData.note;
+            
+            // Visual label
+            const label = document.createElement('span');
+            label.className = 'note-name';
+            label.innerText = noteData.note.replace(/\d/, ''); 
+            key.appendChild(label);
+
+            const trigger = (e) => {
+                e.preventDefault(); 
+                if(e.type === 'mousedown' && e.buttons !== 1) return;
+
+                playNote(noteData.freq);
+                
+                key.classList.add('active');
+                
+                const splash = document.createElement('div');
+                splash.className = 'hit-effect';
+                key.appendChild(splash);
+                setTimeout(() => splash.remove(), 500);
+
+                setTimeout(() => key.classList.remove('active'), 100);
+            };
+
+            key.addEventListener('touchstart', trigger, { passive: false });
+            key.addEventListener('mousedown', trigger);
+
+            return key;
+        }
+
+        // --- App State ---
+        startBtn.addEventListener('click', () => {
+            initAudio();
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 500);
+        });
+
+        document.addEventListener('contextmenu', event => event.preventDefault());
+
+    </script>
+</body>
+</html>

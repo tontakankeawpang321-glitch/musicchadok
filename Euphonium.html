@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Euphonium Pro Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #1a1a1a;
+            touch-action: none; /* ป้องกันการซูมและเลื่อน */
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Metallic Gold Gradient for Buttons */
+        .valve-btn {
+            background: radial-gradient(circle at 30% 30%, #fffacd, #ffd700, #b8860b, #8b4500);
+            box-shadow: 
+                0 4px 6px rgba(0,0,0,0.5),
+                inset 0 -2px 5px rgba(0,0,0,0.4),
+                inset 0 2px 5px rgba(255,255,255,0.7);
+            transition: transform 0.05s, box-shadow 0.05s;
+            border: 2px solid #5c3a00;
+        }
+
+        .valve-btn:active, .valve-btn.active {
+            transform: translateY(4px) scale(0.98);
+            background: radial-gradient(circle at 40% 40%, #b8860b, #ffd700);
+            box-shadow: 
+                0 1px 2px rgba(0,0,0,0.5),
+                inset 0 4px 8px rgba(0,0,0,0.6);
+        }
+
+        /* Realistic Instrument Body Background */
+        .instrument-bg {
+            background: linear-gradient(135deg, #2c1a00 0%, #000000 100%);
+            position: relative;
+        }
+        
+        .brass-pipe {
+            position: absolute;
+            background: linear-gradient(90deg, #8b4500, #ffd700, #ffec8b, #b8860b);
+            border-radius: 999px;
+            opacity: 0.3;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .control-btn {
+            backdrop-filter: blur(5px);
+            transition: all 0.2s;
+        }
+        
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+
+        .led-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #333;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+            transition: background-color 0.2s;
+        }
+        .led-indicator.recording {
+            background-color: #ff3b30;
+            box-shadow: 0 0 8px #ff3b30;
+            animation: pulse 1s infinite;
+        }
+        .led-indicator.playing {
+            background-color: #34c759;
+            box-shadow: 0 0 8px #34c759;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col instrument-bg text-white">
+
+    <!-- Decoration Pipes (Visual Only) -->
+    <div class="brass-pipe w-64 h-64 border-[30px] border-yellow-600 rounded-full top-[-50px] right-[-50px]"></div>
+    <div class="brass-pipe w-full h-12 bottom-0 left-0 opacity-20"></div>
+
+    <!-- Header & Controls -->
+    <div class="relative z-10 flex flex-col p-4 bg-black/40 border-b border-yellow-900/50 backdrop-blur-md">
+        <div class="flex justify-between items-center mb-3">
+            <h1 class="text-xl font-bold text-yellow-500 tracking-wider drop-shadow-md">EUPHONIUM</h1>
+            <div id="statusLed" class="led-indicator"></div>
+        </div>
+        
+        <div class="flex gap-2 justify-between">
+            <button id="btnRecord" onclick="toggleRecording()" class="control-btn flex-1 bg-red-900/80 hover:bg-red-700 text-white py-2 rounded-lg border border-red-500 text-sm font-bold flex items-center justify-center gap-2">
+                <span id="recordText">อัดเสียง</span>
+            </button>
+            <button id="btnPlay" onclick="playRecording()" disabled class="control-btn flex-1 bg-gray-700 text-gray-400 py-2 rounded-lg border border-gray-600 text-sm font-bold">
+                เล่น
+            </button>
+            <button id="btnDownload" onclick="downloadRecording()" disabled class="control-btn flex-1 bg-gray-700 text-gray-400 py-2 rounded-lg border border-gray-600 text-sm font-bold">
+                โหลด
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Playing Area (Valves/Keys) -->
+    <div class="relative z-10 flex-1 p-2 flex flex-col justify-center items-center overflow-hidden">
+        
+        <!-- Note Grid (Low to High) -->
+        <div class="grid grid-cols-4 gap-3 w-full max-w-md h-full content-center p-2" id="keypad">
+            <!-- Low Register -->
+            <button class="valve-btn rounded-full w-full aspect-square flex flex-col items-center justify-center text-black font-bold" data-note="Bb2">
+                <span class="text-xs opacity-60">Low</span>
+                <span class="text-xl">Bb</span>
+            </button>
+            <button class="valve-btn rounded-full w-full aspect-square flex flex-col items-center justify-center text-black font-bold" data-note="C3">
+                <span class="text-xl">C</span>
+            </button>
+            <button class="valve-btn rounded-full w-full aspect-square flex flex-col items-center justify-center text-black font-bold" data-note="D3">
+                <span class="text-xl">D</span>
+            </button>
+            <button class="valve-btn rounded-full w-full aspect-square flex flex-col items-center justify-center text-black font-bold" data-note="Eb3">
+                <span class="text-xl">Eb</span>
+            </button>
+
+            <!-- Mid Register -->
+            <button class="valve-btn rounded-full w-full aspect-square flex flex-col items-center justify-center text-black font-bold" data-note="F3">
+                <span class="text-xl">F</span>
+            </button>
+            <button class="valve-btn rounded-full w-full aspect-square flex flex-col items-center justify-center text-black font-bold" data-note="G3">
+                <span class="text-xl">G</span>
+            </button>
+            <button class="valve-btn rounded-full w-full aspect-square flex flex-col items-center justify-center text-black font-bold" data-note="A3">
+                <span class="text-xl">A</span>
+            </button>
+            <button class="valve-btn rounded-full w-full aspect-square flex flex-col items-center justify-center text-black font-bold" data-note="Bb3">
+                <span class="text-xs opacity-60">Mid</span>
+                <span class="text-xl">Bb</span>
+            </button>
+
+            <!-- High Register -->
+            <button class="valve-btn rounded-full w-full aspect-square flex flex-col items-center justify-center text-black font-bold" data-note="C4">
+                <span class="text-xl">C</span>
+            </button>
+            <button class="valve-btn rounded-full w-full aspect-square flex flex-col items-center justify-center text-black font-bold" data-note="D4">
+                <span class="text-xl">D</span>
+            </button>
+            <button class="valve-btn rounded-full w-full aspect-square flex flex-col items-center justify-center text-black font-bold" data-note="Eb4">
+                <span class="text-xl">Eb</span>
+            </button>
+            <button class="valve-btn rounded-full w-full aspect-square flex flex-col items-center justify-center text-black font-bold" data-note="F4">
+                <span class="text-xl">F</span>
+            </button>
+        </div>
+        
+        <div class="mt-4 text-center text-yellow-600/50 text-xs">
+            แตะเพื่อเล่น • แตะหลายปุ่มได้ (Multitouch)
+        </div>
+    </div>
+
+    <script>
+        // --- Audio Context Setup ---
+        let audioCtx;
+        let masterGain;
+        let dest; // For recording
+        let mediaRecorder;
+        let recordedChunks = [];
+        let audioBlob;
+        let audioUrl;
+        let isRecording = false;
+        
+        const noteFrequencies = {
+            'Bb2': 116.54, 'C3': 130.81, 'D3': 146.83, 'Eb3': 155.56,
+            'F3': 174.61, 'G3': 196.00, 'A3': 220.00, 'Bb3': 233.08,
+            'C4': 261.63, 'D4': 293.66, 'Eb4': 311.13, 'F4': 349.23
+        };
+
+        let activeOscillators = {};
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // Master Gain for volume control
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.6;
+                
+                // Destination for recording
+                dest = audioCtx.createMediaStreamDestination();
+                
+                // Connect Master to Speakers AND Recorder
+                masterGain.connect(audioCtx.destination);
+                masterGain.connect(dest);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // --- Sound Synthesis (Brass Model) ---
+        function playNote(note) {
+            initAudio();
+            const freq = noteFrequencies[note];
+            if (!freq) return;
+
+            // Prevent stacking same note
+            if(activeOscillators[note]) return;
+
+            const t = audioCtx.currentTime;
+
+            // 1. Oscillator (Sawtooth for Brass buzz)
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.value = freq;
+
+            // 2. Filter (Lowpass for mellow brass tone)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(freq * 2, t); // Start brighter
+            filter.frequency.exponentialRampToValueAtTime(freq * 1.5, t + 0.2); // Mellow out
+            filter.Q.value = 1;
+
+            // 3. Envelope (ADSR)
+            const env = audioCtx.createGain();
+            env.gain.setValueAtTime(0, t);
+            env.gain.linearRampToValueAtTime(1, t + 0.05); // Attack
+            env.gain.exponentialRampToValueAtTime(0.7, t + 0.2); // Decay
+
+            // Connections
+            osc.connect(filter);
+            filter.connect(env);
+            env.connect(masterGain);
+
+            osc.start(t);
+            
+            // Store reference to stop later
+            activeOscillators[note] = { osc, env, filter };
+        }
+
+        function stopNote(note) {
+            if (!activeOscillators[note]) return;
+            
+            const { osc, env } = activeOscillators[note];
+            const t = audioCtx.currentTime;
+
+            // Release phase
+            env.gain.cancelScheduledValues(t);
+            env.gain.setValueAtTime(env.gain.value, t);
+            env.gain.exponentialRampToValueAtTime(0.001, t + 0.3); // Release time
+
+            osc.stop(t + 0.3);
+            
+            delete activeOscillators[note];
+        }
+
+        // --- Interaction Handlers (Touch & Mouse) ---
+        const buttons = document.querySelectorAll('.valve-btn');
+
+        buttons.forEach(btn => {
+            const note = btn.getAttribute('data-note');
+
+            // Touch events for mobile
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                btn.classList.add('active');
+                playNote(note);
+            }, { passive: false });
+
+            btn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                btn.classList.remove('active');
+                stopNote(note);
+            });
+
+            // Mouse events for desktop testing
+            btn.addEventListener('mousedown', () => {
+                btn.classList.add('active');
+                playNote(note);
+            });
+            btn.addEventListener('mouseup', () => {
+                btn.classList.remove('active');
+                stopNote(note);
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.classList.remove('active');
+                stopNote(note);
+            });
+        });
+
+        // --- Recording Logic ---
+        function toggleRecording() {
+            initAudio();
+            const btn = document.getElementById('btnRecord');
+            const led = document.getElementById('statusLed');
+            const txt = document.getElementById('recordText');
+
+            if (!isRecording) {
+                // Start Recording
+                recordedChunks = [];
+                try {
+                    mediaRecorder = new MediaRecorder(dest.stream);
+                } catch (e) {
+                    alert('Browser not compatible with MediaRecorder');
+                    return;
+                }
+
+                mediaRecorder.ondataavailable = (evt) => {
+                    if (evt.data.length > 0) recordedChunks.push(evt.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+                    audioUrl = URL.createObjectURL(audioBlob);
+                    
+                    // Enable Play/Download
+                    document.getElementById('btnPlay').disabled = false;
+                    document.getElementById('btnPlay').classList.replace('bg-gray-700', 'bg-green-600');
+                    document.getElementById('btnPlay').classList.replace('text-gray-400', 'text-white');
+                    
+                    document.getElementById('btnDownload').disabled = false;
+                    document.getElementById('btnDownload').classList.replace('bg-gray-700', 'bg-blue-600');
+                    document.getElementById('btnDownload').classList.replace('text-gray-400', 'text-white');
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                
+                // UI Updates
+                btn.classList.replace('bg-red-900/80', 'bg-red-600');
+                txt.innerText = "หยุดอัด";
+                led.className = "led-indicator recording";
+                
+                // Reset previous recording
+                document.getElementById('btnPlay').disabled = true;
+                document.getElementById('btnDownload').disabled = true;
+
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                
+                // UI Updates
+                btn.classList.replace('bg-red-600', 'bg-red-900/80');
+                txt.innerText = "อัดเสียง";
+                led.className = "led-indicator";
+            }
+        }
+
+        function playRecording() {
+            if (!audioUrl) return;
+            const led = document.getElementById('statusLed');
+            const audio = new Audio(audioUrl);
+            
+            led.className = "led-indicator playing";
+            audio.play();
+            
+            audio.onended = () => {
+                led.className = "led-indicator";
+            };
+        }
+
+        function downloadRecording() {
+            if (!audioUrl) return;
+            const a = document.createElement('a');
+            a.href = audioUrl;
+            a.download = `euphonium_solo_${new Date().getTime()}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    </script>
+</body>
+</html>

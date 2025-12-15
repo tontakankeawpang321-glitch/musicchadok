@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>คาบาซาจำลอง (Cabasa Simulator)</title>
+    <style>
+        /* CSS Reset & Basic Setup */
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: white;
+            font-family: 'Sarabun', sans-serif;
+            overflow: hidden; /* Prevent scrolling */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            touch-action: none; /* Critical for touch games */
+        }
+
+        /* Background Pattern */
+        .bg-pattern {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: radial-gradient(#333 1px, transparent 1px);
+            background-size: 20px 20px;
+            opacity: 0.2;
+            z-index: -1;
+        }
+
+        /* Title & Info */
+        .header {
+            position: absolute;
+            top: 20px;
+            text-align: center;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            color: #f0c040;
+        }
+
+        p {
+            font-size: 0.9rem;
+            color: #aaa;
+            margin-top: 5px;
+        }
+
+        /* The Cabasa Instrument Container */
+        #cabasa-container {
+            position: relative;
+            width: 300px;
+            height: 500px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transform-origin: center center;
+            transition: transform 0.05s ease-out;
+            cursor: pointer;
+        }
+
+        /* Handle */
+        .handle {
+            width: 40px;
+            height: 180px;
+            background: linear-gradient(90deg, #3e2723, #8d6e63, #3e2723);
+            border-radius: 0 0 10px 10px;
+            position: relative;
+            top: -10px;
+            z-index: 1;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        .handle::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            height: 100%;
+            background: rgba(255,255,255,0.05);
+            border-radius: 5px;
+        }
+
+        /* The Head (Cylinder) */
+        .head {
+            width: 220px;
+            height: 220px;
+            background: linear-gradient(90deg, #444, #888, #444);
+            border-radius: 15px;
+            position: relative;
+            z-index: 2;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.6);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-evenly;
+            padding: 10px 0;
+            overflow: hidden;
+            border: 4px solid #222;
+        }
+
+        /* Top cap of the head */
+        .head-cap {
+            position: absolute;
+            top: -15px;
+            width: 200px;
+            height: 30px;
+            background: #2a2a2a;
+            border-radius: 50%;
+            z-index: 0;
+        }
+
+        /* Beads Rows */
+        .bead-row {
+            width: 100%;
+            height: 18px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 5px;
+        }
+
+        /* Individual Bead */
+        .bead {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #fff, #bdc3c7, #7f8c8d);
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            transform: scale(1);
+            transition: transform 0.1s;
+        }
+
+        /* Start Overlay */
+        #start-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .start-btn {
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            background: #f0c040;
+            color: #1a1a1a;
+            border: none;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(240, 192, 64, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(240, 192, 64, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(240, 192, 64, 0); }
+        }
+
+        /* Recording Button Styles */
+        .controls {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 20;
+            display: flex;
+            gap: 15px;
+        }
+
+        .record-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: #e74c3c;
+            border: 4px solid #fff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.1s, background-color 0.3s, border-color 0.3s;
+        }
+
+        .record-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Button State: Recording */
+        .record-btn.recording {
+            background-color: #fff;
+            border-color: #e74c3c;
+            animation: pulse-record 2s infinite;
+        }
+
+        .record-shape {
+            width: 24px;
+            height: 24px;
+            background-color: white;
+            border-radius: 50%; /* Circle shape for 'Record' */
+            transition: all 0.3s ease;
+        }
+
+        .record-btn.recording .record-shape {
+            background-color: #e74c3c;
+            border-radius: 4px; /* Square shape for 'Stop' */
+            width: 20px;
+            height: 20px;
+        }
+        
+        @keyframes pulse-record {
+            0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(231, 76, 60, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+        }
+
+        /* Animation classes */
+        .shake-anim {
+            animation: shake 0.15s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0) rotate(-1deg); }
+            20%, 80% { transform: translate3d(2px, 0, 0) rotate(2deg); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0) rotate(-4deg); }
+            40%, 60% { transform: translate3d(4px, 0, 0) rotate(4deg); }
+        }
+
+        .bead-spin {
+            animation: spinBeads 0.2s linear infinite;
+        }
+
+        @keyframes spinBeads {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(1px); }
+            100% { transform: translateY(0); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="bg-pattern"></div>
+
+    <div class="header">
+        <h1>Cabasa</h1>
+        <p>แตะเพื่อเขย่า • ลากเพื่อถู</p>
+    </div>
+
+    <!-- Instrument Visual -->
+    <div id="cabasa-container">
+        <div class="head" id="cabasa-head">
+            <!-- Beads generated by JS -->
+        </div>
+        <div class="handle"></div>
+    </div>
+
+    <!-- Recording Controls -->
+    <div class="controls">
+        <div class="record-btn" id="record-btn" title="บันทึกเสียง/หยุด">
+            <div class="record-shape"></div>
+        </div>
+    </div>
+
+    <!-- Start Overlay -->
+    <div id="start-overlay">
+        <button class="start-btn" id="start-btn">เริ่มเล่น (Start)</button>
+        <p style="margin-top: 20px; font-size: 0.8rem; opacity: 0.7;">เปิดเสียงเพื่อประสบการณ์ที่ดีที่สุด</p>
+    </div>
+
+    <script>
+        /**
+         * Cabasa Sound Engine using Web Audio API
+         */
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        let noiseBuffer = null;
+        let isSetup = false;
+        
+        // Recording variables
+        let masterGain;
+        let destNode;
+        let mediaRecorder;
+        let chunks = [];
+        let isRecording = false;
+
+        // Visual Elements
+        const container = document.getElementById('cabasa-container');
+        const head = document.getElementById('cabasa-head');
+        const overlay = document.getElementById('start-overlay');
+        const startBtn = document.getElementById('start-btn');
+        const recordBtn = document.getElementById('record-btn');
+
+        // Generate Beads visually
+        function generateBeads() {
+            for (let i = 0; i < 11; i++) { // 11 rows
+                const row = document.createElement('div');
+                row.className = 'bead-row';
+                // Offset rows slightly for realism
+                row.style.transform = i % 2 === 0 ? 'translateX(3px)' : 'translateX(-3px)';
+                
+                for (let j = 0; j < 14; j++) { // 14 beads per row
+                    const bead = document.createElement('div');
+                    bead.className = 'bead';
+                    row.appendChild(bead);
+                }
+                head.appendChild(row);
+            }
+        }
+        generateBeads();
+
+        // --- AUDIO ENGINE ---
+
+        // 1. Create White Noise Buffer (Static Sound Source)
+        function createNoiseBuffer() {
+            if (!audioCtx) return;
+            const bufferSize = audioCtx.sampleRate * 2.0; // 2 seconds buffer
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1; // White noise
+            }
+            noiseBuffer = buffer;
+        }
+
+        // 2. Play Sound Function
+        function playSound(type, velocity = 1.0) {
+            if (!audioCtx || !noiseBuffer || !masterGain) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const t = audioCtx.currentTime;
+            const source = audioCtx.createBufferSource();
+            source.buffer = noiseBuffer;
+            source.loop = true;
+
+            // Filter to simulate metallic beads (High Bandpass)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'bandpass';
+            // Randomize freq slightly for natural variation
+            filter.frequency.value = 3000 + (Math.random() * 1000); 
+            filter.Q.value = 1.0; // Width of the band
+
+            // Secondary Filter for "air"
+            const highShelf = audioCtx.createBiquadFilter();
+            highShelf.type = 'highshelf';
+            highShelf.frequency.value = 8000;
+            highShelf.gain.value = 10;
+
+            // Envelope (Volume Control)
+            const gainNode = audioCtx.createGain();
+            
+            // Connect Graph: Source -> Filter -> HighShelf -> Gain -> MASTER -> Destination
+            source.connect(filter);
+            filter.connect(highShelf);
+            highShelf.connect(gainNode);
+            gainNode.connect(masterGain); // Connect to Master Gain instead of direct destination
+
+            // Start Noise
+            source.start(t);
+
+            // Apply Envelope based on type
+            if (type === 'hit') {
+                // Sharp attack, fast decay
+                const attack = 0.01;
+                const decay = 0.08 + (Math.random() * 0.05);
+                gainNode.gain.setValueAtTime(0, t);
+                gainNode.gain.linearRampToValueAtTime(0.8 * velocity, t + attack);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, t + attack + decay);
+                source.stop(t + attack + decay + 0.1);
+            } else if (type === 'scrape') {
+                // Slower attack, slightly longer decay, less sharp
+                const duration = 0.15; 
+                gainNode.gain.setValueAtTime(0, t);
+                gainNode.gain.linearRampToValueAtTime(0.4 * velocity, t + 0.02);
+                gainNode.gain.linearRampToValueAtTime(0.01, t + duration);
+                source.stop(t + duration + 0.05);
+            }
+        }
+
+        // --- INTERACTION & INIT ---
+
+        function initAudio() {
+            if (isSetup) return;
+            audioCtx = new AudioContext();
+            
+            // Setup Master Gain & Recording Destination
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 1.0;
+            
+            // Connect Master to physical speakers
+            masterGain.connect(audioCtx.destination);
+            
+            // Connect Master to MediaStream for recording
+            destNode = audioCtx.createMediaStreamDestination();
+            masterGain.connect(destNode);
+
+            createNoiseBuffer();
+            isSetup = true;
+            overlay.style.display = 'none';
+        }
+
+        startBtn.addEventListener('click', initAudio);
+
+        // --- RECORDING LOGIC ---
+
+        recordBtn.addEventListener('click', () => {
+            if (!isSetup) {
+                // In case user somehow clicks record without starting audio (should be blocked by overlay)
+                return;
+            }
+
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        });
+
+        function startRecording() {
+            chunks = [];
+            // Try to use webm, fallback to whatever browser supports if needed
+            let options = { mimeType: 'audio/webm' };
+            if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                 options = { mimeType: 'audio/mp4' }; // Safari 14.1+
+                 if (!MediaRecorder.isTypeSupported('audio/mp4')) {
+                     options = {}; // Default browser format
+                 }
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(destNode.stream, options);
+            } catch (err) {
+                console.error("MediaRecorder error:", err);
+                mediaRecorder = new MediaRecorder(destNode.stream); // Try without options
+            }
+
+            mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+            mediaRecorder.onstop = exportAudio;
+            
+            mediaRecorder.start();
+            isRecording = true;
+            recordBtn.classList.add('recording');
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.classList.remove('recording');
+            }
+        }
+
+        function exportAudio() {
+            // Determine MIME type for file extension
+            const blob = new Blob(chunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            
+            const timestamp = new Date().toLocaleTimeString('th-TH').replace(/:/g, '-');
+            const ext = (mediaRecorder.mimeType && mediaRecorder.mimeType.includes('mp4')) ? 'mp4' : 'webm';
+            
+            a.download = `cabasa-jam-${timestamp}.${ext}`;
+            document.body.appendChild(a);
+            a.click();
+            
+            // Cleanup
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+        }
+
+        // --- INPUT HANDLING ---
+
+        // Visual Feedback
+        function triggerVisualShake() {
+            container.classList.remove('shake-anim');
+            void container.offsetWidth; // Trigger reflow
+            container.classList.add('shake-anim');
+            
+            const beads = document.querySelectorAll('.bead');
+            beads.forEach(b => b.style.background = 'radial-gradient(circle at 30% 30%, #fff, #ecf0f1, #bdc3c7)');
+            setTimeout(() => {
+                beads.forEach(b => b.style.background = 'radial-gradient(circle at 30% 30%, #fff, #bdc3c7, #7f8c8d)');
+            }, 100);
+        }
+
+        // Touch & Mouse Events
+        let lastY = 0;
+        let isTouching = false;
+        let scrapeThreshold = 5;
+        let accumulatedDist = 0;
+
+        const handleStart = (e) => {
+            if(!isSetup) initAudio();
+            e.preventDefault(); 
+            isTouching = true;
+            
+            if (e.touches) {
+                lastY = e.touches[0].clientY;
+            } else {
+                lastY = e.clientY;
+            }
+
+            playSound('hit', 1.0);
+            triggerVisualShake();
+        };
+
+        const handleMove = (e) => {
+            if (!isTouching) return;
+            e.preventDefault();
+
+            let currentY;
+            if (e.touches) {
+                currentY = e.touches[0].clientY;
+            } else {
+                currentY = e.clientY;
+            }
+
+            const delta = Math.abs(currentY - lastY);
+            accumulatedDist += delta;
+
+            if (accumulatedDist > scrapeThreshold) {
+                let velocity = Math.min(delta / 10, 1.2); 
+                playSound('scrape', 0.5 + (velocity * 0.5));
+                
+                const rotation = (currentY - lastY) > 0 ? 2 : -2;
+                head.style.transform = `rotate(${rotation}deg)`;
+                
+                accumulatedDist = 0;
+                lastY = currentY;
+            }
+        };
+
+        const handleEnd = () => {
+            isTouching = false;
+            head.style.transform = `rotate(0deg)`;
+        };
+
+        container.addEventListener('mousedown', handleStart);
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleEnd);
+
+        container.addEventListener('touchstart', handleStart, { passive: false });
+        container.addEventListener('touchmove', handleMove, { passive: false });
+        container.addEventListener('touchend', handleEnd);
+
+        // --- SHAKE DETECTION ---
+        let shakeThreshold = 15;
+        let lastX = 0, lastY_acc = 0, lastZ = 0;
+        let lastTime = 0;
+
+        function handleMotion(event) {
+            if (!isSetup) return;
+            
+            let current = event.accelerationIncludingGravity;
+            if (!current) return;
+
+            let curTime = new Date().getTime();
+            if ((curTime - lastTime) > 100) {
+                let diffTime = curTime - lastTime;
+                lastTime = curTime;
+
+                let speed = Math.abs(current.x + current.y + current.z - lastX - lastY_acc - lastZ) / diffTime * 10000;
+
+                if (speed > shakeThreshold * 100) { 
+                     playSound('hit', 0.8);
+                     triggerVisualShake();
+                }
+
+                lastX = current.x;
+                lastY_acc = current.y;
+                lastZ = current.z;
+            }
+        }
+
+        if (typeof DeviceMotionEvent !== 'undefined') {
+            if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                startBtn.addEventListener('click', () => {
+                    DeviceMotionEvent.requestPermission()
+                        .then(response => {
+                            if (response === 'granted') {
+                                window.addEventListener('devicemotion', handleMotion, true);
+                            }
+                        })
+                        .catch(console.error);
+                });
+            } else {
+                window.addEventListener('devicemotion', handleMotion, true);
+            }
+        }
+
+    </script>
+</body>
+</html>

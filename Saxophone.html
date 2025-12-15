@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Saxophone มือถือ (Pro Sound)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        :root {
+            --sax-gold: #e6c200;
+            --sax-dark: #b8860b;
+            --sax-light: #fffacd;
+            --bg-color: #1a1a1a;
+            /* ปรับขนาดปุ่มให้ยืดหยุ่นตามความสูงหน้าจอ (ไม่เกิน 70px และไม่เกิน 8.5% ของความสูงจอ) */
+            --key-size: min(70px, 8.5vh); 
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: white;
+            font-family: 'Sarabun', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            /* ป้องกันการเลื่อนและซูมระดับ body */
+            overflow: hidden; 
+            touch-action: none; 
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Header & Controls */
+        header {
+            width: 100%;
+            padding: 10px;
+            background: linear-gradient(180deg, #333, #111);
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            z-index: 10;
+            flex-shrink: 0; /* ป้องกัน Header หดตัว */
+        }
+
+        h1 {
+            margin: 0 0 5px 0; /* ลดระยะห่าง */
+            font-size: 1.2rem;
+            color: var(--sax-gold);
+            text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+
+        button.ctrl-btn {
+            padding: 6px 12px; /* ลดขนาดปุ่มควบคุมเล็กน้อย */
+            border-radius: 20px;
+            border: none;
+            font-family: 'Sarabun', sans-serif;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.85rem;
+        }
+
+        .btn-record { background-color: #ff4444; color: white; }
+        .btn-record.recording { background-color: #ff0000; animation: pulse 1s infinite; }
+        .btn-stop { background-color: #444; color: white; }
+        .btn-play { background-color: #4CAF50; color: white; }
+        .btn-labels { background-color: var(--sax-dark); color: white; }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+        }
+
+        /* Saxophone Body */
+        .sax-body {
+            flex: 1;
+            width: 100%;
+            max-width: 400px;
+            background: linear-gradient(90deg, #8B4513 0%, #daa520 20%, #ffd700 50%, #daa520 80%, #8B4513 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-evenly; /* กระจายปุ่มให้เท่ากันเต็มพื้นที่ */
+            padding: 10px 0; /* ลด padding เพื่อประหยัดพื้นที่ */
+            position: relative;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.6);
+            border-radius: 20px 20px 0 0;
+            overflow: hidden; /* ปิด Scrollbar ในตัว Sax */
+        }
+
+        /* Keys */
+        .key-container {
+            position: relative;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .sax-key {
+            width: var(--key-size);
+            height: var(--key-size);
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #ffffff, #e0e0e0 40%, #a0a0a0 100%);
+            border: 3px solid #b8860b; /* ลดขนาดขอบเล็กน้อย */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4), inset 0 0 8px rgba(255,255,255,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.1rem; /* ปรับขนาดตัวหนังสือ */
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+            position: relative;
+            -webkit-tap-highlight-color: transparent;
+            z-index: 2; /* ให้อยู่เหนือก้านเหล็ก */
+        }
+
+        /* Active State (Pressed) */
+        .sax-key:active, .sax-key.active {
+            transform: scale(0.92);
+            background: radial-gradient(circle at 30% 30%, #cccccc, #a0a0a0 40%, #606060 100%);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4), inset 0 0 15px rgba(0,0,0,0.3);
+            border-color: #8b6508;
+        }
+
+        /* Note Labels */
+        .note-label {
+            position: absolute;
+            pointer-events: none;
+            opacity: 1;
+            transition: opacity 0.3s;
+        }
+        .note-label.hidden {
+            opacity: 0;
+        }
+
+        /* Audio Player area */
+        #audio-container {
+            width: 100%;
+            padding: 5px;
+            background: #222;
+            display: none; /* Hidden by default */
+            justify-content: center;
+        }
+        audio {
+            width: 90%;
+            height: 30px;
+        }
+
+        /* Start Overlay */
+        #start-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+        }
+        #start-btn {
+            background: var(--sax-gold);
+            color: black;
+            font-size: 1.5rem;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 50px;
+            margin-top: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+            animation: pulse 2s infinite;
+        }
+
+        /* Decoration: Rods connecting keys */
+        .rod {
+            position: absolute;
+            width: 6px;
+            /* ปรับความสูงก้านให้สัมพันธ์กับระยะห่างที่อาจเปลี่ยนไป */
+            height: 4vh; 
+            background: linear-gradient(90deg, #8B4513, #daa520, #8B4513);
+            top: -3vh; /* ขยับขึ้นตามความสูง */
+            z-index: 1; /* อยู่ใต้ปุ่ม */
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Start Screen Overlay -->
+    <div id="start-overlay">
+        <h2>Saxophone มือถือ</h2>
+        <p>แตะปุ่มเพื่อเริ่มใช้งานเสียง</p>
+        <button id="start-btn">เริ่มเล่น (Start)</button>
+    </div>
+
+    <header>
+        <h1>🎷 Saxophone</h1>
+        <div class="controls">
+            <button class="ctrl-btn btn-record" id="recordBtn">อัดเสียง</button>
+            <button class="ctrl-btn btn-labels" id="toggleLabelBtn">ซ่อนโน้ต</button>
+        </div>
+        <div id="audio-container">
+            <audio id="audioPlayer" controls></audio>
+        </div>
+    </header>
+
+    <div class="sax-body" id="keyboard">
+        <!-- Keys will be generated by JS -->
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const NOTES = [
+            { note: 'C5', freq: 523.25, label: 'ดํ' }, // High Do
+            { note: 'B4', freq: 493.88, label: 'ท' },
+            { note: 'A4', freq: 440.00, label: 'ล' },
+            { note: 'G4', freq: 392.00, label: 'ซ' },
+            { note: 'F4', freq: 349.23, label: 'ฟ' },
+            { note: 'E4', freq: 329.63, label: 'ม' },
+            { note: 'D4', freq: 293.66, label: 'ร' },
+            { note: 'C4', freq: 261.63, label: 'ด' }  // Low Do
+        ];
+
+        let audioCtx;
+        let masterGain;
+        let mediaRecorder;
+        let audioChunks = [];
+        let destStream; // For recording
+        
+        // Track active oscillators to prevent hanging notes
+        const activeNotes = {}; 
+
+        // --- DOM Elements ---
+        const keyboard = document.getElementById('keyboard');
+        const startOverlay = document.getElementById('start-overlay');
+        const startBtn = document.getElementById('start-btn');
+        const recordBtn = document.getElementById('recordBtn');
+        const audioContainer = document.getElementById('audio-container');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const toggleLabelBtn = document.getElementById('toggleLabelBtn');
+
+        let isRecording = false;
+        let labelsVisible = true;
+
+        // --- Initialization ---
+        function initAudio() {
+            if (audioCtx) return;
+
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+
+            // Master Gain (Volume Control)
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.6; // Base volume
+            
+            // Compressor (To prevent clipping when multiple keys pressed)
+            const compressor = audioCtx.createDynamicsCompressor();
+            compressor.threshold.value = -20;
+            compressor.knee.value = 40;
+            compressor.ratio.value = 12;
+            compressor.attack.value = 0;
+            compressor.release.value = 0.25;
+
+            // Chain: Master -> Compressor -> Destination
+            masterGain.connect(compressor);
+            compressor.connect(audioCtx.destination);
+
+            // Setup Recording Stream
+            destStream = audioCtx.createMediaStreamDestination();
+            compressor.connect(destStream);
+
+            // Reverb Effect (Optional simulation using delay)
+            // Keeping it simple for stability and file size
+        }
+
+        startBtn.addEventListener('click', () => {
+            initAudio();
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            startOverlay.style.display = 'none';
+        });
+
+        // --- Sound Engine (Saxophone Synthesis) ---
+        function playSound(freq, noteId) {
+            if (!audioCtx) return;
+            if (activeNotes[noteId]) return; // Note already playing
+
+            const t = audioCtx.currentTime;
+
+            // 1. Oscillator (Source) - Sawtooth is best for brass/reeds
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, t);
+
+            // 2. Filter (Timbre) - Lowpass to cut harshness
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.Q.value = 1; // Resonance
+            // Dynamic filter: Opens up slightly on attack (breath effect)
+            filter.frequency.setValueAtTime(800, t);
+            filter.frequency.exponentialRampToValueAtTime(1200, t + 0.1); 
+
+            // 3. Envelope (ADSR)
+            const envNode = audioCtx.createGain();
+            envNode.gain.setValueAtTime(0, t);
+            envNode.gain.linearRampToValueAtTime(0.8, t + 0.05); // Attack (Blow)
+            envNode.gain.linearRampToValueAtTime(0.6, t + 0.2); // Decay to Sustain
+
+            // Connect graph
+            osc.connect(filter);
+            filter.connect(envNode);
+            envNode.connect(masterGain);
+
+            osc.start(t);
+
+            // Store reference to stop later
+            activeNotes[noteId] = { osc, envNode, filter };
+        }
+
+        function stopSound(noteId) {
+            if (!audioCtx || !activeNotes[noteId]) return;
+
+            const { osc, envNode } = activeNotes[noteId];
+            const t = audioCtx.currentTime;
+            
+            // Release envelope (Fade out quickly but smooth)
+            envNode.gain.cancelScheduledValues(t);
+            envNode.gain.setValueAtTime(envNode.gain.value, t);
+            envNode.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+
+            osc.stop(t + 0.15); // Stop after release
+
+            delete activeNotes[noteId];
+        }
+
+        // --- UI Generation ---
+        NOTES.forEach((n, index) => {
+            // Container for Rod decoration (except first)
+            const keyContainer = document.createElement('div');
+            keyContainer.className = 'key-container';
+            
+            if (index > 0) {
+                const rod = document.createElement('div');
+                rod.className = 'rod';
+                keyContainer.appendChild(rod);
+            }
+
+            const btn = document.createElement('div');
+            btn.className = 'sax-key';
+            btn.dataset.note = n.note;
+            btn.dataset.freq = n.freq;
+            btn.id = 'key-' + n.note;
+            
+            // Label
+            const label = document.createElement('span');
+            label.className = 'note-label';
+            label.innerText = n.label;
+            btn.appendChild(label);
+
+            // Event Listeners (Pointer Events for better mobile support)
+            const startNote = (e) => {
+                e.preventDefault(); // Stop scrolling
+                btn.classList.add('active');
+                playSound(n.freq, n.note);
+            };
+
+            const endNote = (e) => {
+                e.preventDefault();
+                btn.classList.remove('active');
+                stopSound(n.note);
+            };
+
+            // Touch/Mouse Start
+            btn.addEventListener('pointerdown', startNote);
+            
+            // Touch/Mouse End/Leave/Cancel (Crucial for stability)
+            btn.addEventListener('pointerup', endNote);
+            btn.addEventListener('pointerleave', endNote);
+            btn.addEventListener('pointercancel', endNote);
+
+            keyContainer.appendChild(btn);
+            keyboard.appendChild(keyContainer);
+        });
+
+        // --- Recording Logic ---
+        recordBtn.addEventListener('click', () => {
+            if (!audioCtx) initAudio();
+
+            if (!isRecording) {
+                // Start Recording
+                audioChunks = [];
+                // Use a supported mime type
+                let options = { mimeType: 'audio/webm' };
+                if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                    options = { mimeType: 'audio/ogg' }; // Fallback
+                }
+                
+                try {
+                    mediaRecorder = new MediaRecorder(destStream.stream, options);
+                } catch (e) {
+                    alert('เบราว์เซอร์นี้ไม่รองรับการอัดเสียง');
+                    return;
+                }
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const audioURL = URL.createObjectURL(blob);
+                    audioPlayer.src = audioURL;
+                    audioContainer.style.display = 'flex';
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.innerText = "หยุดอัด";
+                recordBtn.classList.add('recording');
+                audioContainer.style.display = 'none';
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.innerText = "อัดเสียง";
+                recordBtn.classList.remove('recording');
+            }
+        });
+
+        // --- Label Toggle ---
+        toggleLabelBtn.addEventListener('click', () => {
+            labelsVisible = !labelsVisible;
+            const labels = document.querySelectorAll('.note-label');
+            labels.forEach(l => {
+                if (labelsVisible) l.classList.remove('hidden');
+                else l.classList.add('hidden');
+            });
+            toggleLabelBtn.innerText = labelsVisible ? "ซ่อนโน้ต" : "แสดงโน้ต";
+        });
+
+        // Prevent Context Menu on long press
+        window.oncontextmenu = function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            return false;
+        };
+
+        // Global cleanup (if window loses focus, stop all sound)
+        window.addEventListener('blur', () => {
+            Object.keys(activeNotes).forEach(key => stopSound(key));
+        });
+
+    </script>
+</body>
+</html>

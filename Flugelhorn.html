@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Realistic Flugelhorn Simulator</title>
+    <!-- Tailwind CSS for layout utility -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Global Reset & No Scroll */
+        body {
+            background: #1a1a1a;
+            color: white;
+            overflow: hidden; /* ห้ามเลื่อน */
+            touch-action: none; /* ห้าม Zoom/Pan */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Metallic Gradient for the Instrument */
+        .brass-gradient {
+            background: linear-gradient(135deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.4), 5px 5px 15px rgba(0,0,0,0.5);
+        }
+
+        .valve-cap {
+            background: radial-gradient(circle at 30% 30%, #e8e8e8, #a0a0a0);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            transition: transform 0.05s; /* Faster visual response */
+        }
+        
+        .valve-cap:active, .valve-cap.active {
+            transform: translateY(15px); /* Animation when pressed */
+            background: radial-gradient(circle at 30% 30%, #d0d0d0, #808080);
+        }
+
+        /* Note Button Styling */
+        .note-btn {
+            appearance: none;
+            border: 2px solid #b38728;
+            background: rgba(30, 30, 30, 0.9);
+            color: #fcf6ba;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(179, 135, 40, 0.2);
+            transition: all 0.05s; /* Faster touch response */
+            touch-action: none; /* Critical for mobile game feel */
+            position: relative;
+            z-index: 10;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .note-btn:active, .note-btn.active {
+            background: #b38728;
+            color: #1a1a1a;
+            transform: scale(0.95);
+            box-shadow: 0 0 20px rgba(179, 135, 40, 0.8);
+        }
+
+        /* Control Panel Buttons */
+        .ctrl-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #333;
+            border-radius: 12px;
+            padding: 8px;
+            width: 64px;
+            height: 64px;
+            border: 1px solid #555;
+            transition: background 0.2s;
+        }
+        .ctrl-btn:active {
+            background: #444;
+        }
+        .ctrl-btn.recording {
+            background: #500;
+            border-color: #f00;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+        }
+
+        /* Canvas for Visualizer */
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* SVG Instrument Layout */
+        .instrument-container {
+            position: relative;
+            width: 100%;
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* Label Text */
+        .label-text {
+            font-size: 10px;
+            margin-top: 4px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header / Status -->
+    <div class="h-14 bg-black/50 flex items-center justify-between px-4 border-b border-gray-700 z-20">
+        <h1 class="text-gold font-bold text-lg text-yellow-500 flex items-center gap-2">
+            <i data-lucide="music"></i> Flugelhorn Sim
+        </h1>
+        <div id="status" class="text-xs text-green-400 font-mono opacity-0 transition-opacity">Ready</div>
+    </div>
+
+    <!-- Main Instrument Area -->
+    <div class="instrument-container relative">
+        <!-- Background Visualizer -->
+        <div class="absolute inset-0 z-0 opacity-30">
+            <canvas id="visualizer"></canvas>
+        </div>
+
+        <!-- The Flugelhorn Graphic (SVG) -->
+        <div class="relative z-10 w-[90%] max-w-[500px] aspect-[4/3]">
+            <svg viewBox="0 0 400 300" class="w-full h-full drop-shadow-2xl">
+                <defs>
+                    <linearGradient id="brass" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#bf953f;stop-opacity:1" />
+                        <stop offset="25%" style="stop-color:#fcf6ba;stop-opacity:1" />
+                        <stop offset="50%" style="stop-color:#b38728;stop-opacity:1" />
+                        <stop offset="75%" style="stop-color:#fbf5b7;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#aa771c;stop-opacity:1" />
+                    </linearGradient>
+                    <filter id="glow">
+                        <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+                        <feMerge>
+                            <feMergeNode in="coloredBlur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
+                </defs>
+
+                <!-- Tubing (Leadpipe to Bell) -->
+                <!-- The Flugelhorn has a wider conical bore than a trumpet -->
+                <path d="M 50 100 Q 150 100 200 150 T 350 150" 
+                      fill="none" stroke="url(#brass)" stroke-width="20" stroke-linecap="round" />
+                
+                <!-- The Bell -->
+                <path d="M 350 150 Q 380 150 390 110 L 400 110 Q 380 200 390 290 L 380 290 Q 370 250 350 250 L 350 150" 
+                      fill="url(#brass)" />
+                <ellipse cx="370" cy="200" rx="30" ry="50" fill="url(#brass)" fill-opacity="0.8" />
+                
+                <!-- Valve Casings -->
+                <rect x="130" y="120" width="20" height="120" fill="url(#brass)" stroke="#555" stroke-width="1"/>
+                <rect x="160" y="120" width="20" height="120" fill="url(#brass)" stroke="#555" stroke-width="1"/>
+                <rect x="190" y="120" width="20" height="120" fill="url(#brass)" stroke="#555" stroke-width="1"/>
+
+                <!-- Mouthpiece -->
+                <path d="M 10 95 L 40 98 L 40 102 L 10 105 Z" fill="#c0c0c0" />
+                <rect x="40" y="97" width="10" height="6" fill="#bf953f" />
+
+                <!-- Pistons (Visual only, animated by JS) -->
+                <rect id="piston1" x="132" y="110" width="16" height="30" class="valve-cap" rx="2" />
+                <rect id="piston2" x="162" y="110" width="16" height="30" class="valve-cap" rx="2" />
+                <rect id="piston3" x="192" y="110" width="16" height="30" class="valve-cap" rx="2" />
+            </svg>
+        </div>
+
+        <!-- Note Buttons Overlay (Ergonomic Arc) -->
+        <div class="absolute bottom-4 left-0 right-0 z-20 flex justify-center pb-2">
+            <div class="grid grid-cols-4 gap-3 sm:gap-6">
+                <!-- Lower Octave -->
+                <button class="note-btn" data-note="G3">G</button>
+                <button class="note-btn" data-note="A3">A</button>
+                <button class="note-btn" data-note="B3">B</button>
+                <button class="note-btn" data-note="C4" style="border-color: #fff;">C</button>
+                
+                <!-- Upper Octave -->
+                <button class="note-btn" data-note="D4">D</button>
+                <button class="note-btn" data-note="E4">E</button>
+                <button class="note-btn" data-note="F4">F</button>
+                <button class="note-btn" data-note="G4">G'</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Control Deck (Bottom) -->
+    <div class="bg-gray-900 border-t border-gray-700 p-4 pb-8 z-30">
+        <div class="flex justify-around items-center max-w-md mx-auto">
+            
+            <!-- Record Button -->
+            <button id="recordBtn" class="ctrl-btn text-red-500">
+                <i data-lucide="mic"></i>
+                <span class="label-text">อัดเสียง</span>
+            </button>
+
+            <!-- Play Button -->
+            <button id="playBtn" class="ctrl-btn text-blue-400" disabled style="opacity: 0.5;">
+                <i data-lucide="play"></i>
+                <span class="label-text">ฟังเสียง</span>
+            </button>
+
+            <!-- Download Button -->
+            <button id="downloadBtn" class="ctrl-btn text-yellow-500" disabled style="opacity: 0.5;">
+                <i data-lucide="download"></i>
+                <span class="label-text">โหลด</span>
+            </button>
+
+        </div>
+    </div>
+
+    <!-- Hidden Audio Element for Playback -->
+    <audio id="audioPlayback" class="hidden"></audio>
+
+    <script>
+        // --- 1. Audio Engine (Web Audio API) ---
+        let audioCtx;
+        let masterGain;
+        let analyser;
+        let recordingDest;
+        let mediaRecorder;
+        let recordedChunks = [];
+        let audioBlob = null;
+        let isRecording = false;
+
+        // Frequencies for Notes (Concert Pitch)
+        // Flugelhorn is Bb instrument, but for simplicity we label C as C (Concert Pitch) for general users
+        const noteFreqs = {
+            'G3': 196.00,
+            'A3': 220.00,
+            'B3': 246.94,
+            'C4': 261.63,
+            'D4': 293.66,
+            'E4': 329.63,
+            'F4': 349.23,
+            'G4': 392.00
+        };
+
+        // Valve Mapping for Visuals (Which valve goes down for which note)
+        // 1 = Pressed, 0 = Open
+        const valveMap = {
+            'G3': [1, 0, 1], // 1+3 (Low G)
+            'A3': [1, 1, 0], // 1+2
+            'B3': [0, 1, 0], // 2
+            'C4': [0, 0, 0], // Open
+            'D4': [1, 0, 0], // 1
+            'E4': [0, 0, 0], // Open (harmonic) or 1+2. Let's use Open for simpler visual
+            'F4': [1, 0, 0], // 1
+            'G4': [0, 0, 0]  // Open
+        };
+
+        let activeOscillators = {};
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.6; // Initial volume
+
+                // Analyser for Visuals
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 256;
+
+                // Compressor (to prevent clipping/distortion when multiple notes overlap)
+                const compressor = audioCtx.createDynamicsCompressor();
+                compressor.threshold.value = -10;
+                compressor.knee.value = 40;
+                compressor.ratio.value = 12;
+                compressor.attack.value = 0;
+                compressor.release.value = 0.25;
+
+                // Recording Destination
+                recordingDest = audioCtx.createMediaStreamDestination();
+
+                // Chain: Master -> Analyser -> Compressor -> Destination (Speakers + Recorder)
+                masterGain.connect(analyser);
+                analyser.connect(compressor);
+                compressor.connect(audioCtx.destination);
+                compressor.connect(recordingDest);
+
+                document.getElementById('status').style.opacity = '1';
+                drawVisualizer();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playNote(note) {
+            initAudio();
+            
+            // STABILITY FIX: If note is already playing/fading, force stop it first to allow rapid re-triggering
+            if (activeOscillators[note]) {
+                forceStop(note);
+            }
+
+            const freq = noteFreqs[note];
+            const t = audioCtx.currentTime;
+
+            // 1. Oscillator (The Source)
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sawtooth'; 
+            osc.frequency.setValueAtTime(freq, t);
+
+            // 2. Filter (The Timbre/Tone) - Low Pass
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            // Brass attack: Filter opens up slightly then settles
+            filter.frequency.setValueAtTime(400, t); 
+            filter.frequency.linearRampToValueAtTime(1800, t + 0.1); // Attack "Wah"
+            filter.frequency.exponentialRampToValueAtTime(1000, t + 0.5); // Sustain brightness
+
+            // 3. Envelope (The Volume Shape)
+            const env = audioCtx.createGain();
+            env.gain.setValueAtTime(0, t);
+            env.gain.linearRampToValueAtTime(0.8, t + 0.05); // Attack (Soft brass attack)
+            env.gain.linearRampToValueAtTime(0.6, t + 0.2);  // Decay to Sustain level
+
+            // Connections
+            osc.connect(filter);
+            filter.connect(env);
+            env.connect(masterGain);
+
+            osc.start(t);
+
+            activeOscillators[note] = { osc, env, filter };
+
+            // Visuals: Valve Animation
+            animateValves(note);
+        }
+
+        function stopNote(note) {
+            if (!activeOscillators[note]) return;
+
+            const { osc, env } = activeOscillators[note];
+            const t = audioCtx.currentTime;
+
+            // Release Envelope
+            // Important: cancelScheduledValues allows us to take over immediately
+            env.gain.cancelScheduledValues(t);
+            env.gain.setValueAtTime(env.gain.value, t);
+            env.gain.exponentialRampToValueAtTime(0.001, t + 0.2); // Release tail
+
+            osc.stop(t + 0.2);
+            
+            // STABILITY FIX: Remove from active list immediately so we can re-play instantly
+            // The audio node will finish its release in the background
+            delete activeOscillators[note];
+
+            // Reset Valves
+            resetValves();
+        }
+
+        // Helper to instantly kill a note (used for re-triggering or panic button)
+        function forceStop(note) {
+            if (activeOscillators[note]) {
+                const { osc, env } = activeOscillators[note];
+                try {
+                    const t = audioCtx.currentTime;
+                    env.gain.cancelScheduledValues(t);
+                    env.gain.setValueAtTime(0, t);
+                    osc.stop(t);
+                } catch(e) {
+                    // Ignore errors if already stopped
+                }
+                delete activeOscillators[note];
+            }
+        }
+        
+        // Panic Button / Global Stop
+        function stopAllNotes() {
+            Object.keys(activeOscillators).forEach(note => forceStop(note));
+            resetValves();
+        }
+
+        // --- 2. Visuals & Animation ---
+        
+        function animateValves(note) {
+            const pattern = valveMap[note];
+            if(!pattern) return;
+
+            const pistons = [
+                document.getElementById('piston1'),
+                document.getElementById('piston2'),
+                document.getElementById('piston3')
+            ];
+
+            pistons.forEach((piston, index) => {
+                if (pattern[index] === 1) {
+                    piston.classList.add('active');
+                } else {
+                    piston.classList.remove('active');
+                }
+            });
+        }
+
+        function resetValves() {
+            // Only reset if no other notes are playing (monophonic visual logic for simplicity)
+            if (Object.keys(activeOscillators).length === 0) {
+                 document.querySelectorAll('.valve-cap').forEach(el => el.classList.remove('active'));
+            }
+        }
+
+        // Canvas Visualizer
+        function drawVisualizer() {
+            const canvas = document.getElementById('visualizer');
+            const ctx = canvas.getContext('2d');
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            // Handle Resize
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+
+            function render() {
+                requestAnimationFrame(render);
+                analyser.getByteFrequencyData(dataArray);
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw wave/bars
+                const barWidth = (canvas.width / bufferLength) * 2.5;
+                let barHeight;
+                let x = 0;
+
+                for(let i = 0; i < bufferLength; i++) {
+                    barHeight = dataArray[i];
+                    // Gold color with opacity
+                    ctx.fillStyle = `rgba(255, 215, 0, ${barHeight / 255})`; 
+                    ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                    x += barWidth + 1;
+                }
+            }
+            render();
+        }
+
+        // --- 3. Interaction Handling ---
+
+        const buttons = document.querySelectorAll('.note-btn');
+
+        buttons.forEach(btn => {
+            const note = btn.dataset.note;
+            
+            // Mouse Events
+            btn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                playNote(note);
+            });
+            btn.addEventListener('mouseup', (e) => {
+                e.preventDefault();
+                stopNote(note);
+            });
+            btn.addEventListener('mouseleave', (e) => {
+                stopNote(note);
+            });
+
+            // Touch Events (Mobile responsiveness)
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // Prevent scroll/zoom
+                btn.classList.add('active');
+                playNote(note);
+            }, { passive: false });
+
+            btn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                btn.classList.remove('active');
+                stopNote(note);
+            }, { passive: false });
+            
+            // Handle touch cancel (e.g. call interrupt)
+            btn.addEventListener('touchcancel', () => {
+                btn.classList.remove('active');
+                stopNote(note);
+            });
+        });
+        
+        // Safety: Stop all sounds if window loses focus or is hidden
+        window.addEventListener('blur', stopAllNotes);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) stopAllNotes();
+        });
+
+        // --- 4. Recorder Logic ---
+
+        const recordBtn = document.getElementById('recordBtn');
+        const playBtn = document.getElementById('playBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const audioPlayback = document.getElementById('audioPlayback');
+
+        recordBtn.addEventListener('click', () => {
+            initAudio();
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        });
+
+        function startRecording() {
+            recordedChunks = [];
+            // Stream from the destination node we created earlier
+            const stream = recordingDest.stream;
+            mediaRecorder = new MediaRecorder(stream);
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                audioPlayback.src = audioUrl;
+                
+                // Enable controls
+                playBtn.disabled = false;
+                playBtn.style.opacity = '1';
+                downloadBtn.disabled = false;
+                downloadBtn.style.opacity = '1';
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            
+            // UI Update
+            recordBtn.classList.add('recording');
+            recordBtn.innerHTML = `<i data-lucide="square"></i><span class="label-text">หยุด</span>`;
+            lucide.createIcons();
+            
+            // Clear previous recording UI state
+            playBtn.disabled = true;
+            playBtn.style.opacity = '0.5';
+            downloadBtn.disabled = true;
+            downloadBtn.style.opacity = '0.5';
+        }
+
+        function stopRecording() {
+            mediaRecorder.stop();
+            isRecording = false;
+            
+            // UI Update
+            recordBtn.classList.remove('recording');
+            recordBtn.innerHTML = `<i data-lucide="mic"></i><span class="label-text">อัดเสียง</span>`;
+            lucide.createIcons();
+        }
+
+        playBtn.addEventListener('click', () => {
+            if (audioPlayback.src) {
+                audioPlayback.play();
+            }
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            if (audioBlob) {
+                const url = URL.createObjectURL(audioBlob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'flugelhorn_recording_' + new Date().getTime() + '.webm';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+            }
+        });
+
+        // Initialize Icons
+        lucide.createIcons();
+
+        // Prevent Context Menu on long press
+        window.oncontextmenu = function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            return false;
+        };
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Realistic Vibraphone Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;500;700&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #1a1a1a;
+            color: #eee;
+            overflow: hidden; /* Prevent scrolling on mobile */
+            touch-action: none; /* Crucial for multitouch gaming */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Metallic Bar Styling */
+        .bar {
+            position: relative;
+            cursor: pointer;
+            border-radius: 4px;
+            box-shadow: 2px 4px 6px rgba(0,0,0,0.5), inset 0 0 10px rgba(255,255,255,0.2);
+            transition: transform 0.05s, background 0.1s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.8rem;
+            color: rgba(0,0,0,0.6);
+            font-weight: bold;
+        }
+
+        .bar-natural {
+            background: linear-gradient(135deg, #d4d4d4 0%, #f0f0f0 50%, #a0a0a0 100%);
+            height: 100%;
+            z-index: 10;
+        }
+
+        .bar-accidental {
+            background: linear-gradient(135deg, #c5a005 0%, #ffd700 50%, #b8860b 100%); /* Gold color */
+            height: 60%;
+            z-index: 20;
+            position: absolute;
+            top: 0;
+            /* Width and positioning calculated in JS/Inline style */
+        }
+
+        .bar:active, .bar.active {
+            transform: scale(0.96) translateY(2px);
+            filter: brightness(1.2);
+        }
+        
+        /* Hit animation */
+        @keyframes hitGlow {
+            0% { box-shadow: 0 0 15px white; }
+            100% { box-shadow: 2px 4px 6px rgba(0,0,0,0.5); }
+        }
+        
+        .hit {
+            animation: hitGlow 0.3s ease-out;
+        }
+
+        /* Felt/Damper look */
+        .felt-strip {
+            background-color: #2a2a2a;
+            box-shadow: inset 0 0 10px #000;
+        }
+        
+        /* Controls UI */
+        .knob-container {
+            background: #333;
+            border-radius: 12px;
+            padding: 10px;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        /* Slider customization */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #ffd700;
+            cursor: pointer;
+            margin-top: -8px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #555;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-between py-2">
+
+    <!-- Top Controls -->
+    <div class="w-full max-w-4xl px-4 flex justify-between items-center h-[15vh]">
+        <div class="flex items-center gap-4">
+            <h1 class="text-xl md:text-2xl font-bold text-gray-300 tracking-wider">VIBRAPHONE</h1>
+        </div>
+        
+        <div class="flex gap-4 items-center knob-container">
+            <!-- Recording Button (New) -->
+            <div class="flex flex-col items-center mr-2 border-r border-gray-600 pr-4">
+                <label class="text-xs text-gray-400 mb-1">บันทึก (Rec)</label>
+                <button id="recordBtn" class="w-12 h-6 rounded-full bg-gray-600 text-[10px] font-bold text-white transition-all flex items-center justify-center shadow-md">
+                    REC
+                </button>
+            </div>
+
+            <!-- Motor Switch -->
+            <div class="flex flex-col items-center">
+                <label class="text-xs text-gray-400 mb-1">มอเตอร์ (Motor)</label>
+                <button id="motorBtn" class="w-12 h-6 rounded-full bg-gray-600 transition-colors relative flex items-center px-1">
+                    <div id="motorKnob" class="w-4 h-4 bg-white rounded-full transition-transform transform translate-x-0"></div>
+                </button>
+            </div>
+
+            <!-- Speed Control -->
+            <div class="flex flex-col items-center w-32">
+                <label class="text-xs text-gray-400 mb-1">ความเร็ว (Speed)</label>
+                <input type="range" id="speedSlider" min="1" max="10" step="0.1" value="3" disabled>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instrument Area -->
+    <div class="relative w-full max-w-5xl h-[80vh] bg-stone-800 rounded-lg shadow-2xl overflow-hidden border-8 border-stone-900 felt-strip p-2 md:p-4 flex flex-col justify-center">
+        
+        <!-- Note: We use CSS Grid/Flex heavily here for alignment -->
+        <div id="vibraphone-container" class="relative w-full h-full flex justify-center items-end select-none">
+            <!-- Bars will be generated by JS -->
+        </div>
+
+    </div>
+
+    <!-- Audio Start Overlay (needed for browsers) -->
+    <div id="startOverlay" class="fixed inset-0 bg-black/80 z-50 flex flex-col justify-center items-center text-center cursor-pointer">
+        <div class="bg-white/10 p-8 rounded-2xl backdrop-blur-md border border-white/20">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto mb-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h2 class="text-2xl font-bold text-white mb-2">แตะเพื่อเริ่มใช้งาน</h2>
+            <p class="text-gray-300">Tap anywhere to start audio engine</p>
+        </div>
+    </div>
+
+<script>
+    // --- Audio Context & Configuration ---
+    let audioCtx;
+    let motorEnabled = false;
+    let motorSpeed = 3; // Hz
+    let masterGain;
+    let dest; // For recording
+    let mediaRecorder;
+    let recordedChunks = [];
+    let isRecording = false;
+    
+    // Notes Configuration (F3 to F5 range - typical mid range of vibes)
+    // We can map these to be generated dynamically
+    const notes = [
+        { note: 'F3', freq: 174.61, type: 'natural' },
+        { note: 'F#3', freq: 185.00, type: 'accidental' },
+        { note: 'G3', freq: 196.00, type: 'natural' },
+        { note: 'G#3', freq: 207.65, type: 'accidental' },
+        { note: 'A3', freq: 220.00, type: 'natural' },
+        { note: 'A#3', freq: 233.08, type: 'accidental' },
+        { note: 'B3', freq: 246.94, type: 'natural' },
+        { note: 'C4', freq: 261.63, type: 'natural' },
+        { note: 'C#4', freq: 277.18, type: 'accidental' },
+        { note: 'D4', freq: 293.66, type: 'natural' },
+        { note: 'D#4', freq: 311.13, type: 'accidental' },
+        { note: 'E4', freq: 329.63, type: 'natural' },
+        { note: 'F4', freq: 349.23, type: 'natural' },
+        { note: 'F#4', freq: 369.99, type: 'accidental' },
+        { note: 'G4', freq: 392.00, type: 'natural' },
+        { note: 'G#4', freq: 415.30, type: 'accidental' },
+        { note: 'A4', freq: 440.00, type: 'natural' },
+        { note: 'A#4', freq: 466.16, type: 'accidental' },
+        { note: 'B4', freq: 493.88, type: 'natural' },
+        { note: 'C5', freq: 523.25, type: 'natural' },
+        { note: 'C#5', freq: 554.37, type: 'accidental' },
+        { note: 'D5', freq: 587.33, type: 'natural' },
+        { note: 'D#5', freq: 622.25, type: 'accidental' },
+        { note: 'E5', freq: 659.25, type: 'natural' },
+        { note: 'F5', freq: 698.46, type: 'natural' }
+    ];
+
+    // --- UI Logic ---
+    const container = document.getElementById('vibraphone-container');
+    const motorBtn = document.getElementById('motorBtn');
+    const motorKnob = document.getElementById('motorKnob');
+    const speedSlider = document.getElementById('speedSlider');
+    const overlay = document.getElementById('startOverlay');
+    const recordBtn = document.getElementById('recordBtn');
+
+    // Initialize Audio
+    function initAudio() {
+        if (!audioCtx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.8;
+            
+            // Connect to speakers
+            masterGain.connect(audioCtx.destination);
+
+            // Connect to Recorder Destination
+            dest = audioCtx.createMediaStreamDestination();
+            masterGain.connect(dest);
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        overlay.classList.add('hidden');
+    }
+
+    // Build the Instrument UI
+    function buildInstrument() {
+        // We need to arrange keys. Natural keys are a row. Accidentals overlay them.
+        // Calculate widths.
+        const naturals = notes.filter(n => n.type === 'natural');
+        const numNaturals = naturals.length;
+        const widthPercent = 100 / numNaturals; 
+        
+        let naturalIndex = 0;
+
+        notes.forEach((noteData, index) => {
+            const btn = document.createElement('div');
+            
+            // Text label
+            btn.innerText = noteData.note.replace(/[0-9]/g, ''); // Show C, D, E without octave number
+
+            if (noteData.type === 'natural') {
+                btn.className = 'bar bar-natural';
+                btn.style.width = `${widthPercent - 0.5}%`; // gap
+                btn.style.left = 'auto'; // Flex handles this
+                btn.style.height = `${100 - (naturalIndex * 1.5)}%`; // Tapering height slightly for visual effect
+                naturalIndex++;
+            } else {
+                btn.className = 'bar bar-accidental';
+                btn.style.width = `${widthPercent * 0.7}%`;
+                // Calculate position relative to the previous natural key
+                // Accidental usually sits between two naturals.
+                // We need to find how many naturals came before this accidental
+                let prevNaturals = 0;
+                for(let i=0; i<index; i++) {
+                    if(notes[i].type === 'natural') prevNaturals++;
+                }
+                
+                // Position: (Previous Naturals * Width) - (Half Width of accidental)
+                const leftPos = (prevNaturals * widthPercent) - (widthPercent * 0.35); 
+                btn.style.left = `${leftPos}%`;
+                btn.style.height = `${55 - (naturalIndex * 1.5)}%`; // Tapering
+            }
+
+            // Events
+            const triggerNote = (e) => {
+                e.preventDefault(); // Prevent scroll
+                initAudio();
+                playNote(noteData.freq);
+                
+                // Visual feedback
+                btn.classList.add('active');
+                btn.classList.add('hit');
+                setTimeout(() => {
+                    btn.classList.remove('active');
+                    btn.classList.remove('hit');
+                }, 150);
+            };
+
+            btn.addEventListener('mousedown', triggerNote);
+            btn.addEventListener('touchstart', triggerNote, { passive: false });
+
+            container.appendChild(btn);
+        });
+    }
+
+    // --- Sound Synthesis Engine ---
+    function playNote(freq) {
+        if (!audioCtx) return;
+
+        const now = audioCtx.currentTime;
+
+        // 1. Main Oscillator (The Fundamental)
+        const osc = audioCtx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+
+        // 2. Overtone (Harmonic for metallic timbre - usually around 4x for bars)
+        const osc2 = audioCtx.createOscillator();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(freq * 3.99, now); // Slightly detuned 4th harmonic makes it realistic
+
+        // 3. Amplitude Envelope (Attack & Decay)
+        const gainNode = audioCtx.createGain();
+        const gainNode2 = audioCtx.createGain(); // For overtone
+
+        // Hard mallet attack
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(1.0, now + 0.005); // Sharp attack
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 2.5); // Long sustain/decay
+
+        // Overtone decays faster
+        gainNode2.gain.setValueAtTime(0, now);
+        gainNode2.gain.linearRampToValueAtTime(0.3, now + 0.005);
+        gainNode2.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+
+        // 4. Motor / Tremolo Effect (Amplitude Modulation)
+        const tremoloGain = audioCtx.createGain();
+        tremoloGain.gain.value = 1; // Default gain passed through
+
+        if (motorEnabled) {
+            const lfo = audioCtx.createOscillator();
+            lfo.type = 'sine';
+            lfo.frequency.value = motorSpeed; // Speed of fans
+            
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = 0.6; // Depth of tremolo (0 to 1)
+
+            // Connect LFO to modulate the gain of the tremolo node
+            // The math: Gain = 1 + (SinWave * Depth)
+            // But WebAudio param connection sums values. 
+            // So we connect LFO to tremoloGain.gain (which is AudioParam)
+            
+            lfo.connect(lfoGain);
+            lfoGain.connect(tremoloGain.gain);
+            lfo.start(now);
+            lfo.stop(now + 2.5);
+        }
+
+        // 5. Connections
+        // Osc 1 -> Envelope -> Tremolo -> Master
+        osc.connect(gainNode);
+        gainNode.connect(tremoloGain);
+        
+        // Osc 2 -> Envelope -> Tremolo -> Master
+        osc2.connect(gainNode2);
+        gainNode2.connect(tremoloGain);
+
+        tremoloGain.connect(masterGain);
+
+        // Start & Stop
+        osc.start(now);
+        osc.stop(now + 2.5);
+        osc2.start(now);
+        osc2.stop(now + 2.5);
+
+        // Cleanup
+        setTimeout(() => {
+            osc.disconnect();
+            osc2.disconnect();
+            gainNode.disconnect();
+            gainNode2.disconnect();
+            tremoloGain.disconnect();
+        }, 3000);
+    }
+
+    // --- Control Event Listeners ---
+    overlay.addEventListener('click', initAudio);
+    overlay.addEventListener('touchstart', initAudio);
+
+    // Recording Logic
+    recordBtn.addEventListener('click', () => {
+        initAudio(); // Ensure audio context is ready
+        
+        if (!isRecording) {
+            // Start Recording
+            isRecording = true;
+            recordedChunks = [];
+            
+            // Create recorder if not exists
+            if(!mediaRecorder) {
+                // Check for supported mime types
+                let options = { mimeType: 'audio/webm' };
+                if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                     options = { mimeType: 'audio/mp4' }; // Fallback for Safari sometimes
+                }
+                
+                try {
+                    mediaRecorder = new MediaRecorder(dest.stream, options);
+                } catch (e) {
+                    alert('Browser does not support recording natively.');
+                    isRecording = false;
+                    return;
+                }
+                
+                mediaRecorder.ondataavailable = (evt) => {
+                    if (evt.data.size > 0) recordedChunks.push(evt.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    // Create download link
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `vibraphone-session-${new Date().toISOString().slice(0,19).replace(/:/g,"-")}.webm`;
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Cleanup
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                };
+            }
+
+            mediaRecorder.start();
+            
+            // UI Feedback
+            recordBtn.classList.remove('bg-gray-600');
+            recordBtn.classList.add('bg-red-600', 'animate-pulse');
+            recordBtn.innerText = 'STOP';
+            
+        } else {
+            // Stop Recording
+            isRecording = false;
+            mediaRecorder.stop();
+            
+            // UI Feedback
+            recordBtn.classList.remove('bg-red-600', 'animate-pulse');
+            recordBtn.classList.add('bg-gray-600');
+            recordBtn.innerText = 'REC';
+        }
+    });
+
+    motorBtn.addEventListener('click', () => {
+        motorEnabled = !motorEnabled;
+        if (motorEnabled) {
+            motorBtn.classList.remove('bg-gray-600');
+            motorBtn.classList.add('bg-green-500');
+            motorKnob.classList.add('translate-x-6');
+            speedSlider.disabled = false;
+        } else {
+            motorBtn.classList.add('bg-gray-600');
+            motorBtn.classList.remove('bg-green-500');
+            motorKnob.classList.remove('translate-x-6');
+            speedSlider.disabled = true;
+        }
+    });
+
+    speedSlider.addEventListener('input', (e) => {
+        motorSpeed = parseFloat(e.target.value);
+    });
+
+    // Keyboard support (Optional)
+    const keyMap = {
+        'a': 'C4', 'w': 'C#4', 's': 'D4', 'e': 'D#4', 'd': 'E4', 'f': 'F4',
+        't': 'F#4', 'g': 'G4', 'y': 'G#4', 'h': 'A4', 'u': 'A#4', 'j': 'B4',
+        'k': 'C5'
+    };
+
+    window.addEventListener('keydown', (e) => {
+        if (e.repeat) return;
+        const noteName = keyMap[e.key];
+        if (noteName) {
+            const targetNote = notes.find(n => n.note === noteName);
+            if (targetNote) {
+                // Find button to visualize
+                const allButtons = document.querySelectorAll('.bar');
+                // This is a naive lookup for visualization, audio works regardless
+                // In a real app we'd map DOM elements better
+                initAudio();
+                playNote(targetNote.freq);
+            }
+        }
+    });
+
+    // Initialize UI
+    buildInstrument();
+
+</script>
+</body>
+</html>

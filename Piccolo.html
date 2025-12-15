@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Piccolo Virtual Pro</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* ป้องกันการเลือกข้อความและการแตะซ้ำบนมือถือ */
+        body {
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overscroll-behavior: none;
+        }
+
+        /* เอฟเฟกต์ปุ่มกดแบบโลหะ (Metallic Key) */
+        .piccolo-key {
+            background: radial-gradient(circle at 30% 30%, #f0f0f0, #a0a0a0, #4a4a4a);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5), inset 0 -2px 5px rgba(0,0,0,0.2);
+            transition: transform 0.05s, background 0.1s;
+            border: 2px solid #2d2d2d;
+            position: relative;
+            aspect-ratio: 1 / 1;
+            /* สำคัญ: บังคับ Pointer Events */
+            touch-action: none; 
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .piccolo-key:active, .piccolo-key.active {
+            transform: scale(0.92);
+            background: radial-gradient(circle at 30% 30%, #d0d0d0, #808080, #3a3a3a);
+            box-shadow: 0 2px 3px rgba(0,0,0,0.5), inset 0 2px 5px rgba(0,0,0,0.4);
+        }
+
+        /* รูกลางปุ่ม */
+        .piccolo-key::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60%;
+            height: 60%;
+            border-radius: 50%;
+            background: radial-gradient(circle, #ddd 10%, #999 90%);
+            border: 1px solid #666;
+            opacity: 0.8;
+            pointer-events: none;
+        }
+
+        /* ตัวเครื่องปิคโคโล */
+        .instrument-body {
+            background: linear-gradient(90deg, #111 0%, #333 40%, #555 50%, #333 60%, #111 100%);
+            box-shadow: inset 0 0 20px #000;
+            border-radius: 50px;
+        }
+
+        /* ไฟแสดงสถานะอัดเสียง */
+        .rec-dot {
+            width: 10px;
+            height: 10px;
+            background-color: #555;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .rec-dot.recording {
+            background-color: #ff3b30;
+            box-shadow: 0 0 8px #ff3b30;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* หน้าจอ LCD */
+        .lcd-screen {
+            background: #2b3e50;
+            color: #4db8ff;
+            font-family: 'Courier New', Courier, monospace;
+            text-shadow: 0 0 5px rgba(77, 184, 255, 0.5);
+            border: 2px solid #555;
+            border-radius: 6px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-between bg-gray-900 text-white overflow-hidden">
+
+    <!-- ส่วนหัวและแผงควบคุม -->
+    <header class="w-full px-2 pt-2 pb-1 flex flex-col items-center gap-1 shrink-0 z-20 bg-gray-900/90">
+        <div class="flex items-center justify-between w-full max-w-md">
+            <h1 class="text-lg font-bold text-gray-300 tracking-wider">PICCOLO <span class="text-[10px] font-normal text-gray-500">PRO</span></h1>
+            <div class="flex gap-2">
+                <button id="btnRec" class="bg-gray-700 active:bg-gray-600 border border-gray-600 rounded px-2 py-1 text-xs flex items-center shadow-md transition-all touch-manipulation">
+                    <span class="rec-dot" id="recIndicator"></span> REC
+                </button>
+                <button id="btnPlay" class="bg-gray-700 active:bg-gray-600 border border-gray-600 rounded px-2 py-1 text-xs text-green-400 shadow-md transition-all disabled:opacity-50 touch-manipulation" disabled>
+                    ▶ PLAY
+                </button>
+            </div>
+        </div>
+
+        <div class="lcd-screen w-full max-w-md h-8 flex items-center justify-center text-lg tracking-widest relative">
+            <span id="noteDisplay">READY</span>
+        </div>
+    </header>
+
+    <!-- ตัวเครื่องดนตรี -->
+    <main class="flex-1 w-full max-w-md relative flex justify-center items-center py-1 overflow-hidden">
+        <div class="instrument-body absolute top-0 bottom-0 w-20 md:w-28 z-0"></div>
+
+        <div class="relative z-10 flex flex-col justify-evenly items-center h-full w-full py-2" id="keyContainer">
+            <!-- ปุ่มจะถูกสร้างโดย JS -->
+        </div>
+    </main>
+
+    <footer class="text-[10px] text-gray-600 pb-1 pt-1 shrink-0 bg-gray-900 w-full text-center">
+        Low Latency | Stable Audio | Fitscreen
+    </footer>
+
+    <script>
+        // --- Audio Context Setup (Low Latency) ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        let masterGain;
+        let recorderDest;
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordedAudioUrl = null;
+        let isRecording = false;
+
+        const notes = [
+            { note: 'C6', freq: 1046.50, label: 'ดํ (Do)' },
+            { note: 'B5', freq: 987.77, label: 'ท (Ti)' },
+            { note: 'A5', freq: 880.00, label: 'ล (La)' },
+            { note: 'G5', freq: 783.99, label: 'ซ (Sol)' },
+            { note: 'F5', freq: 698.46, label: 'ฟ (Fa)' },
+            { note: 'E5', freq: 659.25, label: 'ม (Mi)' },
+            { note: 'D5', freq: 587.33, label: 'ร (Re)' },
+            { note: 'C5', freq: 523.25, label: 'ด (Do)' }
+        ];
+
+        const activeOscillators = {}; 
+
+        // --- DOM Elements ---
+        const keyContainer = document.getElementById('keyContainer');
+        const noteDisplay = document.getElementById('noteDisplay');
+        const btnRec = document.getElementById('btnRec');
+        const btnPlay = document.getElementById('btnPlay');
+        const recIndicator = document.getElementById('recIndicator');
+
+        // --- Robust Initialization ---
+        function initAudio() {
+            if (!audioCtx) {
+                // latencyHint: 'interactive' สำคัญมากสำหรับการตอบสนองที่ไวที่สุด
+                audioCtx = new AudioContext({ latencyHint: 'interactive' });
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.4;
+                
+                recorderDest = audioCtx.createMediaStreamDestination();
+                masterGain.connect(audioCtx.destination);
+                masterGain.connect(recorderDest);
+            }
+            // ตรวจสอบและปลุก AudioContext ถ้ามันหลับอยู่ (โดยเฉพาะ iOS)
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // --- Sound Generation ---
+        function playTone(freq, noteName) {
+            initAudio(); // เรียกทุกครั้งเพื่อความชัวร์
+
+            // ถ้ามีเสียงเดิมค้างอยู่ ให้หยุดทันทีก่อนเริ่มเสียงใหม่
+            if (activeOscillators[noteName]) {
+                forceStopTone(noteName);
+            }
+
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            osc.type = 'sine'; 
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+            // ADSR: Attack เร็วมาก (0.02s) เพื่อความกระชับ
+            gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(1, audioCtx.currentTime + 0.02);
+
+            osc.connect(gainNode);
+            gainNode.connect(masterGain);
+
+            osc.start();
+            activeOscillators[noteName] = { osc, gainNode };
+
+            noteDisplay.innerText = noteName;
+            noteDisplay.style.color = '#fff';
+            noteDisplay.style.textShadow = '0 0 10px #fff';
+        }
+
+        function stopTone(noteName) {
+            const active = activeOscillators[noteName];
+            if (active) {
+                const { osc, gainNode } = active;
+                // Release: ปล่อยเสียงดับลงใน 0.1s
+                const releaseTime = 0.1;
+                
+                try {
+                    gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+                    gainNode.gain.setValueAtTime(gainNode.gain.value, audioCtx.currentTime);
+                    gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + releaseTime);
+                    osc.stop(audioCtx.currentTime + releaseTime);
+                } catch (e) {
+                    console.error("Audio error during stop:", e);
+                }
+                
+                // ลบออกจากรายการทันทีที่สั่งหยุด (ไม่ต้องรอ timeout เพื่อความเสถียรของ logic)
+                delete activeOscillators[noteName];
+            }
+            
+            // คืนค่าหน้าจอถ้าไม่มีปุ่มไหนกดอยู่
+            if (Object.keys(activeOscillators).length === 0) {
+                noteDisplay.style.color = '#4db8ff';
+                noteDisplay.style.textShadow = '0 0 5px rgba(77, 184, 255, 0.5)';
+            }
+        }
+
+        // ฟังก์ชันหยุดทันที (ใช้กรณีแตะรัวๆ)
+        function forceStopTone(noteName) {
+            const active = activeOscillators[noteName];
+            if (active) {
+                try {
+                    active.osc.stop();
+                    active.gainNode.disconnect();
+                } catch(e) {}
+                delete activeOscillators[noteName];
+            }
+        }
+
+        // --- Stable UI Construction (Pointer Events) ---
+        notes.forEach((n) => {
+            const btn = document.createElement('div');
+            btn.className = 'piccolo-key w-[9vh] h-[9vh] max-w-[80px] max-h-[80px] rounded-full flex items-center justify-center cursor-pointer select-none';
+            btn.innerHTML = `<span class="text-[10px] md:text-sm font-bold text-gray-800 drop-shadow-md pointer-events-none transform translate-y-[140%] bg-white/80 px-1 rounded shadow-sm">${n.label}</span>`;
+            
+            // ใช้ Pointer Events แทน Mouse/Touch เพื่อความเสถียรสูงสุด
+            const startHandler = (e) => {
+                // e.preventDefault(); // อาจทำให้ scroll ไม่ได้ถ้าใช้ผิดที่ แต่ในปุ่มนี้จำเป็น
+                btn.setPointerCapture(e.pointerId); // จับ Pointer ไว้กับปุ่มนี้ แม้นิ้วจะเลื่อนออกนิดหน่อย
+                btn.classList.add('active');
+                playTone(n.freq, n.note);
+            };
+
+            const endHandler = (e) => {
+                // e.preventDefault();
+                btn.releasePointerCapture(e.pointerId); // ปล่อย Pointer
+                btn.classList.remove('active');
+                stopTone(n.note);
+            };
+
+            const leaveHandler = (e) => {
+                // กรณีลากนิ้วหลุดขอบปุ่มจริงๆ ให้หยุดเสียงด้วย
+                btn.classList.remove('active');
+                stopTone(n.note);
+            }
+
+            // Pointer Events ครอบคลุมทั้ง Mouse และ Touch
+            btn.addEventListener('pointerdown', startHandler);
+            btn.addEventListener('pointerup', endHandler);
+            btn.addEventListener('pointercancel', endHandler); // รับมือกรณีระบบขัดจังหวะ
+            btn.addEventListener('pointerleave', leaveHandler); // รับมือกรณีลากออก
+
+            keyContainer.appendChild(btn);
+        });
+
+        // --- Safety: Stop All Sounds on Visibility Change ---
+        // ป้องกันเสียงค้างเมื่อสลับแอป
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                Object.keys(activeOscillators).forEach(note => forceStopTone(note));
+                if (isRecording) stopRecording();
+            }
+        });
+
+        // --- Recording Logic ---
+        btnRec.addEventListener('click', () => {
+            initAudio();
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        });
+
+        function startRecording() {
+            audioChunks = [];
+            try {
+                mediaRecorder = new MediaRecorder(recorderDest.stream);
+            } catch (err) {
+                alert("อุปกรณ์ไม่รองรับการอัดเสียง");
+                return;
+            }
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                recordedAudioUrl = URL.createObjectURL(audioBlob);
+                btnPlay.disabled = false;
+                noteDisplay.innerText = "SAVED";
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            btnRec.classList.add('bg-red-900', 'border-red-500');
+            recIndicator.classList.add('recording');
+            btnRec.innerHTML = `<span class="rec-dot recording"></span> STOP`;
+            btnPlay.disabled = true;
+            noteDisplay.innerText = "REC...";
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            isRecording = false;
+            btnRec.classList.remove('bg-red-900', 'border-red-500');
+            recIndicator.classList.remove('recording');
+            btnRec.innerHTML = `<span class="rec-dot"></span> REC`;
+        }
+
+        btnPlay.addEventListener('click', () => {
+            if (recordedAudioUrl) {
+                noteDisplay.innerText = "PLAY...";
+                const audio = new Audio(recordedAudioUrl);
+                audio.play();
+                audio.onended = () => {
+                    noteDisplay.innerText = "END";
+                };
+            }
+        });
+
+        // Global prevent default to stop scrolling/zooming
+        document.body.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+
+    </script>
+</body>
+</html>

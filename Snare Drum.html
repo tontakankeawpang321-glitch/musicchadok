@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Realistic Snare Drum Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* ป้องกันการเลือกข้อความและการซูมบนมือถือ */
+        body {
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* การออกแบบกลอง */
+        .drum-container {
+            position: relative;
+            width: 90vw;
+            max-width: 400px;
+            aspect-ratio: 1/1;
+            margin: 0 auto;
+            border-radius: 50%;
+            transition: transform 0.05s ease;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* ขอบกลอง (Rim) */
+        .rim {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #cfcfcf, #8a8a8a, #cfcfcf);
+            box-shadow: 
+                0 10px 20px rgba(0,0,0,0.5),
+                inset 0 2px 5px rgba(255,255,255,0.8),
+                inset 0 -2px 5px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        /* น็อตยึดกลอง (Lugs visual) */
+        .lug {
+            position: absolute;
+            width: 20px;
+            height: 30px;
+            background: linear-gradient(to bottom, #dcdcdc, #808080);
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            z-index: 11;
+        }
+
+        /* หนังกลอง (Drum Head) */
+        .drum-head {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            bottom: 15px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #fdfdfd, #e0e0e0, #dcdcdc);
+            /* Texture ของหนังกลอง */
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.1'/%3E%3C/svg%3E");
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+        }
+
+        /* เอฟเฟกต์ตอนตี */
+        .drum-head.hit {
+            background: radial-gradient(circle at 30% 30%, #fffff0, #efefef, #dcdcdc);
+            transform: scale(0.99);
+        }
+
+        /* โลโก้กลางกลอง */
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: rgba(0,0,0,0.3);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            pointer-events: none;
+        }
+
+        /* วงแหวน Damper (เพื่อความสมจริง) */
+        .damper-ring {
+            position: absolute;
+            top: 50px;
+            left: 50px;
+            right: 50px;
+            bottom: 50px;
+            border-radius: 50%;
+            border: 2px solid rgba(0,0,0,0.05);
+            pointer-events: none;
+        }
+
+        /* แอนิเมชั่นการสั่นสะเทือน */
+        @keyframes vibrate {
+            0% { transform: translate(0, 0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0, 0); }
+        }
+
+        .vibrating {
+            animation: vibrate 0.1s linear;
+        }
+
+        /* Overlay ก่อนเริ่มใช้งาน */
+        #start-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .visual-ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.1);
+            transform: scale(0);
+            pointer-events: none;
+            animation: ripple-anim 0.3s linear;
+        }
+
+        @keyframes ripple-anim {
+            to {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center h-screen bg-neutral-900 text-white">
+
+    <!-- Overlay สำหรับเริ่ม Audio Context -->
+    <div id="start-overlay">
+        <h1 class="text-3xl font-bold mb-4">Snare Drum Pro</h1>
+        <div class="text-6xl mb-6">🥁</div>
+        <p class="mb-8 text-gray-300">แตะที่หน้าจอเพื่อเริ่มใช้งาน<br>(ใส่หูฟังเพื่อเสียงที่ดีที่สุด)</p>
+        <button id="start-btn" class="px-8 py-3 bg-blue-600 rounded-full font-bold text-lg hover:bg-blue-500 transition shadow-lg">
+            เริ่มตีกลอง
+        </button>
+    </div>
+
+    <!-- ส่วนหัว -->
+    <div class="absolute top-4 w-full text-center pointer-events-none">
+        <h2 class="text-xl font-bold tracking-widest text-neutral-500">SNARE SIMULATOR</h2>
+        <p class="text-xs text-neutral-600">Multi-touch Support</p>
+    </div>
+
+    <!-- ตัวกลอง -->
+    <div id="snare-drum" class="drum-container">
+        <!-- ขอบและน็อต -->
+        <div class="rim">
+            <!-- สร้างน็อต 8 ตัวรอบๆ ด้วย JS หรือทำ manual -->
+            <div class="lug" style="top: -5px; left: 50%; transform: translateX(-50%);"></div>
+            <div class="lug" style="bottom: -5px; left: 50%; transform: translateX(-50%);"></div>
+            <div class="lug" style="left: -5px; top: 50%; transform: translateY(-50%) rotate(90deg);"></div>
+            <div class="lug" style="right: -5px; top: 50%; transform: translateY(-50%) rotate(90deg);"></div>
+            <!-- Diagonal lugs -->
+            <div class="lug" style="top: 14%; left: 14%; transform: rotate(-45deg);"></div>
+            <div class="lug" style="top: 14%; right: 14%; transform: rotate(45deg);"></div>
+            <div class="lug" style="bottom: 14%; left: 14%; transform: rotate(45deg);"></div>
+            <div class="lug" style="bottom: 14%; right: 14%; transform: rotate(-45deg);"></div>
+        </div>
+
+        <!-- หน้ากลอง -->
+        <div id="drum-head" class="drum-head">
+            <div class="logo">GEMINI</div>
+            <div class="damper-ring"></div>
+        </div>
+    </div>
+
+    <div class="mt-8 text-neutral-500 text-sm">
+        แตะที่หน้ากลองเพื่อตี (รองรับหลายนิ้ว)
+    </div>
+
+    <script>
+        // --- ส่วนจัดการ Audio Engine (Web Audio API) ---
+        let audioCtx;
+        let noiseBuffer;
+        let isAudioEnabled = false;
+
+        // ฟังก์ชันสร้าง Noise Buffer (ทำครั้งเดียวเพื่อประหยัดทรัพยากร)
+        function createNoiseBuffer() {
+            if (!audioCtx) return;
+            const bufferSize = audioCtx.sampleRate * 2.0; // 2 วินาที
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            noiseBuffer = buffer;
+        }
+
+        // ฟังก์ชันสังเคราะห์เสียง Snare (ไม่ใช้ไฟล์ mp3 เพื่อความเร็วสูงสุด)
+        function triggerSnare(velocity = 1) {
+            if (!audioCtx || !isAudioEnabled) return;
+
+            const t = audioCtx.currentTime;
+
+            // 1. ส่วนเสียงโทน (Body ของกลอง) - สร้างความแน่น
+            const osc = audioCtx.createOscillator();
+            const oscGain = audioCtx.createGain();
+            
+            osc.type = 'triangle';
+            
+            // Pitch Envelope: เริ่มสูงแล้วตกลงอย่างเร็ว
+            osc.frequency.setValueAtTime(350, t);
+            osc.frequency.exponentialRampToValueAtTime(180, t + 0.1);
+            
+            // Amplitude Envelope
+            oscGain.gain.setValueAtTime(0, t);
+            oscGain.gain.linearRampToValueAtTime(0.5 * velocity, t + 0.005);
+            oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+
+            osc.connect(oscGain);
+            oscGain.connect(audioCtx.destination);
+            
+            osc.start(t);
+            osc.stop(t + 0.2);
+
+            // 2. ส่วนเสียงแส้ (Noise/Snare wires) - สร้างความคม
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = noiseBuffer;
+            
+            // Filter: กรองความถี่ต่ำออก ให้เหลือแต่เสียงซ่าๆ ด้านบน
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'highpass';
+            noiseFilter.frequency.value = 1000;
+            
+            const noiseGain = audioCtx.createGain();
+            // Envelope ของเสียงแส้
+            noiseGain.gain.setValueAtTime(0, t);
+            noiseGain.gain.linearRampToValueAtTime(0.8 * velocity, t + 0.005);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.35); // หางเสียงยาวกว่า Tone นิดหน่อย
+
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+            
+            noise.start(t);
+            noise.stop(t + 0.4);
+        }
+
+        // --- ส่วนจัดการ UI และ Event Listeners ---
+        const drumContainer = document.getElementById('snare-drum');
+        const drumHead = document.getElementById('drum-head');
+        const startOverlay = document.getElementById('start-overlay');
+        const startBtn = document.getElementById('start-btn');
+
+        // ฟังก์ชันเริ่มระบบเสียง (ต้องทำผ่าน User Interaction)
+        function initAudio() {
+            if (isAudioEnabled) return;
+            
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            
+            createNoiseBuffer();
+            
+            // เล่นเสียงเงียบๆ เพื่อ unlock audio บน iOS
+            const buffer = audioCtx.createBuffer(1, 1, 22050);
+            const source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioCtx.destination);
+            source.start(0);
+
+            isAudioEnabled = true;
+            startOverlay.style.opacity = '0';
+            setTimeout(() => {
+                startOverlay.style.display = 'none';
+            }, 500);
+        }
+
+        startBtn.addEventListener('click', initAudio);
+        startOverlay.addEventListener('click', initAudio);
+
+        // ฟังก์ชัน Visual Feedback
+        function animateHit(x, y) {
+            // Animation CSS
+            drumHead.classList.remove('hit');
+            void drumHead.offsetWidth; // Trigger reflow
+            drumHead.classList.add('hit');
+
+            // สร้าง Ripple effect ตรงจุดที่ตี
+            const rect = drumHead.getBoundingClientRect();
+            const ripple = document.createElement('div');
+            ripple.className = 'visual-ripple';
+            
+            // คำนวณตำแหน่งสัมพัทธ์
+            const relX = x - rect.left;
+            const relY = y - rect.top;
+            
+            ripple.style.left = relX + 'px';
+            ripple.style.top = relY + 'px';
+            ripple.style.width = '50px';
+            ripple.style.height = '50px';
+            ripple.style.marginLeft = '-25px'; // Center
+            ripple.style.marginTop = '-25px'; // Center
+
+            drumHead.appendChild(ripple);
+            
+            // ลบ Ripple เมื่อเล่นเสร็จ
+            setTimeout(() => {
+                ripple.remove();
+            }, 300);
+        }
+
+        // --- Touch Event Handling (รองรับ Multi-touch) ---
+        
+        drumContainer.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // ป้องกันการซูม/เลื่อน
+            
+            if (!isAudioEnabled) {
+                initAudio();
+                return;
+            }
+
+            // Loop ผ่านทุกนิ้วที่แตะลงมาใหม่
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                
+                // คำนวณความแรงจากการกด (ถ้าอุปกรณ์รองรับ force/3d touch) หรือสุ่มเล็กน้อย
+                let velocity = 1.0;
+                if (touch.force > 0) {
+                    velocity = 0.5 + (touch.force * 0.5); // Normalize
+                } else {
+                    // Variation เล็กน้อยเพื่อให้เสียงไม่แข็งทื่อ
+                    velocity = 0.9 + (Math.random() * 0.2); 
+                }
+
+                triggerSnare(velocity);
+                animateHit(touch.clientX, touch.clientY);
+            }
+        }, { passive: false });
+
+        // --- Mouse Event Handling (สำหรับ Desktop) ---
+        drumContainer.addEventListener('mousedown', (e) => {
+            if (!isAudioEnabled) return;
+            triggerSnare(1.0);
+            animateHit(e.clientX, e.clientY);
+        });
+
+        // Keyboard Support (แถมให้เผื่อใช้คีย์บอร์ด)
+        document.addEventListener('keydown', (e) => {
+            if (!isAudioEnabled) return;
+            if (e.code === 'Space' || e.key === 'f' || e.key === 'j') {
+                triggerSnare(1.0);
+                // สุ่มตำแหน่งกลางๆ กลอง
+                const rect = drumHead.getBoundingClientRect();
+                const x = rect.left + rect.width/2 + (Math.random() * 40 - 20);
+                const y = rect.top + rect.height/2 + (Math.random() * 40 - 20);
+                animateHit(x, y);
+            }
+        });
+
+    </script>
+</body>
+</html>

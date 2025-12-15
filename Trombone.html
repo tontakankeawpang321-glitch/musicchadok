@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Virtual Trombone</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* ป้องกันการเลือกข้อความและการเลื่อนหน้าจอ */
+        body {
+            overscroll-behavior: none;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden;
+            background: #1a1a1a;
+            font-family: 'Sarabun', sans-serif;
+            height: 100dvh; /* ใช้ dvh เพื่อให้เต็มจอจริงบนมือถือ */
+            width: 100vw;
+        }
+
+        /* เอฟเฟกต์สีทองเหลือง */
+        .brass-gradient {
+            background: linear-gradient(90deg, #b8860b 0%, #ffd700 40%, #ffec8b 50%, #ffd700 60%, #b8860b 100%);
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5), 2px 2px 5px rgba(0,0,0,0.3);
+            border-radius: 999px;
+        }
+
+        .bell-gradient {
+            background: radial-gradient(circle at 30% 30%, #ffec8b, #ffd700, #b8860b, #5c4305);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        /* พื้นที่สำหรับสไลด์ - ปรับให้ยืดหยุ่น */
+        #slide-track-container {
+            position: relative;
+            flex-grow: 1; /* ยืดเต็มพื้นที่ที่เหลือ */
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            overflow: hidden; 
+        }
+
+        /* ตัวสไลด์ที่ขยับได้ */
+        #slide-group {
+            width: 160px;
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            /* ความสูงจะถูกจัดการโดย JS เพื่อให้สัมพันธ์กับแทร็ก */
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* เส้นบอกตำแหน่งโน้ต */
+        .note-marker {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            border-top: 1px dashed rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.8rem;
+            pointer-events: none;
+            padding-top: 2px;
+            left: 0;
+        }
+        
+        .active-note {
+            color: #ffd700;
+            font-weight: bold;
+            text-shadow: 0 0 5px #ffd700;
+            opacity: 1;
+        }
+
+        /* ปุ่มกด */
+        .control-btn {
+            transition: all 0.2s;
+        }
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        .recording {
+            animation: pulse-red 1.5s infinite;
+        }
+        
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        /* แถบแสดงสถานะเสียง */
+        #visualizer {
+            height: 4px;
+            width: 100%;
+            background: #333;
+            margin-top: 5px;
+        }
+        #volume-bar {
+            height: 100%;
+            width: 0%;
+            background: #ffd700;
+            transition: width 0.1s;
+        }
+    </style>
+</head>
+<body class="flex flex-col bg-gray-900 text-white">
+
+    <!-- ส่วนหัวและปุ่มควบคุม -->
+    <header class="flex-none p-3 bg-gray-800 shadow-lg z-50 flex flex-col gap-2">
+        <div class="flex justify-between items-center">
+            <h1 class="text-lg font-bold text-yellow-400 flex items-center gap-2">🎺 Trombone Pro</h1>
+            <div id="status-text" class="text-xs text-gray-400">พร้อมใช้งาน</div>
+        </div>
+        
+        <!-- แถบปุ่ม -->
+        <div class="flex gap-2 justify-center">
+            <button id="btn-record" class="control-btn bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-xs font-bold flex-1 flex items-center justify-center gap-1">
+                <span>🔴</span> อัดเสียง
+            </button>
+            <button id="btn-stop" class="control-btn bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-xs font-bold flex-1 hidden">
+                <span>⏹️</span> หยุด
+            </button>
+            <button id="btn-download" class="control-btn bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-bold flex-1 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1" disabled>
+                <span>⬇️</span> ดาวน์โหลด
+            </button>
+        </div>
+        <div id="visualizer"><div id="volume-bar"></div></div>
+    </header>
+
+    <!-- พื้นที่เล่นดนตรี (Main Interface) -->
+    <main class="flex-1 relative bg-gradient-to-b from-gray-900 to-gray-800 flex flex-col items-center overflow-hidden" id="play-area">
+        
+        <!-- ตัวเครื่องทรอมโบน (ส่วนบน - ปากแตร) -->
+        <div class="flex-none w-full flex justify-center z-30 pointer-events-none pt-2 pb-4">
+            <div class="relative">
+                <div class="w-24 h-24 rounded-full bell-gradient flex items-center justify-center border-4 border-yellow-700 shadow-2xl">
+                    <div class="w-16 h-16 rounded-full bg-black opacity-80 shadow-inner"></div>
+                </div>
+                <!-- ท่อเชื่อม -->
+                <div class="absolute top-8 left-[-30px] w-16 h-3 brass-gradient transform -rotate-12"></div>
+                <div class="absolute top-16 left-8 w-3 h-16 brass-gradient"></div>
+            </div>
+        </div>
+
+        <!-- รางสไลด์ (พื้นที่รับสัมผัส - ยืดหยุ่นตามพื้นที่เหลือ) -->
+        <div id="slide-track-container" class="w-full max-w-md cursor-pointer touch-none z-40 relative">
+            
+            <!-- พื้นหลังเป็นเส้นบอกตำแหน่ง -->
+            <div class="absolute inset-0 w-full h-full pointer-events-none" id="grid-lines"></div>
+
+            <!-- ตัวสไลด์ (ขยับตามนิ้ว) -->
+            <div id="slide-group">
+                <!-- มือจับสไลด์ (Crossbar) -->
+                <div id="handle-bar" class="absolute top-0 w-full h-4 brass-gradient z-20 shadow-lg rounded-full"></div>
+                
+                <!-- ท่อสไลด์ซ้าย -->
+                <div class="absolute top-2 left-2 w-3 h-[800px] brass-gradient z-10"></div>
+                <!-- ท่อสไลด์ขวา -->
+                <div class="absolute top-2 right-2 w-3 h-[800px] brass-gradient z-10"></div>
+                
+                <!-- ส่วนโค้งล่างสุดของสไลด์ (U-curve) - ซ่อนอยู่ข้างล่าง -->
+                <div class="absolute left-2 w-[144px] h-16 brass-gradient z-10 rounded-b-full border-t-0 transform translate-y-[-100%]" style="bottom: -800px;"></div>
+            </div>
+            
+        </div>
+        
+        <!-- แสดงโน้ตปัจจุบัน -->
+        <div id="current-note" class="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-black/70 px-4 py-1 rounded-full text-xl font-bold text-yellow-400 border border-yellow-500 z-50 pointer-events-none opacity-0 transition-opacity">
+            --
+        </div>
+    </main>
+
+<script>
+    /**
+     * TROMBONE AUDIO ENGINE
+     */
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx;
+    let masterGain;
+    let oscillator;
+    let filter;
+    let lfo;
+    let isPlaying = false;
+    
+    // Recording vars
+    let dest;
+    let mediaRecorder;
+    let chunks = [];
+    let audioBlob;
+    let audioUrl;
+    // เอาตัวแปรเล่นเสียงออก (recordedAudio)
+
+    // Frequency Config
+    const MAX_FREQ = 233.08; // Bb3
+    const MIN_FREQ = 82.41;  // E2
+    
+    const POSITIONS = [
+        { pos: 1, note: "Bb", freq: 233.08 },
+        { pos: 2, note: "A",  freq: 220.00 },
+        { pos: 3, note: "Ab", freq: 207.65 },
+        { pos: 4, note: "G",  freq: 196.00 },
+        { pos: 5, note: "Gb", freq: 185.00 },
+        { pos: 6, note: "F",  freq: 174.61 },
+        { pos: 7, note: "E",  freq: 164.81 }
+    ];
+
+    function initAudio() {
+        if (audioCtx) return;
+        audioCtx = new AudioContext();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = 0;
+        
+        filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 2000;
+        filter.Q.value = 1;
+
+        dest = audioCtx.createMediaStreamDestination();
+        masterGain.connect(audioCtx.destination);
+        masterGain.connect(dest);
+    }
+
+    function startTone(frequency) {
+        if (!audioCtx) initAudio();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        if (!oscillator) {
+            oscillator = audioCtx.createOscillator();
+            oscillator.type = 'sawtooth';
+            
+            lfo = audioCtx.createOscillator();
+            lfo.type = 'sine';
+            lfo.frequency.value = 4;
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = 2;
+            
+            lfo.connect(lfoGain);
+            lfoGain.connect(oscillator.frequency);
+            lfo.start();
+
+            oscillator.connect(filter);
+            filter.connect(masterGain);
+            oscillator.start();
+        }
+
+        oscillator.frequency.setTargetAtTime(frequency, audioCtx.currentTime, 0.05);
+        filter.frequency.setTargetAtTime(frequency * 8, audioCtx.currentTime, 0.1);
+
+        if (!isPlaying) {
+            masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
+            masterGain.gain.setValueAtTime(masterGain.gain.value, audioCtx.currentTime);
+            masterGain.gain.linearRampToValueAtTime(0.8, audioCtx.currentTime + 0.1);
+            isPlaying = true;
+            updateVisualizer(0.8);
+        }
+    }
+
+    function stopTone() {
+        if (!isPlaying || !masterGain) return;
+        masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
+        masterGain.gain.setValueAtTime(masterGain.gain.value, audioCtx.currentTime);
+        masterGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.2);
+        
+        isPlaying = false;
+        updateVisualizer(0);
+        document.getElementById('current-note').style.opacity = '0';
+    }
+    
+    function changePitch(frequency) {
+        if (oscillator && isPlaying) {
+             oscillator.frequency.setTargetAtTime(frequency, audioCtx.currentTime, 0.02);
+             filter.frequency.setTargetAtTime(frequency * 6, audioCtx.currentTime, 0.05);
+        }
+    }
+
+    /**
+     * DYNAMIC UI & INTERACTION
+     * Calculates dimensions based on actual screen size
+     */
+    const slideContainer = document.getElementById('slide-track-container');
+    const slideGroup = document.getElementById('slide-group');
+    const noteDisplay = document.getElementById('current-note');
+    const gridLines = document.getElementById('grid-lines');
+    
+    // Dynamic Dimensions
+    let trackRect;
+    let trackHeight;
+    let startY;
+    let stepHeight;
+
+    function updateDimensions() {
+        // Clear old grid lines
+        gridLines.innerHTML = '';
+        
+        // Get actual dimensions of the container
+        trackRect = slideContainer.getBoundingClientRect();
+        trackHeight = trackRect.height - 40; // Leave some padding at bottom
+        startY = trackRect.top;
+        stepHeight = trackHeight / 7;
+
+        // Create Grid Lines based on new height
+        POSITIONS.forEach((pos, index) => {
+            const line = document.createElement('div');
+            line.className = 'note-marker';
+            // Calculate relative top position
+            const topPos = (index * stepHeight) + 10; // +10px padding top
+            line.style.top = topPos + 'px';
+            line.innerHTML = `<span class="bg-gray-800 px-1 rounded text-xs opacity-70">${pos.pos}</span>`;
+            line.id = `marker-${index}`;
+            gridLines.appendChild(line);
+            
+            // Store relative Y for calculation
+            pos.relativeY = topPos; 
+        });
+    }
+
+    // Call initially and on resize
+    window.addEventListener('load', updateDimensions);
+    window.addEventListener('resize', updateDimensions);
+    // Call after a slight delay to ensure layout is settled on mobile
+    setTimeout(updateDimensions, 100);
+
+    function handleInput(e) {
+        e.preventDefault();
+        
+        let clientY;
+        if(e.type.includes('touch')) {
+            clientY = e.touches[0].clientY;
+        } else {
+            clientY = e.clientY;
+        }
+
+        // Calculate position relative to container
+        // Y relative to the start of the track
+        let relativeY = clientY - startY;
+
+        // Clamp values
+        const minY = 0;
+        const maxY = trackHeight;
+        let clampedY = Math.max(minY, Math.min(maxY, relativeY));
+        
+        // Move visual slide
+        slideGroup.style.transform = `translate(-50%, ${clampedY}px)`;
+
+        // Calculate Frequency
+        const percentage = clampedY / trackHeight;
+        const freq = MAX_FREQ - (percentage * (MAX_FREQ - MIN_FREQ));
+        
+        // Find closest note
+        let closestNote = "";
+        
+        POSITIONS.forEach((p, i) => {
+             const marker = document.getElementById(`marker-${i}`);
+             if(marker) marker.classList.remove('active-note');
+             
+             // Check distance
+             const dist = Math.abs(clampedY - p.relativeY);
+             if (dist < (stepHeight / 2)) {
+                 if(marker) marker.classList.add('active-note');
+                 closestNote = p.note;
+             }
+        });
+
+        if (closestNote) {
+            noteDisplay.innerText = closestNote;
+            noteDisplay.style.opacity = '1';
+        }
+
+        if (e.type === 'touchstart' || e.type === 'mousedown') {
+            startTone(freq);
+        } else {
+            changePitch(freq);
+        }
+    }
+
+    function handleEnd(e) {
+        e.preventDefault();
+        stopTone();
+    }
+
+    // Event Listeners
+    slideContainer.addEventListener('mousedown', handleInput);
+    document.addEventListener('mousemove', (e) => {
+        if (isPlaying) handleInput(e);
+    });
+    document.addEventListener('mouseup', handleEnd);
+
+    slideContainer.addEventListener('touchstart', handleInput, {passive: false});
+    slideContainer.addEventListener('touchmove', handleInput, {passive: false});
+    slideContainer.addEventListener('touchend', handleEnd);
+    slideContainer.addEventListener('touchcancel', handleEnd);
+
+    // Recording Logic (Updated for Download)
+    const btnRecord = document.getElementById('btn-record');
+    const btnStop = document.getElementById('btn-stop');
+    const btnDownload = document.getElementById('btn-download');
+    const statusText = document.getElementById('status-text');
+
+    btnRecord.onclick = () => {
+        initAudio();
+        chunks = [];
+        mediaRecorder = new MediaRecorder(dest.stream);
+        
+        mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+        mediaRecorder.onstop = () => {
+            audioBlob = new Blob(chunks, { 'type' : 'audio/ogg; codecs=opus' });
+            audioUrl = URL.createObjectURL(audioBlob);
+            
+            // เปิดให้กดปุ่มดาวน์โหลดได้
+            btnDownload.disabled = false;
+            statusText.innerText = "บันทึกเสร็จสิ้น กดดาวน์โหลดได้เลย";
+        };
+
+        mediaRecorder.start();
+        btnRecord.classList.add('hidden');
+        btnStop.classList.remove('hidden');
+        
+        // ปิดปุ่มดาวน์โหลดระหว่างอัด
+        btnDownload.disabled = true; 
+        
+        statusText.innerText = "กำลังบันทึก...";
+        statusText.classList.add('text-red-500', 'animate-pulse');
+    };
+
+    btnStop.onclick = () => {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+            btnStop.classList.add('hidden');
+            btnRecord.classList.remove('hidden');
+            statusText.classList.remove('text-red-500', 'animate-pulse');
+        }
+    };
+
+    // ฟังก์ชันดาวน์โหลดไฟล์
+    btnDownload.onclick = () => {
+        if (audioUrl) {
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = audioUrl;
+            // ตั้งชื่อไฟล์พร้อมเวลาปัจจุบัน
+            a.download = 'trombone_recording_' + new Date().getTime() + '.ogg';
+            document.body.appendChild(a);
+            a.click();
+            
+            // Cleanup
+            setTimeout(() => {
+                document.body.removeChild(a);
+                // ไม่ revoke ทันทีเพื่อให้กดโหลดซ้ำได้ถ้าต้องการ แต่ถ้าจะเคลียร์เมมโมรี่ค่อยทำทีหลัง
+            }, 100);
+            
+            statusText.innerText = "ดาวน์โหลดเรียบร้อย";
+        }
+    };
+    
+    function updateVisualizer(volume) {
+        const bar = document.getElementById('volume-bar');
+        if(bar) bar.style.width = (volume * 100) + '%';
+        if (volume > 0.01) {
+            requestAnimationFrame(() => updateVisualizer(volume * 0.95));
+        }
+    }
+
+</script>
+</body>
+</html>

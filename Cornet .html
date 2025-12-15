@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cornet Simulator Mobile</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none; /* ป้องกันการเลื่อนหน้าจอ */
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at center, #2b2b2b, #000000);
+            font-family: 'Sarabun', sans-serif;
+            overflow: hidden; /* ห้ามล้นขอบ */
+            display: flex;
+            flex-direction: column;
+            color: #fff;
+        }
+
+        /* ส่วนหัวและหน้าจอแสดงผล */
+        header {
+            height: 15vh;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border-bottom: 2px solid #daa520;
+        }
+
+        .display-panel {
+            text-align: center;
+            flex-grow: 1;
+        }
+
+        #note-display {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #daa520;
+            text-shadow: 0 0 10px rgba(218, 165, 32, 0.5);
+            min-height: 3rem;
+        }
+
+        #status-display {
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        /* ส่วนตัวเครื่องดนตรี */
+        .instrument-body {
+            flex-grow: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+
+        /* ท่อลมตกแต่ง */
+        .pipe-deco {
+            position: absolute;
+            z-index: 0;
+            background: linear-gradient(90deg, #8B4513, #daa520, #ffd700, #daa520, #8B4513);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            border-radius: 20px;
+        }
+
+        .main-pipe {
+            width: 90%;
+            height: 40px;
+            top: 40%;
+        }
+
+        .bell {
+            position: absolute;
+            right: -20px;
+            top: 30%;
+            width: 120px;
+            height: 120px;
+            background: radial-gradient(circle, #333 10%, #daa520 40%, #ffd700 100%);
+            border-radius: 50%;
+            border: 5px solid #b8860b;
+            transform: scaleY(0.6) rotate(-10deg);
+            z-index: -1;
+            box-shadow: inset 0 0 20px #000;
+        }
+
+        /* แผงควบคุมวาล์ว */
+        .valve-container {
+            display: flex;
+            gap: 20px;
+            z-index: 10;
+            padding-bottom: 20px;
+        }
+
+        .valve-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .valve-piston {
+            width: 15px;
+            height: 80px;
+            background: linear-gradient(90deg, #ccc, #fff, #ccc);
+            margin-bottom: -10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .valve-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #fff, #e0e0e0, #a0a0a0);
+            border: 4px solid #daa520;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.5), inset 0 0 10px rgba(255,255,255,0.8);
+            cursor: pointer;
+            transition: transform 0.1s, margin-top 0.1s;
+            position: relative;
+            z-index: 2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: #555;
+            font-size: 1.2rem;
+        }
+
+        .valve-btn.active {
+            transform: translateY(15px);
+            background: radial-gradient(circle at 30% 30%, #e0e0e0, #a0a0a0, #707070);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        /* ส่วนควบคุมล่าง (ปากเป่า + ช่วงเสียง) */
+        .controls-area {
+            height: 25vh;
+            background: #1a1a1a;
+            display: flex;
+            padding: 10px;
+            align-items: center;
+            justify-content: space-around;
+            border-top: 2px solid #daa520;
+        }
+
+        /* Slider ปรับช่วงเสียง (Lip Tension) */
+        .lip-control {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 20%;
+        }
+
+        .lip-label {
+            font-size: 0.8rem;
+            color: #daa520;
+            margin-bottom: 5px;
+        }
+
+        input[type=range][orient=vertical] {
+            writing-mode: bt-lr; /* IE */
+            -webkit-appearance: slider-vertical; /* WebKit */
+            width: 8px;
+            height: 100px;
+            padding: 0 5px;
+        }
+
+        /* ปุ่มเป่าลม */
+        .blow-pad {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #ff6b6b, #c0392b);
+            border: 4px solid #fff;
+            box-shadow: 0 0 15px #c0392b;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .blow-pad:active, .blow-pad.blowing {
+            transform: scale(0.95);
+            background: radial-gradient(circle, #ff8787, #e74c3c);
+            box-shadow: 0 0 25px #e74c3c;
+        }
+
+        /* แผงอัดเสียง */
+        .recorder-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 25%;
+            align-items: center;
+        }
+
+        .rec-btn {
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 8px;
+            width: 100%;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+
+        .rec-btn.recording {
+            background: #e74c3c;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        /* Start Overlay */
+        #start-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #daa520;
+        }
+
+        .start-btn {
+            margin-top: 20px;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            background: #daa520;
+            color: #000;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(218, 165, 32, 0.5);
+        }
+
+        /* Responsive */
+        @media (orientation: landscape) {
+            .instrument-body { flex-direction: row; }
+            .valve-container { transform: scale(0.8); }
+            .main-pipe { height: 60px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="start-overlay">
+        <h1>Cornet Simulator</h1>
+        <p>จำลองเสียงคอร์เน็ทสมจริง</p>
+        <button class="start-btn" onclick="initAudio()">แตะเพื่อเริ่มใช้งาน</button>
+    </div>
+
+    <header>
+        <div class="display-panel">
+            <div id="status-display">พร้อมใช้งาน</div>
+            <div id="note-display">--</div>
+        </div>
+    </header>
+
+    <div class="instrument-body">
+        <div class="bell"></div>
+        <div class="pipe-deco main-pipe"></div>
+        
+        <div class="valve-container">
+            <div class="valve-wrapper">
+                <div class="valve-piston"></div>
+                <div class="valve-btn" id="valve3" data-val="3">3</div>
+            </div>
+            <div class="valve-wrapper">
+                <div class="valve-piston"></div>
+                <div class="valve-btn" id="valve2" data-val="1">2</div>
+            </div>
+            <div class="valve-wrapper">
+                <div class="valve-piston"></div>
+                <div class="valve-btn" id="valve1" data-val="2">1</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls-area">
+        <div class="lip-control">
+            <span class="lip-label">ระดับเสียง (Lips)</span>
+            <input type="range" id="harmonicSlider" min="2" max="6" value="4" orient="vertical">
+        </div>
+
+        <div class="blow-pad" id="blowPad">
+            เป่า
+        </div>
+
+        <div class="recorder-panel">
+            <button class="rec-btn" id="btnRecord">🔴 อัดเสียง</button>
+            <button class="rec-btn" id="btnPlay" disabled>▶️ เล่น</button>
+            <button class="rec-btn" id="btnDownload" disabled>⬇️ โหลด</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Audio Context & Variables ---
+        let audioCtx;
+        let masterGain;
+        let oscillator;
+        let filter;
+        let isBlowing = false;
+        let valves = { 1: false, 2: false, 3: false }; // Note: Valve 1 lowers 2 semitones, V2 lowers 1, V3 lowers 3
+        let currentHarmonic = 4; // Default harmonic series (Middle Bb range)
+        
+        // Recording variables
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob;
+        let audioUrl;
+        let recordedAudio = new Audio();
+        let destNode; // Destination for recording
+
+        // Frequency Map (Cornet in Bb)
+        // Base Harmonics of Open Pipe (Approximate):
+        // H2: Bb3 (233.08), H3: F4 (349.23), H4: Bb4 (466.16), H5: D5 (587.33), H6: F5 (698.46)
+        const harmonicBaseFreqs = {
+            2: 233.08, // Low
+            3: 349.23,
+            4: 466.16, // Mid (Tuning Bb)
+            5: 587.33,
+            6: 698.46  // High
+        };
+
+        const noteNames = [
+            "C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"
+        ];
+
+        function getNoteName(freq) {
+            // Formula: NoteNum = 12 * log2(freq / 440) + 69
+            // 69 is A4. 
+            if(freq === 0) return "--";
+            let noteNum = 12 * (Math.log(freq / 440) / Math.log(2)) + 69;
+            noteNum = Math.round(noteNum);
+            let noteIndex = noteNum % 12;
+            let octave = Math.floor(noteNum / 12) - 1;
+            return noteNames[noteIndex] + octave;
+        }
+
+        // --- Initialization ---
+        function initAudio() {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            
+            // Master Gain (Volume)
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0;
+
+            // Destination for Recorder
+            destNode = audioCtx.createMediaStreamDestination();
+            masterGain.connect(audioCtx.destination);
+            masterGain.connect(destNode);
+
+            document.getElementById('start-overlay').style.display = 'none';
+            setupInteraction();
+            updateNoteDisplay("--");
+        }
+
+        function setupOscillator() {
+            if (oscillator) oscillator.stop();
+            
+            oscillator = audioCtx.createOscillator();
+            oscillator.type = 'sawtooth'; // Sawtooth is best base for brass
+            
+            // Filter to simulate brass bell (Lowpass)
+            filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 1500; // Brightness
+            filter.Q.value = 1; // Resonance
+
+            oscillator.connect(filter);
+            filter.connect(masterGain);
+            oscillator.start();
+        }
+
+        function calculateFrequency() {
+            let baseFreq = harmonicBaseFreqs[currentHarmonic];
+            
+            // Valve math:
+            // Valve 2: -1 semitone
+            // Valve 1: -2 semitones
+            // Valve 3: -3 semitones
+            let semitoneDrop = 0;
+            if (valves[2]) semitoneDrop += 1;
+            if (valves[1]) semitoneDrop += 2;
+            if (valves[3]) semitoneDrop += 3;
+
+            // Calculate new frequency: f = f0 * (2 ^ (-n/12))
+            let finalFreq = baseFreq * Math.pow(2, -semitoneDrop / 12);
+            return finalFreq;
+        }
+
+        function updateSound() {
+            if (!audioCtx) return;
+            
+            let freq = calculateFrequency();
+            let noteName = getNoteName(freq);
+
+            if (isBlowing) {
+                if (!oscillator) setupOscillator();
+                
+                // Portamento (Glide) for realistic transitions
+                let now = audioCtx.currentTime;
+                oscillator.frequency.setTargetAtTime(freq, now, 0.05);
+                
+                // Envelope for Attack
+                masterGain.gain.cancelScheduledValues(now);
+                masterGain.gain.setTargetAtTime(0.8, now, 0.1); // Attack to 0.8
+                
+                // Open filter slightly on louder notes (Brass simulation)
+                filter.frequency.setTargetAtTime(1000 + (freq), now, 0.1);
+                
+                updateNoteDisplay(noteName);
+            } else {
+                // Release
+                let now = audioCtx.currentTime;
+                masterGain.gain.cancelScheduledValues(now);
+                masterGain.gain.setTargetAtTime(0, now, 0.1);
+                updateNoteDisplay("--");
+                
+                // Stop oscillator after release to save CPU (optional, but good for battery)
+                setTimeout(() => {
+                    if(!isBlowing && oscillator) {
+                        oscillator.stop();
+                        oscillator = null;
+                    }
+                }, 200);
+            }
+        }
+
+        function updateNoteDisplay(note) {
+            document.getElementById('note-display').innerText = note;
+        }
+
+        // --- Interaction Handlers ---
+        function setupInteraction() {
+            const valveBtns = document.querySelectorAll('.valve-btn');
+            const blowPad = document.getElementById('blowPad');
+            const slider = document.getElementById('harmonicSlider');
+
+            // Valve Logic
+            valveBtns.forEach(btn => {
+                const handleValveStart = (e) => {
+                    e.preventDefault();
+                    let id = btn.id.replace('valve', '');
+                    valves[id] = true;
+                    btn.classList.add('active');
+                    if (isBlowing) updateSound();
+                };
+
+                const handleValveEnd = (e) => {
+                    e.preventDefault();
+                    let id = btn.id.replace('valve', '');
+                    valves[id] = false;
+                    btn.classList.remove('active');
+                    if (isBlowing) updateSound();
+                };
+
+                btn.addEventListener('mousedown', handleValveStart);
+                btn.addEventListener('touchstart', handleValveStart);
+                btn.addEventListener('mouseup', handleValveEnd);
+                btn.addEventListener('touchend', handleValveEnd);
+                btn.addEventListener('mouseleave', handleValveEnd);
+            });
+
+            // Blow Pad Logic
+            const startBlowing = (e) => {
+                e.preventDefault();
+                isBlowing = true;
+                blowPad.classList.add('blowing');
+                updateSound();
+            };
+
+            const stopBlowing = (e) => {
+                e.preventDefault();
+                isBlowing = false;
+                blowPad.classList.remove('blowing');
+                updateSound();
+            };
+
+            blowPad.addEventListener('mousedown', startBlowing);
+            blowPad.addEventListener('touchstart', startBlowing);
+            blowPad.addEventListener('mouseup', stopBlowing);
+            blowPad.addEventListener('touchend', stopBlowing);
+            blowPad.addEventListener('mouseleave', stopBlowing);
+
+            // Slider Logic
+            slider.addEventListener('input', (e) => {
+                currentHarmonic = parseInt(e.target.value);
+                if (isBlowing) updateSound();
+                
+                let rangeText = "";
+                if(currentHarmonic == 2) rangeText = "ต่ำ (Low)";
+                else if(currentHarmonic == 4) rangeText = "กลาง (Mid)";
+                else if(currentHarmonic == 6) rangeText = "สูง (High)";
+                document.getElementById('status-display').innerText = "ช่วงเสียง: " + rangeText;
+            });
+
+            // Recording Logic
+            const btnRecord = document.getElementById('btnRecord');
+            const btnPlay = document.getElementById('btnPlay');
+            const btnDownload = document.getElementById('btnDownload');
+
+            btnRecord.addEventListener('click', () => {
+                if (btnRecord.classList.contains('recording')) {
+                    // Stop Recording
+                    mediaRecorder.stop();
+                    btnRecord.classList.remove('recording');
+                    btnRecord.innerText = "🔴 อัดเสียง";
+                    document.getElementById('status-display').innerText = "บันทึกเสร็จสิ้น";
+                } else {
+                    // Start Recording
+                    audioChunks = [];
+                    mediaRecorder = new MediaRecorder(destNode.stream);
+                    
+                    mediaRecorder.ondataavailable = (event) => {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        audioUrl = URL.createObjectURL(audioBlob);
+                        recordedAudio.src = audioUrl;
+                        btnPlay.disabled = false;
+                        btnDownload.disabled = false;
+                    };
+
+                    mediaRecorder.start();
+                    btnRecord.classList.add('recording');
+                    btnRecord.innerText = "⏹ หยุดอัด";
+                    document.getElementById('status-display').innerText = "กำลังอัดเสียง...";
+                    btnPlay.disabled = true;
+                    btnDownload.disabled = true;
+                }
+            });
+
+            btnPlay.addEventListener('click', () => {
+                recordedAudio.play();
+                document.getElementById('status-display').innerText = "กำลังเล่นเสียงที่อัด...";
+                recordedAudio.onended = () => {
+                    document.getElementById('status-display').innerText = "พร้อมใช้งาน";
+                };
+            });
+
+            btnDownload.addEventListener('click', () => {
+                const link = document.createElement('a');
+                link.href = audioUrl;
+                link.download = 'cornet_solo_' + new Date().getTime() + '.webm';
+                link.click();
+            });
+        }
+    </script>
+</body>
+</html>

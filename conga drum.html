@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>กลองคองกาจำลอง (Realistic Conga)</title>
+    <style>
+        :root {
+            --wood-dark: #5d4037;
+            --wood-light: #8d6e63;
+            --skin-color: #f5deb3;
+            --skin-shadow: #d2b48c;
+            --bg-color: #263238;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden; /* Prevent scrolling */
+            touch-action: none; /* Crucial for fast touch response */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+
+        .instructions {
+            font-size: 0.9rem;
+            color: #b0bec5;
+            margin-bottom: 15px;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        /* Controls Area */
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            z-index: 10;
+        }
+
+        .btn {
+            padding: 8px 20px;
+            border-radius: 30px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            outline: none;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn-record {
+            background-color: #ef5350;
+            color: white;
+        }
+
+        .btn-record.recording {
+            background-color: #c62828;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .rec-dot {
+            width: 10px;
+            height: 10px;
+            background-color: #fff;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        .btn-record.recording .rec-dot {
+            background-color: #ff8a80;
+            animation: blink 1s infinite;
+        }
+
+        .btn-download {
+            background-color: #29b6f6;
+            color: white;
+            display: none; /* Hidden by default */
+        }
+
+        @keyframes blink { 
+            0% { opacity: 1; } 
+            50% { opacity: 0.3; } 
+            100% { opacity: 1; } 
+        }
+
+        .drum-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        /* Drum Design */
+        .drum {
+            position: relative;
+            width: 40vw;
+            height: 40vw;
+            max-width: 250px;
+            max-height: 250px;
+            background: radial-gradient(circle, var(--skin-color) 30%, var(--skin-shadow) 90%);
+            border-radius: 50%;
+            border: 12px solid var(--wood-dark);
+            box-shadow: 
+                0 10px 20px rgba(0,0,0,0.5),
+                inset 0 0 20px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: transform 0.05s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Hardware Hardware (Rim) simulation */
+        .drum::after {
+            content: '';
+            position: absolute;
+            top: -12px;
+            left: -12px;
+            right: -12px;
+            bottom: -12px;
+            border-radius: 50%;
+            border: 4px solid #b0bec5; /* Rim color */
+            pointer-events: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        /* Visual cue for center zone */
+        .drum::before {
+            content: '';
+            position: absolute;
+            width: 40%;
+            height: 40%;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.03);
+            pointer-events: none;
+        }
+
+        /* Animation when hit */
+        .drum.active {
+            transform: scale(0.96);
+            background: radial-gradient(circle, #ffeebb 30%, var(--skin-shadow) 90%);
+        }
+
+        .drum-label {
+            position: absolute;
+            bottom: -40px;
+            font-weight: bold;
+            color: #cfd8dc;
+            pointer-events: none;
+        }
+
+        #tumbadora {
+            /* Lower pitch drum */
+            width: 45vw;
+            height: 45vw;
+            max-width: 280px;
+            max-height: 280px;
+        }
+
+        /* Overlay to force audio context start */
+        #start-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            transition: opacity 0.3s;
+        }
+
+        .start-btn {
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            background: #ff5722;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 87, 34, 0.4);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        @media (orientation: portrait) {
+            .drum-container {
+                flex-direction: column;
+                gap: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Start Overlay -->
+    <div id="start-overlay">
+        <button class="start-btn" id="start-btn">แตะเพื่อเริ่มตีกลอง</button>
+        <p style="margin-top:20px; color:#ccc;">(เปิดเสียงอุปกรณ์ของคุณ)</p>
+    </div>
+
+    <h1>กลองคองกา</h1>
+    <p class="instructions">ตีตรงกลาง = เบส | ตีขอบ = เสียงใส<br>ใช้นิ้วหลายนิ้วตีพร้อมกันได้</p>
+
+    <!-- Controls for Recording -->
+    <div class="controls">
+        <button id="recordBtn" class="btn btn-record">
+            <span class="rec-dot"></span>
+            <span id="recordText">อัดเสียง</span>
+        </button>
+        <button id="downloadBtn" class="btn btn-download">
+            💾 ดาวน์โหลด
+        </button>
+    </div>
+
+    <div class="drum-container">
+        <!-- Drum 1: Quinto (Higher Pitch) -->
+        <div class="drum" id="quinto" data-pitch="high">
+            <span class="drum-label">Quinto (เสียงสูง)</span>
+        </div>
+
+        <!-- Drum 2: Tumbadora (Lower Pitch) -->
+        <div class="drum" id="tumbadora" data-pitch="low">
+            <span class="drum-label">Conga (เสียงทุ้ม)</span>
+        </div>
+    </div>
+
+    <script>
+        // --- Audio Engine (Web Audio API) ---
+        let audioCtx;
+        let mainOutputNode; // Node that connects to both speakers and recorder
+        let mediaDest;      // Stream destination for recording
+        let mediaRecorder;
+        let recordedChunks = [];
+        let isRecording = false;
+        
+        // Initialize Audio Context on user gesture
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+
+                // Create a main output node (GainNode)
+                // All sounds will connect to THIS instead of audioCtx.destination directly
+                mainOutputNode = audioCtx.createGain();
+                mainOutputNode.connect(audioCtx.destination); // Connect to speakers
+
+                // Setup Recording Stream
+                try {
+                    mediaDest = audioCtx.createMediaStreamDestination();
+                    mainOutputNode.connect(mediaDest); // Connect output to recorder stream as well
+                } catch (e) {
+                    console.error("MediaStreamDestination not supported", e);
+                }
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Hide overlay and start
+        const startOverlay = document.getElementById('start-overlay');
+        const startBtn = document.getElementById('start-btn');
+
+        startBtn.addEventListener('click', () => {
+            initAudio();
+            startOverlay.style.opacity = '0';
+            setTimeout(() => {
+                startOverlay.style.display = 'none';
+            }, 300);
+        });
+
+        // --- Recording Logic ---
+        const recordBtn = document.getElementById('recordBtn');
+        const recordText = document.getElementById('recordText');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        recordBtn.addEventListener('click', () => {
+            if (!audioCtx) initAudio();
+
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        });
+
+        function startRecording() {
+            if (!mediaDest) return;
+            
+            recordedChunks = [];
+            // Choose mimeType based on support
+            const options = { mimeType: 'audio/webm' };
+            if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                // Fallback for Safari/others if needed (Web Audio usually outputs standard stream)
+                 console.log("webm not supported, trying default");
+                 delete options.mimeType;
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(mediaDest.stream, options);
+            } catch(e) {
+                alert("อุปกรณ์นี้ไม่รองรับการอัดเสียงผ่านเว็บ");
+                return;
+            }
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    recordedChunks.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                // Prepare download
+                const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                const url = URL.createObjectURL(blob);
+                
+                downloadBtn.style.display = 'flex';
+                downloadBtn.onclick = () => {
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = 'my_conga_recording.webm';
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Cleanup
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                        downloadBtn.style.display = 'none';
+                    }, 100);
+                };
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            
+            // UI Updates
+            recordBtn.classList.add('recording');
+            recordText.innerText = "หยุดบันทึก";
+            downloadBtn.style.display = 'none';
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                
+                // UI Updates
+                recordBtn.classList.remove('recording');
+                recordText.innerText = "อัดเสียงใหม่";
+            }
+        }
+
+
+        // Function to create realistic drum sounds synthesis
+        function playSound(pitchType, toneType) {
+            if (!audioCtx) return;
+
+            const t = audioCtx.currentTime;
+            
+            // Master Gain for this hit
+            const hitMasterGain = audioCtx.createGain();
+            
+            // CRITICAL CHANGE: Connect to mainOutputNode (for recording) instead of destination directly
+            hitMasterGain.connect(mainOutputNode);
+
+            hitMasterGain.gain.setValueAtTime(1, t);
+            hitMasterGain.gain.exponentialRampToValueAtTime(0.01, t + 0.5); // Decay
+
+            // --- Oscillators (The Skin Sound) ---
+            const osc = audioCtx.createOscillator();
+            const oscGain = audioCtx.createGain();
+            
+            osc.connect(oscGain);
+            oscGain.connect(hitMasterGain);
+
+            // Pitch Settings
+            let baseFreq = (pitchType === 'high') ? 240 : 180; // Hz
+            
+            if (toneType === 'bass') {
+                // Bass Tone: Lower frequency, pure sine, longer resonance
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(baseFreq * 0.6, t);
+                osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.4, t + 0.1);
+                
+                oscGain.gain.setValueAtTime(0.8, t);
+                oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
+
+            } else if (toneType === 'open') {
+                // Open Tone: Base frequency, ringing sound
+                osc.type = 'triangle'; // Gives a bit more harmonics than sine
+                // Filter to smooth the triangle
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 800;
+                
+                osc.disconnect();
+                osc.connect(filter);
+                filter.connect(oscGain);
+
+                osc.frequency.setValueAtTime(baseFreq, t);
+                osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.9, t + 0.15);
+
+                oscGain.gain.setValueAtTime(0.7, t);
+                oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+                
+                // Add a "Slap" overtone for open hit
+                const slapOsc = audioCtx.createOscillator();
+                const slapGain = audioCtx.createGain();
+                slapOsc.frequency.value = baseFreq * 2.5;
+                slapGain.gain.setValueAtTime(0.2, t);
+                slapGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+                slapOsc.connect(slapGain);
+                slapGain.connect(hitMasterGain);
+                slapOsc.start(t);
+                slapOsc.stop(t + 0.1);
+
+            } else if (toneType === 'slap') {
+                 // Slap Tone: High pitch, noise, short decay
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(baseFreq * 1.8, t);
+                
+                oscGain.gain.setValueAtTime(0.6, t);
+                oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+
+                // Add Noise for the "Crack" sound
+                const bufferSize = audioCtx.sampleRate * 0.1; // 0.1 seconds
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                const noiseGain = audioCtx.createGain();
+                
+                // Filter noise to remove too much low end
+                const noiseFilter = audioCtx.createBiquadFilter();
+                noiseFilter.type = 'highpass';
+                noiseFilter.frequency.value = 1000;
+
+                noise.connect(noiseFilter);
+                noiseFilter.connect(noiseGain);
+                noiseGain.connect(hitMasterGain);
+
+                noiseGain.gain.setValueAtTime(0.6, t);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.08);
+                noise.start(t);
+            }
+
+            osc.start(t);
+            osc.stop(t + 0.6); // Stop slightly after decay ends
+        }
+
+        // --- Input Handling ---
+
+        function handleHit(element, x, y) {
+            // Visual Feedback
+            element.classList.add('active');
+            setTimeout(() => element.classList.remove('active'), 80);
+
+            // Calculate Zone (Center vs Edge)
+            const rect = element.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            // Calculate distance from center (0 to 1 relative to radius)
+            const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+            const radius = rect.width / 2;
+            const normalizedDist = distance / radius;
+
+            const pitch = element.getAttribute('data-pitch');
+            
+            // Logic: 
+            // 0 - 0.4 = Bass (Center)
+            // 0.4 - 1.0 = Open/Slap (Edge)
+            
+            if (normalizedDist < 0.4) {
+                playSound(pitch, 'bass');
+            } else {
+                // Randomize slightly between Open and Slap for variety on edge
+                // Or make outer edge Slap and inner ring Open.
+                if (normalizedDist > 0.75) {
+                    playSound(pitch, 'slap');
+                } else {
+                    playSound(pitch, 'open');
+                }
+            }
+        }
+
+        // Add event listeners to drums
+        const drums = document.querySelectorAll('.drum');
+
+        drums.forEach(drum => {
+            // Mouse Interaction
+            drum.addEventListener('mousedown', (e) => {
+                handleHit(drum, e.clientX, e.clientY);
+            });
+
+            // Touch Interaction (Multi-touch support)
+            drum.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // Prevent scrolling/zooming
+                
+                // Iterate through all changed touches (new fingers touching down)
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    handleHit(drum, touch.clientX, touch.clientY);
+                }
+            }, { passive: false });
+        });
+
+        // Prevent context menu on right click
+        window.addEventListener('contextmenu', e => e.preventDefault());
+
+    </script>
+</body>
+</html>

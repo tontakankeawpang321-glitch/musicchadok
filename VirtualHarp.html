@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Realistic Virtual Harp</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background: radial-gradient(circle at center, #2c1a0e, #0f0803);
+            overflow: hidden;
+            touch-action: none; /* ป้องกันการเลื่อนหน้าจอเมื่อเล่นบนมือถือ */
+        }
+
+        #canvas-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.02);
+            cursor: pointer;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #d4af37;
+            z-index: 10;
+            transition: opacity 0.5s;
+        }
+
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .instruction {
+            margin-top: 10px;
+            font-size: 1rem;
+            color: #aaa;
+            text-align: center;
+        }
+
+        /* ตกแต่งปุ่ม */
+        .btn-start {
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            border: 2px solid #d4af37;
+            background: transparent;
+            color: #d4af37;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .btn-start:hover {
+            background: #d4af37;
+            color: #000;
+            box-shadow: 0 0 20px #d4af37;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 5;
+        }
+
+        .control-btn {
+            background: rgba(255,255,255,0.1);
+            color: #d4af37;
+            border: 1px solid #d4af37;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .control-btn:hover {
+            background: rgba(212, 175, 55, 0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <canvas id="harpCanvas"></canvas>
+        
+        <!-- UI เริ่มต้น -->
+        <div id="overlay">
+            <h1 class="text-4xl md:text-6xl font-bold mb-4 text-[#d4af37] drop-shadow-lg">Virtual Harp</h1>
+            <p class="text-xl text-gray-300 mb-8">เครื่องเล่นฮาร์ปเสียงสมจริง</p>
+            <button id="startBtn" class="btn-start">แตะเพื่อเริ่มเล่น</button>
+            <p class="instruction mt-4">ลากเมาส์หรือนิ้วผ่านสายเพื่อเล่น</p>
+        </div>
+
+        <div id="controls">
+            <button class="control-btn" id="toggleLabels">ซ่อน/แสดง โน้ต</button>
+            <button class="control-btn" id="recordBtn">🔴 บันทึกเสียง</button>
+        </div>
+    </div>
+
+<script>
+    /**
+     * Virtual Harp - High Performance Audio & Physics
+     */
+
+    // --- Audio Context & Synthesis ---
+    let audioCtx;
+    let masterGain;
+    let convolver; // สำหรับ Reverb
+    let compressor; // สำหรับคุมระดับเสียงเมื่อเล่นพร้อมกันหลายโน้ต
+    let dest; // Destination สำหรับการบันทึกเสียง
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
+
+    function initAudio() {
+        if (!audioCtx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            
+            // Master Gain
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.8;
+
+            // Reverb Effect (Convolver)
+            // สร้าง Impulse Response แบบสังเคราะห์เพื่อให้เสียงกังวานเหมือนอยู่ในห้องโถง
+            convolver = audioCtx.createConvolver();
+            convolver.buffer = createImpulseResponse(2.0, 2.0); // 2 วินาที reverb
+
+            // Compressor: ป้องกันเสียงแตกเมื่อเล่นหลายโน้ตพร้อมกัน (Dynamics Stability)
+            compressor = audioCtx.createDynamicsCompressor();
+            compressor.threshold.setValueAtTime(-20, audioCtx.currentTime);
+            compressor.knee.setValueAtTime(30, audioCtx.currentTime);
+            compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+            compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+            compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+
+            // สร้าง Destination สำหรับ Recorder
+            dest = audioCtx.createMediaStreamDestination();
+            
+            // Connect chain:
+            // 1. Dry Signal: Master -> Compressor
+            masterGain.connect(compressor);
+            
+            // 2. Wet Signal: Master -> Convolver -> Compressor
+            masterGain.connect(convolver);
+            convolver.connect(compressor);
+
+            // Final Output:
+            // 1. ไปยังลำโพง (Speakers)
+            compressor.connect(audioCtx.destination);
+            // 2. ไปยังตัวบันทึกเสียง (Recorder)
+            compressor.connect(dest);
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+
+    // สร้าง Impulse Response สำหรับ Reverb
+    function createImpulseResponse(duration, decay) {
+        const rate = audioCtx.sampleRate;
+        const length = rate * duration;
+        const impulse = audioCtx.createBuffer(2, length, rate);
+        const left = impulse.getChannelData(0);
+        const right = impulse.getChannelData(1);
+
+        for (let i = 0; i < length; i++) {
+            const n = i / length; // normalized
+            // noise * decay
+            left[i] = (Math.random() * 2 - 1) * Math.pow(1 - n, decay);
+            right[i] = (Math.random() * 2 - 1) * Math.pow(1 - n, decay);
+        }
+        return impulse;
+    }
+
+    // ฟังก์ชันเล่นเสียงโน้ต (Karplus-Strong-ish approach using Oscillators + Filters)
+    function playNote(freq) {
+        if (!audioCtx) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume(); // Ensure active
+
+        const now = audioCtx.currentTime;
+
+        // 1. Oscillator (ต้นกำเนิดเสียง)
+        const osc = audioCtx.createOscillator();
+        // Triangle wave ให้เสียงที่นุ่มนวลคล้ายเครื่องสายมากกว่า Sine
+        osc.type = 'triangle'; 
+        osc.frequency.setValueAtTime(freq, now);
+
+        // 2. Filter (จำลองการดีด)
+        // เมื่อดีด เสียงจะสว่างแล้วค่อยๆ ทึบลง
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.Q.value = 1;
+        filter.frequency.setValueAtTime(3000, now);
+        filter.frequency.exponentialRampToValueAtTime(freq, now + 1.5); // Filter ปิดลงตามเวลา
+
+        // 3. Amplitude Envelope (การดัง-เบา)
+        const gainNode = audioCtx.createGain();
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(0.6, now + 0.02); // Attack เร็วๆ (เสียงดีด)
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 3.0); // Decay ยาวๆ (เสียงกังวาน)
+
+        // เชื่อมต่อ: Osc -> Filter -> Gain -> Master
+        osc.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(masterGain);
+
+        osc.start(now);
+        osc.stop(now + 3.1);
+
+        // Cleanup
+        setTimeout(() => {
+            osc.disconnect();
+            filter.disconnect();
+            gainNode.disconnect();
+        }, 3200);
+    }
+
+
+    // --- Canvas & Physics ---
+    const canvas = document.getElementById('harpCanvas');
+    const ctx = canvas.getContext('2d');
+    let width, height;
+    
+    // ตั้งค่าตัวแปรฟิสิกส์
+    const strings = [];
+    const particles = [];
+    let showLabels = true;
+
+    // Scale ของ Harp (C Major Scale 2 Octaves)
+    // C4, D4, E4, ...
+    const notes = [
+        { note: 'C4', freq: 261.63, color: '#ff4d4d' }, // สีแดงตามมาตรฐานฮาร์ปสำหรับโน้ต C
+        { note: 'D4', freq: 293.66, color: '#d4af37' },
+        { note: 'E4', freq: 329.63, color: '#d4af37' },
+        { note: 'F4', freq: 349.23, color: '#4d4dff' }, // สีน้ำเงิน/ดำสำหรับโน้ต F
+        { note: 'G4', freq: 392.00, color: '#d4af37' },
+        { note: 'A4', freq: 440.00, color: '#d4af37' },
+        { note: 'B4', freq: 493.88, color: '#d4af37' },
+        { note: 'C5', freq: 523.25, color: '#ff4d4d' },
+        { note: 'D5', freq: 587.33, color: '#d4af37' },
+        { note: 'E5', freq: 659.25, color: '#d4af37' },
+        { note: 'F5', freq: 698.46, color: '#4d4dff' },
+        { note: 'G5', freq: 783.99, color: '#d4af37' },
+        { note: 'A5', freq: 880.00, color: '#d4af37' },
+        { note: 'B5', freq: 987.77, color: '#d4af37' },
+        { note: 'C6', freq: 1046.50, color: '#ff4d4d' }
+    ];
+
+    class HarpString {
+        constructor(x, yStart, yEnd, noteData) {
+            this.x = x;
+            this.yStart = yStart;
+            this.yEnd = yEnd;
+            this.baseX = x;
+            this.noteData = noteData;
+            
+            // Physics
+            this.amplitude = 0; // ความกว้างของการสั่น
+            this.velocity = 0;
+            this.frequency = 0.3; // ความเร็วในการสั่นกลับไปมา (visual only)
+            this.damping = 0.92; // แรงเสียดทาน
+            
+            this.playing = false;
+            this.cooldown = 0; // ป้องกันการดีดซ้ำรัวเกินไป
+        }
+
+        pluck(force = 15) {
+            if (this.cooldown > 0) return;
+            
+            // เล่นเสียง
+            playNote(this.noteData.freq);
+            
+            // เริ่มสั่น
+            this.velocity = force;
+            this.playing = true;
+            this.cooldown = 10; // frames
+
+            // สร้าง Particle effect
+            createParticles(this.x, (this.yStart + this.yEnd) / 2, this.noteData.color);
+        }
+
+        update() {
+            // Physics simulation (Spring motion)
+            // แรงดึงกลับหาจุดศูนย์กลาง
+            const tension = (this.baseX - this.x) * 0.2;
+            this.velocity += tension;
+            this.velocity *= this.damping;
+            this.x += this.velocity;
+
+            // Cooldown ลดลง
+            if (this.cooldown > 0) this.cooldown--;
+
+            // หยุดคำนวณถ้าสั่นน้อยมากๆ
+            if (Math.abs(this.x - this.baseX) < 0.1 && Math.abs(this.velocity) < 0.1) {
+                this.x = this.baseX;
+                this.velocity = 0;
+                this.playing = false;
+            }
+        }
+
+        draw(ctx, time) {
+            ctx.beginPath();
+            
+            // สีสาย
+            ctx.strokeStyle = this.noteData.color;
+            ctx.lineWidth = 2 + (Math.abs(this.x - this.baseX) / 2); // สายหนาขึ้นเมื่อสั่นแรง
+            
+            // วาดเส้นโค้ง Bezier เพื่อความสมจริงเวลาสั่น
+            ctx.moveTo(this.baseX, this.yStart);
+            
+            // จุดควบคุมตรงกลางขยับตาม physics
+            const midY = (this.yStart + this.yEnd) / 2;
+            ctx.quadraticCurveTo(this.x, midY, this.baseX, this.yEnd);
+            
+            // Glow effect
+            if (this.playing) {
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.noteData.color;
+            } else {
+                ctx.shadowBlur = 0;
+            }
+
+            ctx.stroke();
+            ctx.shadowBlur = 0; // Reset
+
+            // วาดชื่อโน้ต
+            if (showLabels) {
+                ctx.fillStyle = '#fff';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(this.noteData.note, this.baseX, this.yEnd + 20);
+            }
+        }
+    }
+
+    class Particle {
+        constructor(x, y, color) {
+            this.x = x;
+            this.y = y;
+            this.color = color;
+            this.size = Math.random() * 3 + 1;
+            this.speedX = (Math.random() - 0.5) * 4;
+            this.speedY = (Math.random() - 0.5) * 4;
+            this.life = 1.0; // Opacity
+        }
+        update() {
+            this.x += this.speedX;
+            this.y += this.speedY;
+            this.life -= 0.03;
+        }
+        draw(ctx) {
+            ctx.globalAlpha = this.life;
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+        }
+    }
+
+    function createParticles(x, y, color) {
+        for(let i=0; i<8; i++) {
+            particles.push(new Particle(x, y, color));
+        }
+    }
+
+    // --- Initialization & Loop ---
+
+    function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+        initStrings();
+    }
+
+    function initStrings() {
+        strings.length = 0;
+        const totalStrings = notes.length;
+        // คำนวณระยะห่าง
+        const marginX = width * 0.1;
+        const spacing = (width - (marginX * 2)) / (totalStrings - 1);
+        
+        // รูปทรงฮาร์ป (สายสั้นไปยาว หรือ ยาวไปสั้น)
+        // ฮาร์ปจริง: เสียงต่ำสายยาว เสียงสูงสายสั้น
+        
+        notes.forEach((note, index) => {
+            const x = marginX + (index * spacing);
+            // คำนวณความยาวสายให้สวยงาม (Slope)
+            const heightRatio = 0.6 + (0.3 * (1 - (index / totalStrings))); 
+            const stringLen = height * heightRatio;
+            const yStart = (height - stringLen) / 2 + 50;
+            const yEnd = yStart + stringLen;
+            
+            strings.push(new HarpString(x, yStart, yEnd, note));
+        });
+    }
+
+    function animate(time) {
+        ctx.clearRect(0, 0, width, height);
+
+        // วาดไม้คานด้านบนและล่าง (Visual Decoration)
+        ctx.fillStyle = '#3e2723';
+        // Top bar
+        // ctx.fillRect(0, 50, width, 20); 
+
+        // Update & Draw Strings
+        strings.forEach(str => {
+            str.update();
+            str.draw(ctx, time);
+        });
+
+        // Update & Draw Particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.update();
+            p.draw(ctx);
+            if (p.life <= 0) {
+                particles.splice(i, 1);
+            }
+        }
+
+        requestAnimationFrame(animate);
+    }
+
+    // --- Interaction Logic ---
+
+    let isTouching = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    function handleInput(x, y) {
+        // ตรวจสอบการชนกับสาย (Collision Detection)
+        // เพื่อประสิทธิภาพ เช็คแค่ระยะ X ก็พอ เพราะสายเป็นแนวตั้ง
+        
+        strings.forEach(str => {
+            // ถ้าเมาส์/นิ้ว อยู่ใกล้สายนี้ในระยะที่กำหนด
+            // และอยู่ในความสูงของสาย
+            const distance = Math.abs(x - str.x);
+            const inHeight = y >= str.yStart && y <= str.yEnd;
+            
+            // Logic: ถ้าลากผ่าน (Crossed)
+            // หรือถ้าแตะใกล้ๆ
+            if (distance < 20 && inHeight) {
+                // คำนวณทิศทางการดีดจากความเร็วเมาส์ (ง่ายๆคือดูระยะห่างจาก base)
+                const force = (x - str.baseX) > 0 ? 15 : -15;
+                str.pluck(force);
+            }
+        });
+    }
+
+    // Mouse Events
+    canvas.addEventListener('mousemove', (e) => {
+        // ใช้ logic ตรวจสอบว่าเมาส์ตัดผ่านเส้น X ของสายหรือไม่จะแม่นยำกว่า
+        // แต่วิธี simple distance check ก็พอไหวสำหรับ UX ลื่นๆ
+        if (e.buttons === 1 || isTouching) { // ต้องคลิกค้าง หรือเป็น touch mode
+             handleInput(e.clientX, e.clientY);
+        }
+    });
+
+    canvas.addEventListener('mousedown', (e) => {
+        isTouching = true;
+        // Safety resume
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        handleInput(e.clientX, e.clientY);
+    });
+
+    canvas.addEventListener('mouseup', () => {
+        isTouching = false;
+    });
+
+    // Touch Events (Multi-touch support for Polyphony)
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        isTouching = true;
+        
+        // Safety resume for mobile
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+            handleInput(t.clientX, t.clientY);
+        }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+            handleInput(t.clientX, t.clientY);
+        }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+        if(e.touches.length === 0) isTouching = false;
+    });
+
+
+    // --- Setup UI & Start ---
+    const startBtn = document.getElementById('startBtn');
+    const overlay = document.getElementById('overlay');
+    const toggleBtn = document.getElementById('toggleLabels');
+    const recordBtn = document.getElementById('recordBtn');
+
+    startBtn.addEventListener('click', () => {
+        initAudio();
+        overlay.classList.add('hidden');
+        // ปลดล็อก AudioContext บนมือถือ
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    });
+
+    toggleBtn.addEventListener('click', () => {
+        showLabels = !showLabels;
+    });
+
+    // Recording Logic
+    recordBtn.addEventListener('click', () => {
+        if (!audioCtx) initAudio();
+
+        if (!isRecording) {
+            // เริ่มบันทึก
+            audioChunks = [];
+            
+            // สร้าง MediaRecorder จาก Stream ของ Web Audio
+            // ตรวจสอบ browser support
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
+            mediaRecorder = new MediaRecorder(dest.stream, { mimeType: mimeType });
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                // สร้างไฟล์เสียงเมื่อหยุด
+                const blob = new Blob(audioChunks, { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                
+                // สร้างลิงก์ดาวน์โหลดชั่วคราว
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                const timestamp = new Date().toISOString().slice(0,19).replace(/[-:]/g,"");
+                a.download = `my-harp-song-${timestamp}.webm`; // หรือ .ogg
+                document.body.appendChild(a);
+                a.click();
+                
+                // Cleanup
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            recordBtn.textContent = "⏹ หยุดบันทึก";
+            recordBtn.style.background = "#ff4d4d";
+            recordBtn.style.color = "white";
+            recordBtn.style.borderColor = "#ff4d4d";
+        } else {
+            // หยุดบันทึก
+            mediaRecorder.stop();
+            isRecording = false;
+            recordBtn.textContent = "🔴 บันทึกเสียง";
+            recordBtn.style.background = ""; // Reset style
+            recordBtn.style.color = "";
+            recordBtn.style.borderColor = "";
+        }
+    });
+
+    // Start everything
+    window.addEventListener('resize', resize);
+    resize();
+    requestAnimationFrame(animate);
+
+</script>
+</body>
+</html>

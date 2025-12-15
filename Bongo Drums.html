@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>กลองบองโกจำลอง (Bongo Drums)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* ป้องกันการเลือกข้อความและการลากบนมือถือ */
+        body {
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+            overflow: hidden;
+            background: #2c1e12; /* สีพื้นหลังไม้เข้ม */
+        }
+
+        /* การตกแต่งตัวกลอง */
+        .drum-container {
+            position: relative;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #d4a373 0%, #a97142 100%);
+            box-shadow: 
+                0 10px 20px rgba(0,0,0,0.5),
+                inset 0 -5px 15px rgba(0,0,0,0.3);
+            border: 8px solid #5d4037;
+            transition: transform 0.05s ease;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* หน้ากลอง (หนังกลอง) */
+        .drum-head {
+            width: 90%;
+            height: 90%;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #fef3c7, #eaddcf, #d4c5b0);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        /* เอฟเฟกต์ตอนตี */
+        .drum-container.active {
+            transform: scale(0.95);
+        }
+        .drum-container.active .drum-head {
+            background: radial-gradient(circle at 30% 30%, #fffbf0, #f5eadd, #e0d0b8);
+        }
+
+        /* ลายไม้พื้นหลัง */
+        .wood-bg {
+            background-color: #3e2723;
+            background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h20v20H0V0zm10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14zm20 0a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM10 37a7 7 0 1 0 0-14 7 7 0 0 0 0 14zm10-17h20v20H20V20zm10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14z' fill='%234e342e' fill-opacity='0.4' fill-rule='evenodd'/%3E%3C/svg%3E");
+        }
+
+        /* วงแหวนเหล็กขอบกลอง */
+        .rim {
+            position: absolute;
+            top: -4px;
+            left: -4px;
+            right: -4px;
+            bottom: -4px;
+            border-radius: 50%;
+            border: 4px solid #9e9e9e;
+            box-shadow: 
+                0 2px 5px rgba(0,0,0,0.5),
+                inset 0 2px 2px rgba(255,255,255,0.5);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* ตัวยึดตรงกลาง */
+        .connector {
+            background: #5d4037;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+        }
+        
+        /* แอนิเมชันสำหรับคำแนะนำ */
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+        .instruction {
+            animation: pulse 2s infinite;
+        }
+
+        /* ปุ่มบันทึกเสียง */
+        .btn-record {
+            background: #e53935;
+            color: white;
+            padding: 8px 24px;
+            border-radius: 9999px;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+            border: 2px solid #b71c1c;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+        .btn-record:active {
+            transform: scale(0.95);
+        }
+        .btn-record.recording {
+            background: #f44336;
+            animation: pulse-red 1.5s infinite;
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(229, 57, 53, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0); }
+        }
+    </style>
+</head>
+<body class="wood-bg h-screen w-screen flex flex-col items-center justify-between py-4">
+
+    <!-- Header -->
+    <header class="text-center z-10 flex flex-col items-center">
+        <h1 class="text-3xl font-bold text-[#f3e5f5] drop-shadow-md tracking-wider">BONGO DRUMS</h1>
+        
+        <!-- Controls Area -->
+        <div class="mt-4 z-20">
+            <button id="record-btn" class="btn-record" onclick="toggleRecording()">
+                <span id="record-icon">●</span>
+                <span id="record-text">บันทึกเสียง</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Drum Set Area -->
+    <main class="flex-grow flex items-center justify-center w-full max-w-4xl relative">
+        
+        <!-- ตัวเชื่อมกลอง (Connector) -->
+        <div class="connector absolute w-16 h-8 md:w-24 md:h-12 rounded-lg z-0"></div>
+
+        <div class="flex gap-4 md:gap-12 items-center justify-center z-10 w-full px-4">
+            
+            <!-- กลองใบใหญ่ (Hembra) - เสียงทุ้ม -->
+            <div id="drum-low" class="drum-container w-40 h-40 md:w-64 md:h-64" data-key="a">
+                <div class="rim"></div>
+                <div class="drum-head"></div>
+            </div>
+
+            <!-- กลองใบเล็ก (Macho) - เสียงแหลม -->
+            <div id="drum-high" class="drum-container w-32 h-32 md:w-52 md:h-52" data-key="d">
+                <div class="rim"></div>
+                <div class="drum-head"></div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer / Controls -->
+    <footer class="mb-4 text-[#a1887f] text-xs text-center">
+        <p class="instruction">แตะหน้าจอเพื่อเล่น | กดปุ่มบันทึกเพื่ออัดเสียง</p>
+        <p class="mt-2 opacity-50">Keyboard: กด 'A' (ใบใหญ่) และ 'D' (ใบเล็ก)</p>
+    </footer>
+
+    <script>
+        // --- Web Audio API Setup ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        let masterGain; // ตัวควบคุมเสียงหลักเพื่อส่งไปทั้งหูฟังและเครื่องอัด
+        
+        // Recording Variables
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        
+        // ฟังก์ชันเริ่ม AudioContext และเตรียมระบบอัดเสียง
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+                
+                // 1. สร้าง Master Gain Node (จุดรวมเสียง)
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 1.0;
+
+                // 2. เชื่อม Master ไปยังลำโพง (Destination)
+                masterGain.connect(audioCtx.destination);
+
+                // 3. เตรียมระบบอัดเสียง (MediaStreamDestination)
+                const dest = audioCtx.createMediaStreamDestination();
+                masterGain.connect(dest); // ส่งเสียงจาก Master ไปเข้าตัวอัดด้วย
+
+                // 4. ตั้งค่า MediaRecorder
+                try {
+                    mediaRecorder = new MediaRecorder(dest.stream);
+                    
+                    mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            audioChunks.push(event.data);
+                        }
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        // สร้าง Blob ไฟล์เสียง
+                        const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const url = URL.createObjectURL(blob);
+                        
+                        // สร้างลิงก์ดาวน์โหลดอัตโนมัติ
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        const timestamp = new Date().toLocaleTimeString('th-TH').replace(/:/g, '-');
+                        a.download = `bongo-recording-${timestamp}.webm`;
+                        document.body.appendChild(a);
+                        a.click();
+                        
+                        // คืนค่าหน่วยความจำ
+                        setTimeout(() => {
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(url);
+                        }, 100);
+                        
+                        // รีเซ็ต Chunks
+                        audioChunks = [];
+                    };
+                } catch (e) {
+                    console.error("Browser does not support MediaRecorder for WebAudio", e);
+                    alert("เบราว์เซอร์นี้ไม่รองรับการอัดเสียงจาก WebAudio โดยตรง");
+                }
+
+            } else if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // ฟังก์ชันจัดการปุ่มอัดเสียง
+        function toggleRecording() {
+            initAudio(); // ตรวจสอบว่า audio context ทำงาน
+            
+            const btn = document.getElementById('record-btn');
+            const icon = document.getElementById('record-icon');
+            const text = document.getElementById('record-text');
+
+            if (!isRecording) {
+                // เริ่มอัด
+                if (mediaRecorder && mediaRecorder.state === "inactive") {
+                    mediaRecorder.start();
+                    isRecording = true;
+                    btn.classList.add('recording');
+                    icon.textContent = '⬛'; // สัญลักษณ์หยุด
+                    text.textContent = 'หยุดบันทึก';
+                }
+            } else {
+                // หยุดอัด
+                if (mediaRecorder && mediaRecorder.state === "recording") {
+                    mediaRecorder.stop();
+                    isRecording = false;
+                    btn.classList.remove('recording');
+                    icon.textContent = '●';
+                    text.textContent = 'บันทึกเสียง';
+                }
+            }
+        }
+
+        // ฟังก์ชันสร้างเสียงกลองสังเคราะห์
+        function playBongoSound(type) {
+            if (!audioCtx) initAudio();
+
+            const t = audioCtx.currentTime;
+            
+            // Oscillator สร้างคลื่นเสียง
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            // ตั้งค่าความถี่ (Pitch)
+            // Macho (High) ~ 480Hz, Hembra (Low) ~ 220Hz
+            const baseFreq = type === 'high' ? 480 : 220; 
+            
+            oscillator.frequency.setValueAtTime(baseFreq, t);
+            // Pitch drop (ทำให้เสียงเหมือนหนังกลองที่ถูกตีแล้วหย่อนลง)
+            oscillator.frequency.exponentialRampToValueAtTime(baseFreq * 0.8, t + 0.1); 
+
+            // สร้างรูปคลื่น
+            oscillator.type = 'sine'; // Sine wave ให้เสียงนุ่มแบบหนังกลอง
+
+            // Gain Envelope (การควบคุมความดัง)
+            gainNode.gain.setValueAtTime(0, t);
+            gainNode.gain.linearRampToValueAtTime(1, t + 0.005); // Attack เร็วมาก
+            gainNode.gain.exponentialRampToValueAtTime(0.01, t + 0.4); // Decay
+
+            // เชื่อมต่อ: Oscillator -> Gain -> MasterGain (สำคัญ! ต้องเข้า Master เพื่อให้อัดเสียงได้)
+            oscillator.connect(gainNode);
+            if (masterGain) {
+                gainNode.connect(masterGain);
+            } else {
+                gainNode.connect(audioCtx.destination); // Fallback
+            }
+
+            // เริ่มเล่นและหยุด
+            oscillator.start(t);
+            oscillator.stop(t + 0.4);
+
+            // เพิ่มเสียง "Slap" (Noise) เล็กน้อยเพื่อให้ดูสมจริงขึ้น
+            if (type === 'high') {
+                createSlapNoise(t);
+            }
+        }
+
+        function createSlapNoise(t) {
+            const bufferSize = audioCtx.sampleRate * 0.05; // 50ms noise
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'highpass';
+            noiseFilter.frequency.value = 1000;
+            const noiseGain = audioCtx.createGain();
+            
+            noiseGain.gain.setValueAtTime(0.3, t);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            
+            // เชื่อมต่อเข้า MasterGain เช่นกัน
+            if (masterGain) {
+                noiseGain.connect(masterGain);
+            } else {
+                noiseGain.connect(audioCtx.destination);
+            }
+            
+            noise.start(t);
+        }
+
+        // --- Interaction Logic ---
+        const drumLow = document.getElementById('drum-low');
+        const drumHigh = document.getElementById('drum-high');
+
+        function triggerDrum(element, type) {
+            // เล่นเสียง
+            playBongoSound(type);
+
+            // Visual feedback
+            element.classList.add('active');
+            setTimeout(() => {
+                element.classList.remove('active');
+            }, 80);
+        }
+
+        // รองรับ Touch Event (Multi-touch)
+        function handleTouch(e) {
+            e.preventDefault(); // ป้องกันการซูมหรือเลื่อนหน้าจอ
+            initAudio(); // มั่นใจว่า AudioContext ทำงาน
+
+            // วนลูปทุกนิ้วที่แตะลงมา (รองรับการตีพร้อมกัน)
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                const target = document.elementFromPoint(touch.clientX, touch.clientY);
+
+                if (target) {
+                    // หา Element ที่เป็นกลอง (เผื่อแตะโดน drum-head หรือ rim)
+                    const drumContainer = target.closest('.drum-container');
+                    const recordBtn = target.closest('#record-btn'); // อนุญาตให้กดปุ่มอัดได้
+
+                    if (drumContainer) {
+                        if (drumContainer.id === 'drum-low') triggerDrum(drumLow, 'low');
+                        if (drumContainer.id === 'drum-high') triggerDrum(drumHigh, 'high');
+                    }
+                    
+                    if (recordBtn) {
+                        recordBtn.click();
+                    }
+                }
+            }
+        }
+
+        // Event Listeners สำหรับหน้าจอสัมผัส
+        document.addEventListener('touchstart', handleTouch, { passive: false });
+
+        // Event Listeners สำหรับเมาส์ (Desktop)
+        drumLow.addEventListener('mousedown', () => triggerDrum(drumLow, 'low'));
+        drumHigh.addEventListener('mousedown', () => triggerDrum(drumHigh, 'high'));
+
+        // Keyboard Support
+        document.addEventListener('keydown', (e) => {
+            if (e.repeat) return; // ป้องกันการกดค้าง
+            const key = e.key.toLowerCase();
+            if (key === 'a') triggerDrum(drumLow, 'low');
+            if (key === 'd' || key === 'l') triggerDrum(drumHigh, 'high'); 
+            if (key === ' ' || key === 'r') toggleRecording(); // Spacebar หรือ R เพื่ออัดเสียง
+        });
+
+        // เริ่มต้น AudioContext เมื่อมีการคลิกที่ใดก็ได้บนหน้าจอ (เพื่อแก้ Policy ของบาง Browser)
+        document.body.addEventListener('click', initAudio, { once: true });
+        document.body.addEventListener('touchstart', initAudio, { once: true });
+
+    </script>
+</body>
+</html>

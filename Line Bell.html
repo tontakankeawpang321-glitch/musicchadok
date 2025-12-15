@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Line Bell Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #1a1a1a;
+            color: #f3f4f6;
+            touch-action: manipulation; /* ป้องกันการซูมด้วยนิ้ว */
+            overflow: hidden; /* ป้องกันการเลื่อนหน้าจอ */
+        }
+
+        /* เอฟเฟกต์การสั่นของระฆัง */
+        @keyframes ring {
+            0% { transform: rotate(0); }
+            10% { transform: rotate(10deg); }
+            20% { transform: rotate(-10deg); }
+            30% { transform: rotate(8deg); }
+            40% { transform: rotate(-8deg); }
+            50% { transform: rotate(6deg); }
+            60% { transform: rotate(-6deg); }
+            70% { transform: rotate(4deg); }
+            80% { transform: rotate(-4deg); }
+            90% { transform: rotate(2deg); }
+            100% { transform: rotate(0); }
+        }
+
+        .bell-anim {
+            animation: ring 0.5s ease-in-out;
+        }
+
+        /* เอฟเฟกต์แสงวาบ */
+        .bell-flash {
+            box-shadow: 0 0 20px 10px rgba(255, 215, 0, 0.6);
+            border-color: #fff !important;
+        }
+
+        .bell-btn {
+            transition: all 0.1s;
+            background: radial-gradient(circle at 30% 30%, #ffd700, #b8860b, #8b4500);
+            box-shadow: 
+                0 4px 6px rgba(0,0,0,0.5),
+                inset 0 -5px 10px rgba(0,0,0,0.3),
+                inset 0 5px 10px rgba(255,255,255,0.4);
+        }
+
+        .bell-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* Animation สำหรับปุ่มอัดเสียง */
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        
+        .recording-active {
+            background-color: #ef4444 !important; /* red-500 */
+            animation: pulse-red 1.5s infinite;
+        }
+        
+        .recording-icon-active {
+            background-color: white !important;
+            border-radius: 2px !important; /* เปลี่ยนวงกลมเป็นสี่เหลี่ยม (Stop icon) */
+            width: 10px !important;
+            height: 10px !important;
+        }
+
+        /* ป้องกันการเลือกข้อความ */
+        .no-select {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-between relative bg-gray-900">
+
+    <!-- Overlay สำหรับเริ่ม Audio Context (จำเป็นสำหรับ Browser สมัยใหม่) -->
+    <div id="start-overlay" class="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center cursor-pointer transition-opacity duration-500">
+        <div class="text-center p-6 border-2 border-yellow-500 rounded-xl bg-gray-900 animate-pulse">
+            <h1 class="text-3xl font-bold text-yellow-500 mb-4">ระฆังไทย (Line Bell)</h1>
+            <p class="text-white text-lg">แตะหน้าจอเพื่อเริ่มใช้งาน</p>
+            <p class="text-gray-400 text-sm mt-2">(เปิดเสียงอุปกรณ์ของท่าน)</p>
+        </div>
+    </div>
+
+    <!-- ส่วนหัว -->
+    <header class="w-full text-center pt-2 pb-1 z-10 pointer-events-none shrink-0">
+        <h1 class="text-xl md:text-2xl font-bold text-yellow-500 drop-shadow-md">ระฆังทอง</h1>
+        <p class="text-[10px] md:text-xs text-gray-400">ระบบเสียงสังเคราะห์คุณภาพสูง</p>
+    </header>
+
+    <!-- พื้นที่วางระฆัง -->
+    <main class="w-full max-w-4xl flex-grow flex items-center justify-center p-2 pb-24 overflow-hidden">
+        <div id="bell-grid" class="grid grid-cols-3 md:grid-cols-4 gap-3 md:gap-6 w-full place-items-center content-center">
+            <!-- ระฆังจะถูกสร้างด้วย Javascript -->
+        </div>
+    </main>
+
+    <!-- แถบควบคุมด้านล่าง -->
+    <div class="absolute bottom-4 w-full flex justify-center items-end gap-4 px-4 pointer-events-none z-20">
+        
+        <!-- กลุ่มปุ่มควบคุม (Interactive) -->
+        <div class="pointer-events-auto flex items-center gap-3 bg-gray-900/90 backdrop-blur-sm p-3 rounded-2xl border border-gray-700 shadow-xl">
+            
+            <!-- ปุ่มอัดเสียง -->
+            <button id="record-btn" class="flex flex-col items-center gap-1 group">
+                <div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gray-700 border-2 border-gray-500 flex items-center justify-center transition-all group-active:scale-95" id="record-btn-inner">
+                    <div id="record-icon" class="w-3 h-3 md:w-4 md:h-4 rounded-full bg-red-500 transition-all"></div>
+                </div>
+                <span id="record-label" class="text-[9px] md:text-[10px] text-gray-300">อัดเสียง</span>
+            </button>
+
+            <div class="w-px h-8 md:h-10 bg-gray-700 mx-1"></div>
+
+            <!-- ตัวปรับ Reverb -->
+            <div class="flex flex-col items-center gap-1">
+                <input type="range" id="reverb-slider" min="0" max="1" step="0.1" value="0.7" class="w-20 md:w-24 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-500">
+                <label class="text-[9px] md:text-[10px] text-gray-300">ความก้อง (Reverb)</label>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- ส่วนจัดการเสียง (Audio Engine) ---
+        let audioCtx;
+        let masterGain;
+        let reverbNode;
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        
+        // ความถี่เสียงของระฆัง (โน้ต Pentatonic Scale เพื่อให้ตีมั่วๆ ก็เพราะ)
+        const notes = [
+            { note: "C5", freq: 523.25, label: "ด" },
+            { note: "D5", freq: 587.33, label: "ร" },
+            { note: "E5", freq: 659.25, label: "ม" },
+            { note: "G5", freq: 783.99, label: "ซ" },
+            { note: "A5", freq: 880.00, label: "ล" },
+            { note: "C6", freq: 1046.50, label: "ดํ" },
+            { note: "D6", freq: 1174.66, label: "รํ" },
+            { note: "E6", freq: 1318.51, label: "มํ" },
+            { note: "G6", freq: 1567.98, label: "ซํ" },
+            { note: "A6", freq: 1760.00, label: "ลํ" },
+            { note: "C7", freq: 2093.00, label: "ดํํ" },
+            { note: "E7", freq: 2637.02, label: "มํํ" }
+        ];
+
+        async function initAudio() {
+            if (audioCtx) return;
+
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+
+            // สร้าง Master Gain
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.5;
+
+            // สร้าง Reverb (Convolver)
+            reverbNode = audioCtx.createConvolver();
+            reverbNode.buffer = await createReverbBuffer(audioCtx, 2.5);
+            
+            // Reverb Gain
+            const reverbGain = audioCtx.createGain();
+            reverbGain.gain.value = 0.7;
+            window.reverbGainNode = reverbGain;
+
+            // --- เตรียมระบบอัดเสียง (Recording Setup) ---
+            const dest = audioCtx.createMediaStreamDestination();
+            
+            // Setup MediaRecorder
+            try {
+                // เลือกชนิดไฟล์ที่ Browser รองรับ
+                let mimeType = 'audio/webm';
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    mimeType = 'audio/mp4'; // Fallback สำหรับ Safari บางเวอร์ชัน
+                    if (!MediaRecorder.isTypeSupported(mimeType)) {
+                        mimeType = ''; // ให้ Browser เลือกเอง
+                    }
+                }
+                
+                const options = mimeType ? { mimeType } : {};
+                mediaRecorder = new MediaRecorder(dest.stream, options);
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' }); // Container webm ปลอดภัยสุด
+                    const url = URL.createObjectURL(blob);
+                    
+                    // สร้างชื่อไฟล์ตามเวลา
+                    const now = new Date();
+                    const timestamp = `${now.getHours()}${now.getMinutes()}${now.getSeconds()}`;
+                    const filename = `Bell_Sound_${timestamp}.webm`;
+
+                    // Trigger Download
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                        alert(`บันทึกไฟล์ ${filename} เรียบร้อยแล้ว`);
+                    }, 100);
+                    
+                    audioChunks = []; // ล้างข้อมูลเก่า
+                };
+            } catch (err) {
+                console.error("Recording not supported:", err);
+            }
+
+            // --- การเชื่อมต่อ (Routing) ---
+            // 1. ต่อเข้าลำโพง (Speakers)
+            masterGain.connect(audioCtx.destination);
+            reverbGain.connect(audioCtx.destination);
+            
+            // 2. ต่อเข้าตัวอัดเสียง (Recorder)
+            masterGain.connect(dest);
+            reverbGain.connect(dest);
+
+            // 3. Reverb Path
+            masterGain.connect(reverbNode);
+            reverbNode.connect(reverbGain);
+        }
+
+        // ฟังก์ชันสร้างเสียง Impulse Response สำหรับ Reverb (จำลองเสียงก้อง)
+        function createReverbBuffer(ctx, duration) {
+            const sampleRate = ctx.sampleRate;
+            const length = sampleRate * duration;
+            const impulse = ctx.createBuffer(2, length, sampleRate);
+            const left = impulse.getChannelData(0);
+            const right = impulse.getChannelData(1);
+
+            for (let i = 0; i < length; i++) {
+                const decay = Math.pow(1 - i / length, 2); // เสียงค่อยๆ จาง
+                left[i] = (Math.random() * 2 - 1) * decay;
+                right[i] = (Math.random() * 2 - 1) * decay;
+            }
+            return impulse;
+        }
+
+        // ฟังก์ชันสังเคราะห์เสียงระฆัง
+        function playBellSound(frequency) {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const t = audioCtx.currentTime;
+            
+            // ส่วนประกอบของเสียงระฆัง (Overtones)
+            const ratios = [1.0, 2.0, 3.0, 4.2, 5.8]; 
+            const gains = [1.0, 0.6, 0.4, 0.2, 0.1]; 
+            const decays = [1.5, 1.0, 0.8, 0.5, 0.3]; 
+
+            ratios.forEach((ratio, index) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = index === 0 ? 'sine' : 'triangle'; 
+                osc.frequency.value = frequency * ratio;
+
+                // Envelope (ADSR)
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(gains[index], t + 0.01); 
+                gain.gain.exponentialRampToValueAtTime(0.001, t + decays[index]); 
+
+                osc.connect(gain);
+                gain.connect(masterGain);
+
+                osc.start(t);
+                osc.stop(t + decays[index] + 0.1);
+            });
+        }
+
+        // --- ส่วนจัดการ UI (Interface) ---
+        const bellGrid = document.getElementById('bell-grid');
+        const overlay = document.getElementById('start-overlay');
+        const reverbSlider = document.getElementById('reverb-slider');
+        const recordBtn = document.getElementById('record-btn');
+        const recordBtnInner = document.getElementById('record-btn-inner');
+        const recordIcon = document.getElementById('record-icon');
+        const recordLabel = document.getElementById('record-label');
+
+        // Logic ปุ่มอัดเสียง
+        recordBtn.addEventListener('click', async () => {
+            if (!audioCtx) await initAudio();
+
+            if (!mediaRecorder) {
+                alert("อุปกรณ์ของคุณไม่รองรับการบันทึกเสียง");
+                return;
+            }
+
+            if (isRecording) {
+                // หยุดอัด
+                mediaRecorder.stop();
+                isRecording = false;
+                
+                // Update UI
+                recordBtnInner.classList.remove('recording-active');
+                recordIcon.classList.remove('recording-icon-active');
+                recordLabel.innerText = "อัดเสียง";
+                recordLabel.classList.remove('text-red-400');
+            } else {
+                // เริ่มอัด
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                mediaRecorder.start();
+                isRecording = true;
+
+                // Update UI
+                recordBtnInner.classList.add('recording-active');
+                recordIcon.classList.add('recording-icon-active');
+                recordLabel.innerText = "กำลังอัด...";
+                recordLabel.classList.add('text-red-400');
+            }
+        });
+
+        // สร้างปุ่มระฆัง
+        notes.forEach((item, index) => {
+            const btn = document.createElement('button');
+            // ปรับขนาดปุ่มให้ Responsive ด้วยหน่วย VW และมี Max limit
+            btn.className = `bell-btn rounded-full relative flex items-center justify-center no-select
+                             w-[23vw] h-[23vw] max-w-[5.5rem] max-h-[5.5rem] md:max-w-[7rem] md:max-h-[7rem]
+                             border-2 md:border-4 border-yellow-700 mx-auto`;
+            
+            // ไอคอนระฆัง (SVG)
+            btn.innerHTML = `
+                <div class="pointer-events-none flex flex-col items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-1/2 h-1/2 text-yellow-100 opacity-90 drop-shadow-sm" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2a8 8 0 0 1 7.915 7.15l.613 6.136c.15 1.495 1.34 2.651 2.827 2.714h-22.71c1.487-.063 2.677-1.22 2.827-2.714l.613-6.137a8 8 0 0 1 7.915-7.149zm0 20a3.001 3.001 0 0 1-2.829-2h5.658a3.001 3.001 0 0 1-2.829 2z"/>
+                    </svg>
+                    <span class="text-[10px] md:text-xs font-bold text-yellow-900 mt-1">${item.label}</span>
+                </div>
+            `;
+            
+            // Dataset เพื่อเก็บความถี่
+            btn.dataset.freq = item.freq;
+            btn.dataset.id = index;
+
+            // Event Listeners สำหรับการกด
+            const triggerBell = (e) => {
+                e.preventDefault(); 
+                playBellSound(item.freq);
+
+                // Visual Feedback
+                btn.classList.remove('bell-anim');
+                void btn.offsetWidth; // Trigger reflow
+                btn.classList.add('bell-anim', 'bell-flash');
+                setTimeout(() => {
+                    btn.classList.remove('bell-flash');
+                }, 100);
+            };
+
+            // รองรับทั้ง Touch และ Mouse
+            btn.addEventListener('touchstart', triggerBell, { passive: false });
+            btn.addEventListener('mousedown', (e) => {
+                if ('ontouchstart' in window) return;
+                triggerBell(e);
+            });
+
+            bellGrid.appendChild(btn);
+        });
+
+        // จัดการหน้าจอเริ่ม (Start Overlay)
+        const startApp = async () => {
+            await initAudio();
+            overlay.classList.add('opacity-0');
+            setTimeout(() => {
+                overlay.remove();
+            }, 500);
+        };
+
+        overlay.addEventListener('click', startApp);
+        overlay.addEventListener('touchstart', startApp);
+
+        // ปรับ Reverb
+        reverbSlider.addEventListener('input', (e) => {
+            if (window.reverbGainNode) {
+                window.reverbGainNode.gain.value = parseFloat(e.target.value);
+            }
+        });
+
+    </script>
+</body>
+</html>

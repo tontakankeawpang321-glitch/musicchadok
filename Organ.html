@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Realistic Organ Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* ป้องกันการเลือกข้อความและการลากบนมือถือ */
+        body {
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden;
+            background-color: #1a1a1a;
+        }
+
+        .key {
+            position: relative;
+            cursor: pointer;
+            border-bottom-left-radius: 4px;
+            border-bottom-right-radius: 4px;
+            transition: background-color 0.1s, transform 0.05s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            z-index: 1;
+        }
+
+        .white-key {
+            background: linear-gradient(to bottom, #ffffff 0%, #f0f0f0 100%);
+            height: 100%;
+        }
+
+        .white-key:active, .white-key.active {
+            background: #e0e0e0;
+            transform: translateY(2px);
+            box-shadow: 0 2px 2px rgba(0,0,0,0.2);
+        }
+
+        .black-key {
+            background: linear-gradient(to bottom, #333 0%, #000 100%);
+            height: 60%;
+            position: absolute;
+            top: 0;
+            z-index: 10;
+            width: 8%; /* ความกว้างสัมพันธ์กับ container */
+            border-bottom-left-radius: 2px;
+            border-bottom-right-radius: 2px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+        }
+
+        .black-key:active, .black-key.active {
+            background: #222;
+            transform: translateY(2px);
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+        }
+
+        /* ไฟแสดงสถานะเมื่อเล่น */
+        .led-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #333;
+            margin: 0 auto;
+            margin-top: 5px;
+            transition: background-color 0.1s;
+        }
+        .active .led-indicator {
+            background-color: #00ff00;
+            box-shadow: 0 0 5px #00ff00;
+        }
+
+        /* ตกแต่งส่วนควบคุม */
+        .wood-texture {
+            background-color: #5d4037;
+            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 2px, transparent 2px, transparent 10px);
+            border-bottom: 4px solid #3e2723;
+        }
+
+        /* Animation สำหรับปุ่มอัดเสียง */
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .recording-pulse {
+            animation: pulse-red 1.5s infinite;
+            background-color: #ef4444 !important;
+            color: white !important;
+            border-color: #ef4444 !important;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-center text-white">
+
+    <!-- Header / Controls -->
+    <div class="w-full h-1/4 wood-texture p-4 flex flex-col justify-between shadow-lg relative z-20">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-amber-100 tracking-wider">CHURCH ORGAN</h1>
+                <p class="text-xs text-amber-300 opacity-80">Polyphonic Synth Engine</p>
+            </div>
+            
+            <div class="flex gap-4 items-center">
+                <!-- Record Button -->
+                <button id="record-btn" onclick="toggleRecord()" class="bg-gray-800 border border-gray-600 text-gray-300 px-3 py-2 rounded font-bold text-xs uppercase tracking-wide flex items-center gap-2 hover:bg-gray-700 transition-colors">
+                    <span id="rec-dot" class="w-2 h-2 rounded-full bg-red-500"></span>
+                    <span id="rec-text">REC</span>
+                </button>
+
+                <div class="flex flex-col items-center">
+                    <label class="text-xs uppercase font-bold text-amber-200 mb-1">Volume</label>
+                    <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.7" class="accent-amber-500 cursor-pointer w-24">
+                </div>
+                
+                <div class="flex flex-col items-center">
+                    <label class="text-xs uppercase font-bold text-amber-200 mb-1">Tone</label>
+                    <select id="waveform-select" class="bg-amber-900 text-amber-100 border border-amber-700 rounded px-2 py-1 text-sm focus:outline-none">
+                        <option value="organ">Classic Organ</option>
+                        <option value="pipe">Pipe Organ (Sine)</option>
+                        <option value="reed">Reed Organ (Saw)</option>
+                        <option value="retro">Retro (Square)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center text-xs text-amber-400 opacity-60 mt-2">
+            Use Keyboard (A-K) or Touch Screen
+        </div>
+    </div>
+
+    <!-- Keyboard Container -->
+    <div class="relative w-full h-3/4 bg-black flex justify-center overflow-hidden shadow-inner" id="keyboard-container">
+        <!-- Keys will be generated by JS -->
+    </div>
+
+    <script>
+        // --- Audio Engine ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        let masterGainNode; // Main output for recording
+        let destRecording;  // MediaStreamDestination for recording
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        const activeOscillators = {}; // Map to track playing notes
+
+        // Note Frequencies (C4 to E5)
+        const notes = [
+            { note: 'C4', freq: 261.63, type: 'white', key: 'a' },
+            { note: 'C#4', freq: 277.18, type: 'black', key: 'w', pos: 10 }, 
+            { note: 'D4', freq: 293.66, type: 'white', key: 's' },
+            { note: 'D#4', freq: 311.13, type: 'black', key: 'e', pos: 24 },
+            { note: 'E4', freq: 329.63, type: 'white', key: 'd' },
+            { note: 'F4', freq: 349.23, type: 'white', key: 'f' },
+            { note: 'F#4', freq: 369.99, type: 'black', key: 't', pos: 53 },
+            { note: 'G4', freq: 392.00, type: 'white', key: 'g' },
+            { note: 'G#4', freq: 415.30, type: 'black', key: 'y', pos: 68 },
+            { note: 'A4', freq: 440.00, type: 'white', key: 'h' },
+            { note: 'A#4', freq: 466.16, type: 'black', key: 'u', pos: 82 },
+            { note: 'B4', freq: 493.88, type: 'white', key: 'j' },
+            { note: 'C5', freq: 523.25, type: 'white', key: 'k' },
+            { note: 'C#5', freq: 554.37, type: 'black', key: 'o', pos: 1000 }, 
+            { note: 'D5', freq: 587.33, type: 'white', key: 'l' },
+            { note: 'E5', freq: 659.25, type: 'white', key: ';' }
+        ];
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+                // Create Master Gain Node (This is what we will record)
+                masterGainNode = audioCtx.createGain();
+                masterGainNode.gain.value = 1.0;
+                masterGainNode.connect(audioCtx.destination);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // --- Recording Logic ---
+        function toggleRecord() {
+            initAudio();
+            const btn = document.getElementById('record-btn');
+            const recText = document.getElementById('rec-text');
+            const recDot = document.getElementById('rec-dot');
+
+            if (!isRecording) {
+                // Start Recording
+                audioChunks = [];
+                destRecording = audioCtx.createMediaStreamDestination();
+                masterGainNode.connect(destRecording);
+
+                // Determine supported mime type
+                let options = { mimeType: 'audio/webm' };
+                if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                    options = { mimeType: 'audio/mp4' }; // Fallback for some Safari versions
+                    if (!MediaRecorder.isTypeSupported('audio/mp4')) {
+                         options = undefined; // Let browser decide default
+                    }
+                }
+
+                try {
+                    mediaRecorder = new MediaRecorder(destRecording.stream, options);
+                } catch (e) {
+                    console.error("MediaRecorder error:", e);
+                    mediaRecorder = new MediaRecorder(destRecording.stream); // Try default if specific fails
+                }
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const mimeType = mediaRecorder.mimeType || 'audio/webm';
+                    const blob = new Blob(audioChunks, { type: mimeType });
+                    const url = URL.createObjectURL(blob);
+                    
+                    // Create download link
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                    a.download = `organ_recording_${Date.now()}.${ext}`;
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Cleanup
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                    }, 100);
+                    
+                    // Disconnect recording stream to save resources
+                    masterGainNode.disconnect(destRecording);
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                
+                // UI Update
+                btn.classList.add('recording-pulse');
+                recText.textContent = "STOP";
+                recDot.style.backgroundColor = "white";
+
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+
+                // UI Update
+                btn.classList.remove('recording-pulse');
+                recText.textContent = "REC";
+                recDot.style.backgroundColor = "#ef4444";
+            }
+        }
+
+
+        function getWaveConfig() {
+            const type = document.getElementById('waveform-select').value;
+            switch(type) {
+                case 'pipe': return { type: 'sine', harmonics: [1] };
+                case 'reed': return { type: 'sawtooth', harmonics: [1] };
+                case 'retro': return { type: 'square', harmonics: [1] };
+                case 'organ': default: return { type: 'triangle', harmonics: [1, 2] }; 
+            }
+        }
+
+        function playNote(freq, id) {
+            initAudio();
+            if (activeOscillators[id]) return; 
+
+            const config = getWaveConfig();
+            const gainNode = audioCtx.createGain();
+            const vol = parseFloat(document.getElementById('volume-slider').value);
+            
+            const now = audioCtx.currentTime;
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(vol * 0.3, now + 0.05); 
+
+            // Connect to Master Gain instead of direct destination
+            gainNode.connect(masterGainNode);
+
+            const oscList = [];
+
+            config.harmonics.forEach((h, index) => {
+                const osc = audioCtx.createOscillator();
+                osc.type = config.type;
+                osc.frequency.setValueAtTime(freq * h, now);
+                
+                const harmGain = audioCtx.createGain();
+                harmGain.gain.value = index === 0 ? 1.0 : 0.4; 
+                
+                osc.connect(harmGain);
+                harmGain.connect(gainNode);
+                osc.start(now);
+                oscList.push(osc);
+            });
+
+            activeOscillators[id] = { oscList, gainNode };
+            
+            const el = document.getElementById(`key-${id}`);
+            if (el) el.classList.add('active');
+        }
+
+        function stopNote(id) {
+            if (!activeOscillators[id]) return;
+
+            const { oscList, gainNode } = activeOscillators[id];
+            const now = audioCtx.currentTime;
+            const release = 0.1;
+
+            gainNode.gain.cancelScheduledValues(now);
+            gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, now + release);
+
+            oscList.forEach(osc => {
+                osc.stop(now + release + 0.1); 
+            });
+
+            delete activeOscillators[id];
+
+            const el = document.getElementById(`key-${id}`);
+            if (el) el.classList.remove('active');
+        }
+
+        // --- UI Generation ---
+        const container = document.getElementById('keyboard-container');
+        const whiteNotes = notes.filter(n => n.type === 'white');
+        const blackNotes = notes.filter(n => n.type === 'black');
+
+        // Render White Keys
+        whiteNotes.forEach(note => {
+            const key = document.createElement('div');
+            key.className = 'key white-key flex-1 border-r border-gray-300 flex items-end justify-center pb-2';
+            key.id = `key-${note.key}`;
+            key.dataset.note = note.key;
+            key.innerHTML = `<span class="text-gray-400 text-xs select-none pointer-events-none mb-1">${note.note}</span>`;
+            
+            addInteractions(key, note.freq, note.key);
+            container.appendChild(key);
+        });
+
+        // Render Black Keys
+        const whiteKeyWidth = 100 / whiteNotes.length;
+        
+        const blackKeyPositions = {
+            'C#4': 1, 'D#4': 2, 'F#4': 4, 'G#4': 5, 'A#4': 6, 'C#5': 8 
+        };
+
+        blackNotes.forEach(note => {
+            if (!blackKeyPositions[note.note]) return; 
+
+            const key = document.createElement('div');
+            key.className = 'key black-key';
+            key.id = `key-${note.key}`;
+            
+            let visualIndex = 0;
+            if(note.note.startsWith('C#')) visualIndex = 1;
+            if(note.note.startsWith('D#')) visualIndex = 2;
+            if(note.note.startsWith('F#')) visualIndex = 4;
+            if(note.note.startsWith('G#')) visualIndex = 5;
+            if(note.note.startsWith('A#')) visualIndex = 6;
+            
+            if(note.note.includes('5')) visualIndex += 7;
+
+            const leftPos = (visualIndex * whiteKeyWidth) - (4); 
+
+            key.style.left = `${leftPos}%`;
+            
+            addInteractions(key, note.freq, note.key);
+            container.appendChild(key);
+        });
+
+
+        function addInteractions(element, freq, id) {
+            const start = (e) => {
+                e.preventDefault(); 
+                playNote(freq, id);
+            };
+            const end = (e) => {
+                e.preventDefault();
+                stopNote(id);
+            };
+
+            element.addEventListener('mousedown', start);
+            element.addEventListener('mouseup', end);
+            element.addEventListener('mouseleave', end);
+
+            element.addEventListener('touchstart', start, {passive: false});
+            element.addEventListener('touchend', end, {passive: false});
+            element.addEventListener('touchcancel', end, {passive: false});
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            const note = notes.find(n => n.key === e.key.toLowerCase());
+            if (note) playNote(note.freq, note.key);
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const note = notes.find(n => n.key === e.key.toLowerCase());
+            if (note) stopNote(note.key);
+        });
+
+        document.body.addEventListener('click', initAudio, { once: true });
+        document.body.addEventListener('touchstart', initAudio, { once: true });
+
+    </script>
+</body>
+</html>

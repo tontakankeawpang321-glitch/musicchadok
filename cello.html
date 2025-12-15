@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realistic Cello Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #1a1a1a;
+            color: #eee;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Wood Texture for Cello Body */
+        .cello-body {
+            background: linear-gradient(to right, #3e1e12, #5c2e1a, #8a4b28, #5c2e1a, #3e1e12);
+            box-shadow: inset 0 0 100px #000;
+            position: relative;
+        }
+
+        /* String Styling */
+        .string-container {
+            position: relative;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .string-container:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .cello-string {
+            width: 4px; /* Base thickness */
+            height: 100%;
+            background: linear-gradient(90deg, #888, #fff, #888);
+            box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+            position: absolute;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        /* Thickness variations for strings */
+        .string-c .cello-string { width: 8px; }
+        .string-g .cello-string { width: 6px; }
+        .string-d .cello-string { width: 5px; }
+        .string-a .cello-string { width: 3px; }
+
+        /* Finger positions (Frets visual aid - though cello is fretless) */
+        .fret-line {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background-color: rgba(0,0,0,0.3);
+            pointer-events: none;
+        }
+
+        /* Vibrating Animation */
+        @keyframes vibrate {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(1.5px); }
+            50% { transform: translateX(-1.5px); }
+            75% { transform: translateX(1.5px); }
+            100% { transform: translateX(0); }
+        }
+
+        .vibrating .cello-string {
+            animation: vibrate 0.1s infinite;
+        }
+
+        .active-note {
+            background: radial-gradient(circle, rgba(255,215,0,0.4) 0%, rgba(255,215,0,0) 70%);
+        }
+
+        /* Controls */
+        .control-panel {
+            background: rgba(0, 0, 0, 0.8);
+            border-top: 2px solid #8a4b28;
+        }
+        
+        .key-label {
+            position: absolute;
+            bottom: 20px;
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.3);
+            pointer-events: none;
+            transition: color 0.2s;
+        }
+
+        .note-name {
+            position: absolute;
+            top: 20px;
+            font-weight: bold;
+            color: #ffd700;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.2s ease-out;
+            text-shadow: 0 2px 4px black;
+            pointer-events: none;
+        }
+        
+        /* Show notes on active/hover */
+        .string-container:active .note-name, 
+        .string-container.active-key .note-name {
+            opacity: 1;
+            transform: scale(1.2);
+        }
+
+        /* Global Show Notes Mode */
+        .show-notes-mode .note-name {
+            opacity: 1 !important;
+            transform: scale(1);
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .show-notes-mode .active-key .note-name {
+            color: #ffd700;
+            transform: scale(1.3);
+        }
+
+        .show-notes-mode .key-label {
+            color: rgba(255,255,255,0.6);
+        }
+
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-black text-white p-3 flex flex-wrap justify-between items-center shadow-lg z-20 gap-2">
+        <div>
+            <h1 class="text-xl md:text-2xl font-bold text-amber-500 flex items-center gap-2">
+                🎻 Cello Simulator 
+                <span class="text-xs font-normal text-gray-500 border border-gray-700 rounded px-1 hidden sm:inline-block">Polyphonic</span>
+            </h1>
+        </div>
+        
+        <div class="flex items-center gap-2 md:gap-4 flex-wrap">
+            <!-- Toggle Notes Button -->
+            <button id="toggleNotesBtn" class="bg-gray-700 hover:bg-gray-600 text-white text-sm px-3 py-1.5 rounded border border-gray-600 transition flex items-center gap-1">
+                <span>👁️</span> <span id="toggleText">แสดงโน้ต</span>
+            </button>
+
+            <!-- Recording Button -->
+            <button id="recordBtn" class="bg-gray-700 hover:bg-gray-600 text-white text-sm px-3 py-1.5 rounded border border-gray-600 transition flex items-center gap-1">
+                <span>🔴</span> <span id="recordText">บันทึกเสียง</span>
+            </button>
+
+            <div class="h-6 w-px bg-gray-700 hidden sm:block"></div>
+
+            <div class="flex items-center gap-2">
+                <span class="text-xs md:text-sm text-gray-400">Vol:</span>
+                <input type="range" id="volume" min="0" max="1" step="0.01" value="0.7" class="accent-amber-500 w-20 md:w-24">
+            </div>
+            
+            <button id="startAudio" class="bg-amber-700 hover:bg-amber-600 text-white text-sm px-4 py-2 rounded shadow transition animate-pulse font-bold">
+                🔊 เปิดเสียง (Start)
+            </button>
+        </div>
+    </header>
+
+    <!-- Cello Neck/Fingerboard Area -->
+    <main class="flex-grow flex cello-body relative" id="fingerboard">
+        <!-- Generates Fret Lines for visual reference -->
+        <div class="absolute inset-0 flex flex-col justify-evenly opacity-20 pointer-events-none">
+            <div class="fret-line"></div>
+            <div class="fret-line"></div>
+            <div class="fret-line"></div>
+            <div class="fret-line"></div>
+            <div class="fret-line"></div>
+        </div>
+
+        <!-- String C (Low) -->
+        <div class="flex-1 string-container string-c border-r border-black/20" data-string="C2">
+            <div class="cello-string"></div>
+            <!-- Notes created via JS -->
+        </div>
+
+        <!-- String G -->
+        <div class="flex-1 string-container string-g border-r border-black/20" data-string="G2">
+            <div class="cello-string"></div>
+        </div>
+
+        <!-- String D -->
+        <div class="flex-1 string-container string-d border-r border-black/20" data-string="D3">
+            <div class="cello-string"></div>
+        </div>
+
+        <!-- String A (High) -->
+        <div class="flex-1 string-container string-a" data-string="A3">
+            <div class="cello-string"></div>
+        </div>
+    </main>
+
+    <!-- Instructions / Legend -->
+    <footer class="control-panel p-2 md:p-4 text-center text-xs md:text-sm text-gray-300 grid grid-cols-4 gap-1 md:gap-2 select-none">
+        <div class="bg-black/20 rounded p-1">
+            <span class="block text-amber-500 font-bold">สาย C</span>
+            <span class="text-gray-500">Z...M</span>
+        </div>
+        <div class="bg-black/20 rounded p-1">
+            <span class="block text-amber-500 font-bold">สาย G</span>
+            <span class="text-gray-500">A...J</span>
+        </div>
+        <div class="bg-black/20 rounded p-1">
+            <span class="block text-amber-500 font-bold">สาย D</span>
+            <span class="text-gray-500">Q...U</span>
+        </div>
+        <div class="bg-black/20 rounded p-1">
+            <span class="block text-amber-500 font-bold">สาย A</span>
+            <span class="text-gray-500">1...7</span>
+        </div>
+    </footer>
+
+    <script>
+        // --- Audio Engine ---
+        let audioCtx;
+        const volumeControl = document.getElementById('volume');
+        const startBtn = document.getElementById('startAudio');
+        let masterGain;
+        let isAudioStarted = false;
+        
+        // Recorder Variables
+        let mediaRecorder;
+        let recordedChunks = [];
+        let audioDestination;
+
+        // Note frequencies (Just Intonation/Equal Temperament mix for demo)
+        // Base Frequencies: C2=65.41, G2=98.00, D3=146.83, A3=220.00
+        const stringBaseFreqs = {
+            'C2': 65.41,
+            'G2': 98.00,
+            'D3': 146.83,
+            'A3': 220.00
+        };
+
+        // Keyboard mapping: [Key, Semitones from open string, Note Name]
+        const keyMap = {
+            // String C (Bottom Row)
+            'z': { string: 'C2', semitone: 0, note: 'C2' },
+            'x': { string: 'C2', semitone: 2, note: 'D2' },
+            'c': { string: 'C2', semitone: 4, note: 'E2' },
+            'v': { string: 'C2', semitone: 5, note: 'F2' },
+            'b': { string: 'C2', semitone: 7, note: 'G2' },
+            'n': { string: 'C2', semitone: 9, note: 'A2' },
+            'm': { string: 'C2', semitone: 11, note: 'B2' },
+
+            // String G (Middle Row)
+            'a': { string: 'G2', semitone: 0, note: 'G2' },
+            's': { string: 'G2', semitone: 2, note: 'A2' },
+            'd': { string: 'G2', semitone: 4, note: 'B2' },
+            'f': { string: 'G2', semitone: 5, note: 'C3' },
+            'g': { string: 'G2', semitone: 7, note: 'D3' },
+            'h': { string: 'G2', semitone: 9, note: 'E3' },
+            'j': { string: 'G2', semitone: 11, note: 'F#3' },
+
+            // String D (Top Row)
+            'q': { string: 'D3', semitone: 0, note: 'D3' },
+            'w': { string: 'D3', semitone: 2, note: 'E3' },
+            'e': { string: 'D3', semitone: 4, note: 'F#3' },
+            'r': { string: 'D3', semitone: 5, note: 'G3' },
+            't': { string: 'D3', semitone: 7, note: 'A3' },
+            'y': { string: 'D3', semitone: 9, note: 'B3' },
+            'u': { string: 'D3', semitone: 11, note: 'C#4' },
+
+             // String A (Number Row)
+            '1': { string: 'A3', semitone: 0, note: 'A3' },
+            '2': { string: 'A3', semitone: 2, note: 'B3' },
+            '3': { string: 'A3', semitone: 4, note: 'C#4' },
+            '4': { string: 'A3', semitone: 5, note: 'D4' },
+            '5': { string: 'A3', semitone: 7, note: 'E4' },
+            '6': { string: 'A3', semitone: 9, note: 'F#4' },
+            '7': { string: 'A3', semitone: 11, note: 'G#4' }
+        };
+
+        // Active notes registry to handle polyphony and key releases
+        const activeOscillators = {};
+
+        function initAudio() {
+            if (isAudioStarted) return;
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = volumeControl.value;
+            masterGain.connect(audioCtx.destination);
+            
+            // Setup Recording Destination
+            audioDestination = audioCtx.createMediaStreamDestination();
+            masterGain.connect(audioDestination);
+            
+            // Setup MediaRecorder
+            try {
+                mediaRecorder = new MediaRecorder(audioDestination.stream);
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+                
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    // Auto-download
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `cello_recording_${new Date().toISOString().slice(0,19).replace(/:/g,"-")}.webm`;
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Cleanup
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    recordedChunks = [];
+                };
+            } catch (err) {
+                console.error("MediaRecorder not supported or error:", err);
+            }
+
+            isAudioStarted = true;
+            startBtn.classList.remove('animate-pulse', 'bg-amber-700');
+            startBtn.classList.add('bg-green-700');
+            startBtn.innerHTML = "✓ พร้อมเล่น (Ready)";
+        }
+
+        // Calculate frequency based on semitones
+        function getFrequency(baseFreq, semitones) {
+            return baseFreq * Math.pow(2, semitones / 12);
+        }
+
+        function playSound(keyId, stringName, semitones) {
+            if (!isAudioStarted) initAudio();
+            if (activeOscillators[keyId]) return; // Prevent re-triggering while holding
+
+            const baseFreq = stringBaseFreqs[stringName];
+            const freq = getFrequency(baseFreq, semitones);
+            const now = audioCtx.currentTime;
+
+            // 1. Oscillator (Sawtooth for bow friction string sound)
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, now);
+
+            // 2. Second Oscillator for richness (slightly detuned)
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'sawtooth';
+            osc2.frequency.setValueAtTime(freq, now);
+            osc2.detune.value = 8; // Slight detune for warmth
+
+            // 3. Lowpass Filter (To simulate wooden body resonance)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            // Dynamic filter based on pitch (brighter for higher notes)
+            filter.frequency.setValueAtTime(freq * 8, now); 
+            filter.Q.value = 2;
+
+            // 4. Gain (Envelope: Attack, Decay, Sustain, Release)
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0, now);
+            // Slower attack for low strings, faster for high
+            const attackTime = stringName === 'C2' ? 0.15 : 0.08;
+            gainNode.gain.linearRampToValueAtTime(0.8, now + attackTime); 
+            gainNode.gain.linearRampToValueAtTime(0.6, now + attackTime + 0.2); // Decay to sustain
+
+            // 5. Vibrato (LFO) - Adds realism
+            const lfo = audioCtx.createOscillator();
+            lfo.type = 'sine';
+            lfo.frequency.value = 5.5; // Vibrato speed
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = 4.0; // Vibrato depth
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+            lfoGain.connect(osc2.frequency);
+
+            // Connections
+            osc.connect(filter);
+            osc2.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(masterGain);
+
+            // Start
+            osc.start(now);
+            osc2.start(now);
+            lfo.start(now);
+
+            // Store nodes to stop them later
+            activeOscillators[keyId] = { osc, osc2, lfo, gainNode, filter };
+
+            // UI Feedback
+            animateString(stringName, true);
+        }
+
+        function stopSound(keyId, stringName) {
+            if (!activeOscillators[keyId]) return;
+
+            const { osc, osc2, lfo, gainNode } = activeOscillators[keyId];
+            const now = audioCtx.currentTime;
+            const releaseTime = 0.4; // Long release for resonance
+
+            // Release envelope
+            gainNode.gain.cancelScheduledValues(now);
+            gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, now + releaseTime);
+
+            // Stop oscillators after release
+            osc.stop(now + releaseTime);
+            osc2.stop(now + releaseTime);
+            lfo.stop(now + releaseTime);
+
+            // Clean up memory
+            setTimeout(() => {
+                delete activeOscillators[keyId];
+            }, releaseTime * 1000 + 100);
+
+            // UI Feedback
+            animateString(stringName, false);
+        }
+
+        // --- UI Logic ---
+
+        function animateString(stringName, isPlaying) {
+            const stringClass = `.string-${stringName.charAt(0).toLowerCase()}`;
+            const element = document.querySelector(stringClass);
+            if (element) {
+                if (isPlaying) {
+                    element.classList.add('vibrating', 'active-note');
+                } else {
+                    // Only stop vibrating if NO notes on this string are playing
+                    // Simple approximation: check if any key for this string is pressed?
+                    // For now, we just remove it to keep UI responsive
+                    element.classList.remove('vibrating', 'active-note');
+                }
+            }
+        }
+
+        function createVisualMarkers() {
+            // Add clickable zones for mouse users
+            Object.keys(keyMap).forEach(key => {
+                const data = keyMap[key];
+                const stringClass = `.string-${data.string.charAt(0).toLowerCase()}`;
+                const container = document.querySelector(stringClass);
+                
+                const noteDiv = document.createElement('div');
+                noteDiv.className = 'w-full flex items-center justify-center border-b border-white/5 hover:bg-white/10 transition relative';
+                noteDiv.style.flex = '1';
+                noteDiv.id = `key-${key}`;
+                
+                // Visual label (Key)
+                const label = document.createElement('span');
+                label.className = 'key-label';
+                label.innerText = key.toUpperCase();
+                
+                // Note Name
+                const noteName = document.createElement('span');
+                noteName.className = 'note-name';
+                noteName.innerText = data.note;
+
+                noteDiv.appendChild(noteName);
+                noteDiv.appendChild(label);
+
+                // Mouse/Touch Events for this specific note area
+                const triggerPlay = (e) => {
+                    e.preventDefault(); 
+                    playSound(key, data.string, data.semitone);
+                    noteDiv.classList.add('active-key', 'bg-white/20');
+                };
+                
+                const triggerStop = (e) => {
+                    if(e) e.preventDefault();
+                    stopSound(key, data.string);
+                    noteDiv.classList.remove('active-key', 'bg-white/20');
+                };
+
+                noteDiv.addEventListener('mousedown', triggerPlay);
+                noteDiv.addEventListener('mouseup', triggerStop);
+                noteDiv.addEventListener('mouseleave', () => {
+                    if (activeOscillators[key]) triggerStop();
+                });
+
+                // Touch support
+                noteDiv.addEventListener('touchstart', triggerPlay, {passive: false});
+                noteDiv.addEventListener('touchend', triggerStop);
+
+                // Link visual div to key press
+                data.domElement = noteDiv;
+                
+                container.appendChild(noteDiv);
+            });
+        }
+
+        // --- Features ---
+        
+        // Toggle Notes Visibility
+        const toggleNotesBtn = document.getElementById('toggleNotesBtn');
+        const toggleText = document.getElementById('toggleText');
+        let notesVisible = false;
+
+        toggleNotesBtn.addEventListener('click', () => {
+            notesVisible = !notesVisible;
+            document.getElementById('fingerboard').classList.toggle('show-notes-mode');
+            
+            if (notesVisible) {
+                toggleNotesBtn.classList.remove('bg-gray-700', 'text-white');
+                toggleNotesBtn.classList.add('bg-amber-500', 'text-black', 'border-amber-600');
+                toggleText.innerText = "ซ่อนโน้ต";
+            } else {
+                toggleNotesBtn.classList.add('bg-gray-700', 'text-white');
+                toggleNotesBtn.classList.remove('bg-amber-500', 'text-black', 'border-amber-600');
+                toggleText.innerText = "แสดงโน้ต";
+            }
+        });
+
+        // Recording Logic
+        const recordBtn = document.getElementById('recordBtn');
+        const recordText = document.getElementById('recordText');
+        let isRecording = false;
+
+        recordBtn.addEventListener('click', () => {
+            if (!isAudioStarted) {
+                alert("กรุณากดปุ่ม '🔊 เปิดเสียง' ก่อนทำการบันทึก");
+                return;
+            }
+
+            if (!mediaRecorder) {
+                alert("เบราว์เซอร์นี้ไม่รองรับการบันทึกเสียง");
+                return;
+            }
+
+            if (!isRecording) {
+                // Start Recording
+                recordedChunks = [];
+                mediaRecorder.start();
+                isRecording = true;
+                
+                // UI Update
+                recordBtn.classList.remove('bg-gray-700', 'hover:bg-gray-600');
+                recordBtn.classList.add('bg-red-600', 'hover:bg-red-700', 'animate-pulse');
+                recordText.innerText = "หยุดบันทึก (Stop)";
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                
+                // UI Update
+                recordBtn.classList.add('bg-gray-700', 'hover:bg-gray-600');
+                recordBtn.classList.remove('bg-red-600', 'hover:bg-red-700', 'animate-pulse');
+                recordText.innerText = "บันทึกเสียง";
+            }
+        });
+
+        // --- Event Listeners ---
+
+        startBtn.addEventListener('click', initAudio);
+
+        volumeControl.addEventListener('input', (e) => {
+            if (masterGain) {
+                masterGain.gain.value = e.target.value;
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            const key = e.key.toLowerCase();
+            if (keyMap[key]) {
+                const data = keyMap[key];
+                playSound(key, data.string, data.semitone);
+                if (data.domElement) data.domElement.classList.add('active-key', 'bg-white/20');
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            if (keyMap[key]) {
+                const data = keyMap[key];
+                stopSound(key, data.string);
+                if (data.domElement) data.domElement.classList.remove('active-key', 'bg-white/20');
+            }
+        });
+
+        // Initialize UI
+        createVisualMarkers();
+
+    </script>
+</body>
+</html>

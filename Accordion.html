@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mobile Accordion Pro + Rec</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* ป้องกันการเลือกข้อความและการซูมบนมือถือ */
+        body {
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            overscroll-behavior: none;
+            font-family: 'Sarabun', sans-serif;
+            background-color: #2d3748;
+            height: 100dvh;
+            width: 100vw;
+            overflow: hidden;
+        }
+
+        .key {
+            transition: background-color 0.05s;
+            position: relative;
+            border-radius: 0 0 4px 4px;
+        }
+        .key.active {
+            background-color: #ffd700 !important;
+            transform: scale(0.98);
+        }
+        .black-key {
+            z-index: 10;
+            height: 60%;
+            width: 70%;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            top: 0;
+            border-radius: 0 0 4px 4px;
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+        .black-key-hitbox {
+            pointer-events: auto;
+        }
+        .black-key.active {
+            background-color: #b8860b !important;
+            transform: translateX(-50%) scale(0.98);
+        }
+
+        .bass-btn {
+            border-radius: 50%;
+            box-shadow: inset 0 -4px 4px rgba(0,0,0,0.3), 0 4px 4px rgba(0,0,0,0.3);
+            transition: all 0.05s;
+        }
+        .bass-btn:active, .bass-btn.active {
+            transform: scale(0.9);
+            background-color: #48bb78;
+            box-shadow: inset 0 4px 4px rgba(0,0,0,0.3);
+        }
+
+        .bellows {
+            background: repeating-linear-gradient(
+                45deg,
+                #1a202c,
+                #1a202c 10px,
+                #4a5568 10px,
+                #4a5568 20px
+            );
+            transition: transform 0.1s ease-out;
+        }
+        .bellows.expanding {
+            transform: scaleX(1.05);
+        }
+    </style>
+</head>
+<body class="flex flex-col text-white">
+
+    <!-- Header / Controls -->
+    <div class="h-16 bg-gray-900 flex items-center justify-between px-2 sm:px-4 shadow-lg z-20 shrink-0 gap-2">
+        <h1 class="text-sm sm:text-lg font-bold text-yellow-500 truncate">ThaiAccordion</h1>
+        <div class="flex space-x-2 items-center">
+            <button id="toggle-notes" class="bg-blue-600 active:bg-blue-700 px-2 py-1 rounded text-xs sm:text-sm shadow whitespace-nowrap">
+                โน้ต
+            </button>
+            <button id="record-btn" class="bg-red-600 active:bg-red-700 px-3 py-1 rounded text-xs sm:text-sm shadow flex items-center gap-1 whitespace-nowrap min-w-[70px] justify-center">
+                <span id="rec-dot" class="w-2 h-2 bg-white rounded-full"></span>
+                <span id="rec-text">อัดเสียง</span>
+            </button>
+            <!-- ปุ่มดาวน์โหลด (ซ่อนอยู่ตอนแรก) -->
+            <a id="download-link" class="hidden bg-green-500 active:bg-green-600 px-3 py-1 rounded text-xs sm:text-sm shadow text-white flex items-center gap-1 whitespace-nowrap cursor-pointer hover:bg-green-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                โหลด
+            </a>
+        </div>
+    </div>
+
+    <!-- Bass Section (Top Half) -->
+    <div class="flex-1 bg-gray-800 grid grid-cols-6 gap-2 p-2 items-center justify-items-center relative z-10 border-b-4 border-gray-900 overflow-hidden">
+        <div class="col-span-6 w-full text-center text-xs text-gray-400 mb-1">เบส (Bass) & คอร์ด (Chords)</div>
+        
+        <button class="bass-btn w-12 h-12 bg-gray-300 text-gray-900 font-bold touch-none" data-note="F2" data-type="bass">F</button>
+        <button class="bass-btn w-12 h-12 bg-gray-200 text-gray-900 font-bold border-4 border-gray-400 touch-none" data-note="C2" data-type="bass">C</button>
+        <button class="bass-btn w-12 h-12 bg-gray-300 text-gray-900 font-bold touch-none" data-note="G2" data-type="bass">G</button>
+        <button class="bass-btn w-12 h-12 bg-gray-300 text-gray-900 font-bold touch-none" data-note="D2" data-type="bass">D</button>
+        <button class="bass-btn w-12 h-12 bg-gray-300 text-gray-900 font-bold touch-none" data-note="A2" data-type="bass">A</button>
+        <button class="bass-btn w-12 h-12 bg-gray-300 text-gray-900 font-bold touch-none" data-note="E2" data-type="bass">E</button>
+
+        <button class="bass-btn w-10 h-10 bg-gray-600 text-white text-xs touch-none" data-note="F3,A3,C4" data-type="chord">F M</button>
+        <button class="bass-btn w-10 h-10 bg-gray-600 text-white text-xs touch-none" data-note="C3,E3,G3" data-type="chord">C M</button>
+        <button class="bass-btn w-10 h-10 bg-gray-600 text-white text-xs touch-none" data-note="G3,B3,D4" data-type="chord">G M</button>
+        <button class="bass-btn w-10 h-10 bg-gray-600 text-white text-xs touch-none" data-note="D3,F#3,A3" data-type="chord">D M</button>
+        <button class="bass-btn w-10 h-10 bg-gray-600 text-white text-xs touch-none" data-note="A3,C#4,E4" data-type="chord">A M</button>
+        <button class="bass-btn w-10 h-10 bg-gray-600 text-white text-xs touch-none" data-note="E3,G#3,B3" data-type="chord">E M</button>
+    </div>
+
+    <!-- Bellows Visual -->
+    <div id="bellows" class="h-8 w-full bellows shadow-inner border-y border-black shrink-0"></div>
+
+    <!-- Treble Keyboard -->
+    <div class="h-48 bg-gray-900 relative flex justify-center px-1 pb-1 shrink-0">
+        <div class="flex w-full max-w-3xl h-full relative" id="keyboard-container"></div>
+    </div>
+
+    <script>
+        // --- 1. Audio Engine & Recorder Setup ---
+        let audioCtx;
+        let dest; // MediaStreamDestination for recording
+        let mediaRecorder;
+        let audioChunks = [];
+        const activeOscillators = {};
+        const masterGainValue = 0.4;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                // Create a destination node for the recorder
+                dest = audioCtx.createMediaStreamDestination();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Accordion Sound Synthesis
+        function playSound(noteFreq, type = 'key') {
+            if (!audioCtx) initAudio();
+
+            const safeId = `${noteFreq}-${type}`;
+            if (activeOscillators[safeId]) {
+                activeOscillators[safeId].stop(); 
+            }
+
+            const osc1 = audioCtx.createOscillator();
+            const osc2 = audioCtx.createOscillator();
+            const sub = audioCtx.createOscillator(); 
+            
+            const gainNode = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+
+            if (type === 'bass') {
+                osc1.type = 'sawtooth';
+                osc2.type = 'square';
+                filter.type = 'lowpass';
+                filter.frequency.value = 400;
+            } else if (type === 'chord') {
+                osc1.type = 'sawtooth';
+                osc2.type = 'triangle';
+                filter.type = 'lowpass';
+                filter.frequency.value = 800;
+            } else {
+                osc1.type = 'sawtooth';
+                osc2.type = 'sawtooth'; 
+                sub.type = 'triangle';
+                filter.type = 'lowpass';
+                filter.frequency.value = 3000;
+            }
+
+            osc1.frequency.value = noteFreq;
+            osc2.frequency.value = noteFreq;
+            sub.frequency.value = noteFreq / 2; 
+
+            if (type === 'key') {
+                osc2.detune.value = 15;
+            }
+
+            osc1.connect(filter);
+            osc2.connect(filter);
+            if (type === 'key') sub.connect(filter);
+            
+            filter.connect(gainNode);
+            
+            // CRITICAL CHANGE: Connect to BOTH speakers AND recorder
+            gainNode.connect(audioCtx.destination); // Hear it
+            if (dest) gainNode.connect(dest);       // Record it
+
+            const now = audioCtx.currentTime;
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(masterGainValue, now + 0.05);
+            
+            osc1.start(now);
+            osc2.start(now);
+            if (type === 'key') sub.start(now);
+
+            const stopFunc = () => {
+                try {
+                    const stopTime = audioCtx.currentTime;
+                    gainNode.gain.cancelScheduledValues(stopTime);
+                    gainNode.gain.setValueAtTime(gainNode.gain.value, stopTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, stopTime + 0.1);
+                    
+                    osc1.stop(stopTime + 0.1);
+                    osc2.stop(stopTime + 0.1);
+                    if (type === 'key') sub.stop(stopTime + 0.1);
+                    
+                    setTimeout(() => {
+                        gainNode.disconnect();
+                    }, 200);
+                } catch(e) {}
+            };
+
+            activeOscillators[safeId] = { stop: stopFunc };
+            return { stop: stopFunc };
+        }
+
+        const noteFreqs = {
+            'C2': 65.41, 'D2': 73.42, 'E2': 82.41, 'F2': 87.31, 'G2': 98.00, 'A2': 110.00, 'B2': 123.47,
+            'C3': 130.81, 'C#3': 138.59, 'D3': 146.83, 'D#3': 155.56, 'E3': 164.81, 'F3': 174.61, 'F#3': 185.00, 'G3': 196.00, 'G#3': 207.65, 'A3': 220.00, 'A#3': 233.08, 'B3': 246.94,
+            'C4': 261.63, 'C#4': 277.18, 'D4': 293.66, 'D#4': 311.13, 'E4': 329.63, 'F4': 349.23, 'F#4': 369.99, 'G4': 392.00, 'G#4': 415.30, 'A4': 440.00, 'A#4': 466.16, 'B4': 493.88,
+            'C5': 523.25, 'C#5': 554.37, 'D5': 587.33, 'D#5': 622.25, 'E5': 659.25
+        };
+
+        // --- 2. Keyboard UI ---
+        const keyboardContainer = document.getElementById('keyboard-container');
+        const whiteKeys = ['C3','D3','E3','F3','G3','A3','B3','C4','D4','E4','F4','G4','A4','B4','C5'];
+        const blackKeys = ['C#3','D#3',null,'F#3','G#3','A#3',null,'C#4','D#4',null,'F#4','G#4','A#4',null];
+
+        function createKeyboard() {
+            whiteKeys.forEach((note, index) => {
+                const key = document.createElement('div');
+                key.className = 'key bg-white border border-gray-300 flex-1 flex items-end justify-center pb-2 text-gray-500 font-bold select-none touch-none';
+                key.dataset.note = note;
+                key.innerHTML = `<span class="note-label hidden text-xs sm:text-base pointer-events-none">${note}</span>`;
+                
+                if (index < whiteKeys.length - 1 && blackKeys[index]) {
+                    const blackKey = document.createElement('div');
+                    blackKey.className = 'key black-key black-key-hitbox bg-black text-white flex items-end justify-center pb-2 touch-none';
+                    blackKey.dataset.note = blackKeys[index];
+                    blackKey.innerHTML = `<span class="note-label hidden text-[10px] pointer-events-none">${blackKeys[index]}</span>`;
+                    key.appendChild(blackKey);
+                }
+                keyboardContainer.appendChild(key);
+            });
+        }
+        createKeyboard();
+
+        // --- 3. Interaction Logic ---
+        const bellows = document.getElementById('bellows');
+        let isNotesVisible = false;
+
+        function handleNoteOn(element) {
+            if (!element || element.classList.contains('active')) return;
+            const noteStr = element.dataset.note;
+            const type = element.dataset.type || 'key';
+            
+            element.classList.add('active');
+            bellows.classList.add('expanding');
+
+            const notes = noteStr.split(',');
+            notes.forEach(n => {
+                const freq = noteFreqs[n];
+                if (freq) playSound(freq, type);
+            });
+        }
+
+        function handleNoteOff(element) {
+            if (!element) return;
+            const noteStr = element.dataset.note;
+            const type = element.dataset.type || 'key';
+            
+            element.classList.remove('active');
+            
+            const activeKeys = document.querySelectorAll('.active');
+            if (activeKeys.length === 0) bellows.classList.remove('expanding');
+
+            const notes = noteStr.split(',');
+            notes.forEach(n => {
+                const freq = noteFreqs[n];
+                if (freq) {
+                    const safeId = `${freq}-${type}`;
+                    if (activeOscillators[safeId]) {
+                        activeOscillators[safeId].stop();
+                        delete activeOscillators[safeId];
+                    }
+                }
+            });
+        }
+
+        function setupInputListeners() {
+            // Touch
+            document.body.addEventListener('touchstart', (e) => {
+                if(e.target.closest('.key') || e.target.closest('.bass-btn')) e.preventDefault();
+                initAudio();
+
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                    if (element) {
+                        const target = element.closest('.bass-btn') || element.closest('.black-key') || element.closest('.key');
+                        if (target) {
+                            target.dataset.touchId = touch.identifier;
+                            handleNoteOn(target);
+                        }
+                    }
+                }
+            }, { passive: false });
+
+            // Glissando
+            document.body.addEventListener('touchmove', (e) => {
+                if(e.target.closest('.key') || e.target.closest('.bass-btn')) e.preventDefault();
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                    const newTarget = element ? (element.closest('.bass-btn') || element.closest('.black-key') || element.closest('.key')) : null;
+                    
+                    const activeElements = document.querySelectorAll('.active');
+                    let oldTarget = null;
+                    activeElements.forEach(el => {
+                        if (el.dataset.touchId == touch.identifier) oldTarget = el;
+                    });
+
+                    if (newTarget && oldTarget && newTarget !== oldTarget) {
+                        handleNoteOff(oldTarget);
+                        delete oldTarget.dataset.touchId;
+                        newTarget.dataset.touchId = touch.identifier;
+                        handleNoteOn(newTarget);
+                    } else if (!newTarget && oldTarget) {
+                        handleNoteOff(oldTarget);
+                        delete oldTarget.dataset.touchId;
+                    }
+                }
+            }, { passive: false });
+
+            const endTouch = (e) => {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    const activeElements = document.querySelectorAll('.active');
+                    activeElements.forEach(el => {
+                        if (el.dataset.touchId == touch.identifier) {
+                            handleNoteOff(el);
+                            delete el.dataset.touchId;
+                        }
+                    });
+                }
+            };
+            document.body.addEventListener('touchend', endTouch);
+            document.body.addEventListener('touchcancel', endTouch);
+            
+            // Mouse
+            let isMouseDown = false;
+            document.addEventListener('mousedown', (e) => {
+                if (e.target.closest('button:not(.bass-btn):not(.key)')) return; 
+                isMouseDown = true;
+                initAudio();
+                const target = e.target.closest('.bass-btn') || e.target.closest('.black-key') || e.target.closest('.key');
+                if (target) handleNoteOn(target);
+            });
+            document.addEventListener('mouseup', () => {
+                isMouseDown = false;
+                const activeElements = document.querySelectorAll('.active');
+                activeElements.forEach(el => {
+                    if (!el.dataset.touchId) handleNoteOff(el);
+                });
+            });
+            document.addEventListener('mousemove', (e) => {
+                if(!isMouseDown) return;
+                const target = e.target.closest('.bass-btn') || e.target.closest('.black-key') || e.target.closest('.key');
+                if (target && !target.classList.contains('active')) {
+                     const activeElements = document.querySelectorAll('.active');
+                     activeElements.forEach(el => { if (!el.dataset.touchId) handleNoteOff(el); });
+                     handleNoteOn(target);
+                }
+            });
+        }
+        setupInputListeners();
+
+        // --- 4. Controls & Recording Logic ---
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden) {
+                const activeElements = document.querySelectorAll('.active');
+                activeElements.forEach(el => handleNoteOff(el));
+                Object.values(activeOscillators).forEach(o => o.stop());
+            }
+        });
+        
+        document.getElementById('toggle-notes').addEventListener('click', () => {
+            isNotesVisible = !isNotesVisible;
+            const labels = document.querySelectorAll('.note-label');
+            labels.forEach(l => l.classList.toggle('hidden'));
+        });
+
+        // RECORDER LOGIC
+        const recBtn = document.getElementById('record-btn');
+        const recDot = document.getElementById('rec-dot');
+        const recText = document.getElementById('rec-text');
+        const downloadLink = document.getElementById('download-link');
+        let isRecording = false;
+
+        recBtn.addEventListener('click', () => {
+            initAudio(); // Ensure context is running
+            
+            if (!isRecording) {
+                // START RECORDING
+                audioChunks = [];
+                // Check if MediaRecorder is supported
+                if (!dest || !window.MediaRecorder) {
+                    alert("Browser not supported for recording.");
+                    return;
+                }
+
+                try {
+                    mediaRecorder = new MediaRecorder(dest.stream);
+                } catch (err) {
+                    console.error(err);
+                    alert("Cannot start recording: " + err.message);
+                    return;
+                }
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' }); // Chrome/Android support webm
+                    const url = URL.createObjectURL(blob);
+                    
+                    // Show download button
+                    downloadLink.href = url;
+                    downloadLink.download = `accordion_solo_${Date.now()}.webm`;
+                    downloadLink.classList.remove('hidden');
+                    
+                    // Allow restarting recording logic
+                    isRecording = false;
+                    recText.textContent = "อัดเสียง";
+                    recDot.classList.remove('animate-pulse', 'bg-red-200');
+                    recBtn.classList.remove('bg-gray-600');
+                    recBtn.classList.add('bg-red-600');
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                
+                // UI Updates
+                recText.textContent = "หยุดอัด";
+                recDot.classList.add('animate-pulse', 'bg-red-200');
+                recBtn.classList.remove('bg-red-600');
+                recBtn.classList.add('bg-gray-600');
+                downloadLink.classList.add('hidden'); // Hide old download link
+
+            } else {
+                // STOP RECORDING
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                }
+            }
+        });
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Triangle Simulator - Realistic Sound</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: radial-gradient(circle at center, #2b323c 0%, #0f1216 100%);
+            color: white;
+            font-family: 'Sarabun', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden; /* Prevent scrolling */
+            touch-action: none; /* Crucial for mobile game feel */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .container {
+            position: relative;
+            text-align: center;
+            width: 100%;
+            max-width: 500px;
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            color: #ccc;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+
+        p.instruction {
+            font-size: 1rem;
+            color: #e0e0e0;
+            margin-bottom: 10px;
+            pointer-events: none;
+            background: rgba(0,0,0,0.3);
+            padding: 8px 16px;
+            border-radius: 20px;
+        }
+
+        .sub-instruction {
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 20px;
+        }
+
+        /* SVG Triangle Styling */
+        #triangle-svg {
+            width: 80%;
+            height: auto;
+            max-height: 400px;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.6));
+            cursor: pointer;
+            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* The metal rod */
+        .triangle-path {
+            fill: none;
+            stroke: #d4d4d4;
+            stroke-width: 18;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            /* Metallic sheen simulation */
+            stroke: url(#metalGradient);
+        }
+
+        /* Visual guide for touch zones (optional subtle hint) */
+        .triangle-path:hover {
+            stroke: url(#metalGradientHover);
+        }
+
+        /* The string holding it */
+        .string-path {
+            fill: none;
+            stroke: #ffd700; /* Gold string */
+            stroke-width: 4;
+        }
+
+        /* Animation class when hit */
+        .hit-anim {
+            animation: vibrate 0.2s linear;
+        }
+
+        @keyframes vibrate {
+            0% { transform: scale(1) rotate(0deg); }
+            25% { transform: scale(1.02) rotate(1deg); }
+            50% { transform: scale(0.98) rotate(-1deg); }
+            75% { transform: scale(1.01) rotate(0.5deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+
+        /* Ripple effect for touch feedback */
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.6);
+            transform: scale(0);
+            animation: ripple-anim 0.5s linear;
+            pointer-events: none;
+            width: 50px;
+            height: 50px;
+            margin-left: -25px;
+            margin-top: -25px;
+        }
+        
+        /* Different ripple color for short sound */
+        .ripple.short {
+            background: rgba(255, 200, 100, 0.6);
+        }
+
+        @keyframes ripple-anim {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+
+        /* Controls Container */
+        .controls {
+            margin-top: 30px;
+            display: flex;
+            gap: 15px;
+        }
+
+        /* Button Styles */
+        button {
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-family: 'Sarabun', sans-serif;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            -webkit-tap-highlight-color: transparent;
+            outline: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        /* Mute Button */
+        #mute-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #aaa;
+        }
+
+        #mute-btn:active {
+            background: rgba(255, 50, 50, 0.3);
+            color: white;
+            border-color: rgba(255, 50, 50, 0.5);
+        }
+
+        /* Record Button */
+        #record-btn {
+            background: rgba(255, 50, 50, 0.2);
+            border: 1px solid rgba(255, 50, 50, 0.4);
+            color: #ff8888;
+        }
+
+        #record-btn.recording {
+            background: rgba(255, 50, 50, 0.8);
+            color: white;
+            animation: pulse-red 1.5s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(255, 50, 50, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 50, 50, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 50, 50, 0); }
+        }
+
+        /* Recording Indicator Dot */
+        .rec-dot {
+            width: 10px;
+            height: 10px;
+            background-color: currentColor;
+            border-radius: 50%;
+        }
+
+        .footer {
+            position: absolute;
+            bottom: 10px;
+            font-size: 0.7rem;
+            color: #555;
+            pointer-events: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Triangle Simulator</h1>
+        <p class="instruction">
+            <span style="color:#ffcc80">▲ ส่วนบน: เสียงสั้น</span> &nbsp;|&nbsp; 
+            <span style="color:#ffffff">▼ ส่วนล่าง: เสียงยาว</span>
+        </p>
+        <div class="sub-instruction">(Tap Top for Short / Bottom for Long)</div>
+        
+        <!-- Interactive Area -->
+        <div id="touch-zone" style="position: relative; display: inline-block;">
+            <svg id="triangle-svg" viewBox="0 0 300 300">
+                <defs>
+                    <!-- Metallic Gradient Definition -->
+                    <linearGradient id="metalGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#999;stop-opacity:1" />
+                        <stop offset="25%" style="stop-color:#fff;stop-opacity:1" />
+                        <stop offset="50%" style="stop-color:#ccc;stop-opacity:1" />
+                        <stop offset="75%" style="stop-color:#666;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#bbb;stop-opacity:1" />
+                    </linearGradient>
+                    <linearGradient id="metalGradientHover" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#bbb;stop-opacity:1" />
+                        <stop offset="50%" style="stop-color:#fff;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#ddd;stop-opacity:1" />
+                    </linearGradient>
+                </defs>
+                
+                <!-- The Loop/String holder -->
+                <path class="string-path" d="M150 10 L150 60" />
+                
+                <!-- The Triangle Body -->
+                <path class="triangle-path" d="M150 60 L260 250 L100 250 M80 250 L40 250 L150 60" />
+            </svg>
+        </div>
+
+        <div class="controls">
+            <button id="mute-btn">หยุดเสียง (Damp)</button>
+            <button id="record-btn">
+                <div class="rec-dot"></div>
+                <span id="rec-text">บันทึกเสียง</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="footer">High Definition Web Audio API</div>
+
+    <script>
+        // --- AUDIO ENGINE ---
+        let audioCtx;
+        let activeNodes = []; 
+        let mainBus; // Global Gain Node for routing all sound
+        
+        // Recording variables
+        let mediaRecorder;
+        let recordedChunks = [];
+        let isRecording = false;
+        let recDest;
+
+        // Initialize Audio Context and Recorder Setup
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            // Setup Main Bus (Mixer)
+            if (!mainBus) {
+                mainBus = audioCtx.createGain();
+                mainBus.connect(audioCtx.destination); // Connect to speakers
+
+                // Setup Recording Stream
+                recDest = audioCtx.createMediaStreamDestination();
+                mainBus.connect(recDest); // Also connect to recorder
+
+                // Init MediaRecorder
+                try {
+                    mediaRecorder = new MediaRecorder(recDest.stream);
+                    
+                    mediaRecorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) {
+                            recordedChunks.push(e.data);
+                        }
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                        const url = URL.createObjectURL(blob);
+                        
+                        // Create download link
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        // Timestamp filename
+                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                        a.download = `triangle-sound-${timestamp}.webm`;
+                        document.body.appendChild(a);
+                        a.click();
+                        
+                        // Cleanup
+                        setTimeout(() => {
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(url);
+                        }, 100);
+                        
+                        // Reset chunks
+                        recordedChunks = [];
+                    };
+                } catch (err) {
+                    console.error("MediaRecorder not supported or error:", err);
+                    document.getElementById('record-btn').style.display = 'none';
+                }
+            }
+        }
+
+        /**
+         * Generates a realistic triangle sound
+         */
+        function playTriangleSound(volume = 1.0, isShort = false) {
+            if (!audioCtx) initAudio();
+
+            const t = audioCtx.currentTime;
+            
+            // Randomize slightly for human feel
+            const randomDetune = (Math.random() - 0.5) * 10; 
+            const fundamental = 1200 + randomDetune; 
+
+            const decayMult = isShort ? 0.05 : 1.0; 
+            const brightness = isShort ? 0.3 : 1.0;
+
+            const partials = [
+                { ratio: 1.0,  amp: 0.6,  decay: 3.5 },
+                { ratio: 2.61, amp: 0.3 * brightness,  decay: 2.5 },
+                { ratio: 4.34, amp: 0.15 * brightness, decay: 2.0 },
+                { ratio: 7.12, amp: 0.1 * brightness,  decay: 1.5 },
+                { ratio: 9.40, amp: 0.05 * brightness, decay: 1.0 }
+            ];
+
+            partials.forEach(p => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'sine'; 
+                osc.frequency.setValueAtTime(fundamental * p.ratio, t);
+                
+                const effectiveDecay = p.decay * decayMult;
+
+                // Envelope
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(p.amp * volume, t + 0.005); 
+                gain.gain.exponentialRampToValueAtTime(0.001, t + effectiveDecay);
+
+                osc.connect(gain);
+                
+                // CRITICAL CHANGE: Connect to mainBus instead of destination
+                // This routes audio to both speakers and recorder
+                gain.connect(mainBus); 
+
+                osc.start(t);
+                osc.stop(t + effectiveDecay + 0.1);
+
+                activeNodes.push({ osc, gain });
+            });
+
+            setTimeout(() => {
+                activeNodes = activeNodes.filter(n => n.gain.gain.value > 0.01);
+            }, 4000);
+        }
+
+        function dampSound() {
+            if (!audioCtx) return;
+            const t = audioCtx.currentTime;
+            activeNodes.forEach(node => {
+                try {
+                    node.gain.gain.cancelScheduledValues(t);
+                    node.gain.gain.setTargetAtTime(0, t, 0.05);
+                } catch(e) {}
+            });
+            activeNodes = [];
+        }
+
+
+        // --- UI & INTERACTION ---
+        const triangleSvg = document.getElementById('triangle-svg');
+        const touchZone = document.getElementById('touch-zone');
+        const muteBtn = document.getElementById('mute-btn');
+        const recordBtn = document.getElementById('record-btn');
+        const recText = document.getElementById('rec-text');
+
+        function triggerHit(e) {
+            e.preventDefault(); 
+            initAudio(); 
+            
+            const rect = triangleSvg.getBoundingClientRect();
+            let clientX, clientY;
+            
+            if (e.changedTouches) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            const relativeY = (clientY - rect.top) / rect.height;
+            const isShort = relativeY < 0.65;
+
+            playTriangleSound(1.0, isShort);
+
+            triangleSvg.classList.remove('hit-anim');
+            void triangleSvg.offsetWidth;
+            triangleSvg.classList.add('hit-anim');
+
+            createRipple(clientX, clientY, isShort);
+        }
+
+        function createRipple(x, y, isShort) {
+            const ripple = document.createElement('div');
+            ripple.classList.add('ripple');
+            if (isShort) ripple.classList.add('short');
+            
+            ripple.style.left = x + 'px';
+            ripple.style.top = y + 'px';
+            document.body.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 500);
+        }
+
+        // --- RECORDING LOGIC ---
+        function toggleRecording(e) {
+            e.preventDefault();
+            initAudio();
+
+            if (!mediaRecorder) return;
+
+            if (isRecording) {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.classList.remove('recording');
+                recText.textContent = "บันทึกเสียง";
+            } else {
+                // Start Recording
+                recordedChunks = [];
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.classList.add('recording');
+                recText.textContent = "หยุดและบันทึก";
+            }
+        }
+
+        // --- EVENT LISTENERS ---
+
+        triangleSvg.addEventListener('touchstart', triggerHit, { passive: false });
+        triangleSvg.addEventListener('mousedown', triggerHit);
+
+        // Mute Button
+        const handleMute = (e) => {
+            e.preventDefault();
+            dampSound();
+            muteBtn.style.transform = "scale(0.95)";
+            setTimeout(() => muteBtn.style.transform = "scale(1)", 100);
+        };
+        muteBtn.addEventListener('touchstart', handleMute, { passive: false });
+        muteBtn.addEventListener('mousedown', handleMute);
+
+        // Record Button
+        recordBtn.addEventListener('touchstart', toggleRecording, { passive: false });
+        recordBtn.addEventListener('mousedown', toggleRecording);
+
+        document.addEventListener('contextmenu', event => event.preventDefault());
+
+    </script>
+</body>
+</html>

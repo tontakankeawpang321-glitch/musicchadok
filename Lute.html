@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Realistic Lute Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap');
+        
+        body {
+            font-family: 'Sarabun', sans-serif;
+            touch-action: manipulation; /* ป้องกันการ zoom/scroll ขณะเล่น */
+            user-select: none;
+            background-color: #1a1510;
+            overflow: hidden;
+        }
+
+        /* เอฟเฟกต์ไม้ */
+        .wood-texture {
+            background-color: #5d4037;
+            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 2px, transparent 2px, transparent 4px),
+                              linear-gradient(to bottom, #3e2723, #5d4037);
+        }
+
+        /* สายลูท */
+        .string {
+            position: relative;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            transition: transform 0.05s ease;
+        }
+        
+        /* สายสั่นเมื่อถูกดีด */
+        .vibrating {
+            animation: vibrate 0.2s linear infinite;
+        }
+
+        @keyframes vibrate {
+            0% { transform: translateY(0); }
+            25% { transform: translateY(1px); }
+            50% { transform: translateY(0); }
+            75% { transform: translateY(-1px); }
+            100% { transform: translateY(0); }
+        }
+
+        /* เฟร็ต (ช่องกด) */
+        .fret-cell {
+            position: relative;
+            cursor: pointer;
+            border-right: 4px solid #bcaaa4; /* ก้านเฟร็ต */
+            transition: background-color 0.1s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .fret-cell:active, .fret-cell.active-touch {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .fret-marker {
+            width: 12px;
+            height: 12px;
+            background-color: rgba(255,255,255,0.4);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%; /* Adjusted logic in JS for positioning */
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        /* ป้ายชื่อโน้ต */
+        .note-label {
+            position: absolute;
+            font-size: 10px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.9);
+            background-color: rgba(0, 0, 0, 0.6);
+            padding: 1px 4px;
+            border-radius: 4px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            pointer-events: none;
+            z-index: 20;
+            text-shadow: 0 1px 2px black;
+        }
+
+        /* คลาสสำหรับแสดงโน้ต */
+        .show-notes .note-label {
+            opacity: 1;
+        }
+
+        /* แสงสะท้อนบนสาย */
+        .string::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 50%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.4), transparent);
+            border-radius: 99px;
+        }
+
+        /* Animation for recording button */
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        
+        .recording-pulse {
+            animation: pulse-red 1.5s infinite;
+            background-color: #dc2626 !important; /* red-600 */
+            border-color: #ef4444 !important;
+            color: white !important;
+        }
+        
+        /* Modal สำหรับเริ่มเสียง */
+        #start-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            flex-direction: column;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col text-amber-100">
+
+    <!-- ส่วนหัว -->
+    <header class="p-3 bg-[#2d1b15] shadow-lg flex justify-between items-center z-10 border-b border-[#4a3b32]">
+        <div class="flex items-center gap-2 md:gap-4">
+            <div>
+                <h1 class="text-xl md:text-2xl font-bold text-amber-500">Lute Simulator 🎵</h1>
+                <p class="text-[10px] md:text-xs text-amber-200 opacity-70">Renaissance Lute</p>
+            </div>
+            
+            <div class="flex gap-2">
+                <!-- ปุ่มบันทึกเสียง -->
+                <button id="record-btn" class="ml-2 md:ml-4 px-3 py-1 bg-[#3e2723] border border-amber-700 rounded text-xs text-amber-100 hover:bg-amber-900 transition flex items-center gap-2" disabled>
+                    <span id="record-icon">🔴</span> 
+                    <span id="record-text">บันทึก</span>
+                </button>
+
+                <!-- ปุ่มเปิด/ปิดโน้ต -->
+                <button id="toggle-notes-btn" class="hidden md:flex px-3 py-1 bg-[#3e2723] border border-amber-700 rounded text-xs text-amber-100 hover:bg-amber-900 transition items-center gap-2">
+                    <span id="note-icon">👁️</span> 
+                    <span id="note-text">แสดงโน้ต</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="hidden md:block text-right text-xs text-gray-400">
+            <p>ใช้เมาส์คลิก หรือแตะหน้าจอ</p>
+            <p>กดคีย์บอร์ดแถว 1-6 เพื่อเล่นสายเปิด</p>
+        </div>
+    </header>
+
+    <!-- พื้นที่คอลูท (Fretboard) -->
+    <main class="flex-1 wood-texture relative overflow-x-auto overflow-y-hidden flex items-center justify-center p-4">
+        
+        <!-- ตัวโครงสร้างคอ -->
+        <div id="fretboard" class="relative w-full max-w-5xl h-[300px] bg-[#2a1e18] shadow-2xl border-y-8 border-[#1a120e] flex">
+            
+            <!-- Headstock (ส่วนหัว) -->
+            <div class="w-16 md:w-24 bg-[#1a120e] flex-shrink-0 flex flex-col justify-around py-2 border-r-4 border-[#3e2723] z-10 shadow-xl relative">
+                <div class="text-center text-[10px] text-amber-500 font-bold absolute top-1 left-0 w-full">Nut</div>
+                <!-- ลูกบิดจำลอง -->
+                <div class="w-full h-2 bg-amber-700 rounded-r shadow-inner my-1"></div>
+                <div class="w-full h-2 bg-amber-700 rounded-r shadow-inner my-1"></div>
+                <div class="w-full h-2 bg-amber-700 rounded-r shadow-inner my-1"></div>
+                <div class="w-full h-2 bg-amber-700 rounded-r shadow-inner my-1"></div>
+                <div class="w-full h-2 bg-amber-700 rounded-r shadow-inner my-1"></div>
+                <div class="w-full h-2 bg-amber-700 rounded-r shadow-inner my-1"></div>
+            </div>
+
+            <!-- สายและเฟร็ต -->
+            <div id="strings-container" class="flex-1 grid grid-cols-[repeat(12,minmax(50px,1fr))] relative">
+                <!-- Grid จะถูกสร้างโดย JS -->
+            </div>
+
+        </div>
+        
+        <!-- Rose (รูเสียง) ตกแต่ง -->
+        <div class="absolute right-[-100px] top-1/2 transform -translate-y-1/2 w-64 h-64 rounded-full border-4 border-[#3e2723] bg-[#1a120e] shadow-inner flex items-center justify-center opacity-50 pointer-events-none">
+            <div class="w-56 h-56 rounded-full border border-amber-900 opacity-30"></div>
+        </div>
+    </main>
+
+    <!-- แผงควบคุมด้านล่าง -->
+    <footer class="bg-[#2d1b15] p-3 text-center text-sm border-t border-[#4a3b32] text-amber-200/60">
+        <button id="mobile-toggle-notes" class="md:hidden inline-block mb-2 px-3 py-1 border border-amber-700 rounded text-xs">แสดงโน้ต</button>
+        <div class="block">
+            <span class="hidden md:inline">คลิกที่ช่องเฟร็ตเพื่อเล่นเสียง | </span>
+            <span>ระบบเสียง Polyphonic Web Audio API เสถียรและสมจริง</span>
+        </div>
+    </footer>
+
+    <!-- Overlay เริ่มต้น -->
+    <div id="start-overlay">
+        <div class="text-center animate-bounce">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-amber-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
+        <h2 class="text-3xl font-bold text-white mb-2">เครื่องเล่นลูท (Lute)</h2>
+        <p class="text-gray-300 mb-6">แตะเพื่อเริ่มใช้งานระบบเสียง</p>
+        <button id="start-btn" class="px-8 py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-full shadow-lg transition transform hover:scale-105">
+            เริ่มเล่น
+        </button>
+    </div>
+
+    <script>
+        // --- การตั้งค่าระบบเสียง (Web Audio API) ---
+        let audioCtx;
+        let masterOutput; // ตัวรวมสัญญาณเสียงทั้งหมด (เพื่อส่งไปลำโพงและเครื่องอัด)
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        const tuning = [
+            67, // G4 (String 1 - Highest)
+            62, // D4
+            57, // A3
+            53, // F3
+            48, // C3
+            43  // G2 (String 6 - Lowest)
+        ]; // Renaissance Lute Tuning in G
+
+        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+        // แปลง MIDI เป็นชื่อโน้ต
+        function getNoteName(midi) {
+            const noteIndex = midi % 12;
+            const octave = Math.floor(midi / 12) - 1;
+            return noteNames[noteIndex] + octave;
+        }
+
+        function midiToFreq(midi) {
+            return 440 * Math.pow(2, (midi - 69) / 12);
+        }
+
+        // เริ่มต้นระบบเสียงและเตรียมตัวอัด
+        function initAudioEngine() {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // สร้าง Master Output Node
+            masterOutput = audioCtx.createGain();
+            masterOutput.connect(audioCtx.destination); // ต่อออกลำโพง
+
+            // ตั้งค่า Recorder Destination
+            const dest = audioCtx.createMediaStreamDestination();
+            masterOutput.connect(dest); // ต่อเข้าตัวอัดด้วย
+
+            // ตั้งค่า MediaRecorder
+            try {
+                mediaRecorder = new MediaRecorder(dest.stream);
+                
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    // สร้างลิงก์ดาวน์โหลดอัตโนมัติ
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    const timestamp = new Date().toISOString().slice(0,19).replace(/:/g,"-");
+                    a.download = `lute-recording-${timestamp}.webm`;
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Cleanup
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                    }, 100);
+                    
+                    audioChunks = []; // Reset chunks
+                };
+
+                // เปิดการใช้งานปุ่มอัดเมื่อระบบพร้อม
+                const recordBtn = document.getElementById('record-btn');
+                recordBtn.disabled = false;
+                recordBtn.classList.remove('opacity-50');
+
+            } catch (err) {
+                console.error("MediaRecorder Error:", err);
+                document.getElementById('record-text').innerText = "อัดไม่ได้";
+            }
+        }
+
+        // ฟังก์ชันสร้างเสียง Lute
+        function playNote(midiNote, stringIndex) {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const freq = midiToFreq(midiNote);
+            const now = audioCtx.currentTime;
+
+            // Oscillator Setup
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, now);
+
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'triangle';
+            osc2.frequency.setValueAtTime(freq, now);
+            osc2.detune.value = 5; 
+
+            // Filter Setup
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(3000, now); 
+            filter.frequency.exponentialRampToValueAtTime(500, now + 0.1); 
+            filter.frequency.linearRampToValueAtTime(100, now + 2.5); 
+
+            // Gain Setup
+            const noteGain = audioCtx.createGain();
+            const volume = 0.3; 
+            
+            noteGain.gain.setValueAtTime(0, now);
+            noteGain.gain.linearRampToValueAtTime(volume, now + 0.005); 
+            noteGain.gain.exponentialRampToValueAtTime(0.001, now + 2.0); 
+
+            // Connections
+            osc.connect(filter);
+            osc2.connect(filter);
+            filter.connect(noteGain);
+            
+            // *** สำคัญ: ต่อเข้า masterOutput แทน destination ตรงๆ เพื่อให้อัดเสียงได้ ***
+            noteGain.connect(masterOutput);
+
+            // Play
+            osc.start(now);
+            osc2.start(now);
+            osc.stop(now + 2.5);
+            osc2.stop(now + 2.5);
+
+            // Visual
+            animateString(stringIndex);
+        }
+
+        // --- UI Logic ---
+        const stringsContainer = document.getElementById('strings-container');
+        const NUM_FRETS = 12;
+        const NUM_STRINGS = 6;
+        let showNotes = false; 
+
+        function initLute() {
+            stringsContainer.innerHTML = '';
+
+            for (let s = 0; s < NUM_STRINGS; s++) {
+                const stringLine = document.createElement('div');
+                const thickness = 1 + (s * 0.6); 
+                stringLine.className = 'string absolute w-full pointer-events-none z-10';
+                stringLine.style.height = `${thickness}px`;
+                stringLine.style.backgroundColor = s > 3 ? '#a1887f' : '#fff9c4'; 
+                stringLine.style.top = `${(s * 100 / NUM_STRINGS) + (50 / NUM_STRINGS)}%`; 
+                stringLine.id = `string-visual-${s}`;
+                stringsContainer.appendChild(stringLine);
+            }
+
+            stringsContainer.style.display = 'grid';
+            stringsContainer.style.gridTemplateRows = `repeat(${NUM_STRINGS}, 1fr)`;
+            stringsContainer.style.gridTemplateColumns = `repeat(${NUM_FRETS + 1}, 1fr)`; 
+
+            for (let s = 0; s < NUM_STRINGS; s++) {
+                for (let f = 0; f <= NUM_FRETS; f++) {
+                    const midiVal = tuning[s] + f;
+                    const cell = document.createElement('div');
+                    
+                    if (f === 0) {
+                        cell.className = 'fret-cell bg-[#3e2723] border-r-8 border-amber-900'; 
+                    } else {
+                        cell.className = 'fret-cell border-r-4 border-[#8d6e63]';
+                    }
+
+                    const noteText = getNoteName(midiVal);
+                    const noteSpan = document.createElement('span');
+                    noteSpan.className = 'note-label';
+                    noteSpan.innerText = noteText;
+                    cell.appendChild(noteSpan);
+
+                    if ((s === 2) && [3, 5, 7, 10, 12].includes(f)) {
+                         const marker = document.createElement('div');
+                         marker.className = 'fret-marker';
+                         marker.style.top = '100%'; 
+                         marker.style.zIndex = '0';
+                         cell.appendChild(marker);
+                    }
+
+                    const playHandler = (e) => {
+                        e.preventDefault();
+                        playNote(midiVal, s);
+                        cell.classList.add('active-touch');
+                        setTimeout(() => cell.classList.remove('active-touch'), 150);
+                    };
+
+                    cell.addEventListener('mousedown', playHandler);
+                    cell.addEventListener('touchstart', playHandler);
+
+                    stringsContainer.appendChild(cell);
+                }
+            }
+        }
+
+        function animateString(stringIndex) {
+            const strElement = document.getElementById(`string-visual-${stringIndex}`);
+            if (strElement) {
+                strElement.classList.remove('vibrating');
+                void strElement.offsetWidth; 
+                strElement.classList.add('vibrating');
+                setTimeout(() => {
+                    strElement.classList.remove('vibrating');
+                }, 500);
+            }
+        }
+
+        // Toggle Notes Logic
+        function toggleNotes() {
+            showNotes = !showNotes;
+            const btn = document.getElementById('toggle-notes-btn');
+            const icon = document.getElementById('note-icon');
+            const txt = document.getElementById('note-text');
+            const mobileBtn = document.getElementById('mobile-toggle-notes');
+            
+            if (showNotes) {
+                stringsContainer.classList.add('show-notes');
+                if(btn) {
+                    icon.innerText = '🔒';
+                    txt.innerText = 'ซ่อนโน้ต';
+                    btn.classList.add('bg-amber-900', 'border-amber-500');
+                }
+                if(mobileBtn) {
+                    mobileBtn.innerText = 'ซ่อนโน้ต';
+                    mobileBtn.classList.add('bg-amber-900');
+                }
+            } else {
+                stringsContainer.classList.remove('show-notes');
+                if(btn) {
+                    icon.innerText = '👁️';
+                    txt.innerText = 'แสดงโน้ต';
+                    btn.classList.remove('bg-amber-900', 'border-amber-500');
+                }
+                if(mobileBtn) {
+                    mobileBtn.innerText = 'แสดงโน้ต';
+                    mobileBtn.classList.remove('bg-amber-900');
+                }
+            }
+        }
+
+        document.getElementById('toggle-notes-btn').addEventListener('click', toggleNotes);
+        document.getElementById('mobile-toggle-notes').addEventListener('click', toggleNotes);
+
+        // Recording Logic
+        const recordBtn = document.getElementById('record-btn');
+        const recordText = document.getElementById('record-text');
+        const recordIcon = document.getElementById('record-icon');
+
+        recordBtn.addEventListener('click', () => {
+            if (!mediaRecorder) return;
+
+            if (!isRecording) {
+                // Start Recording
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.classList.add('recording-pulse');
+                recordText.innerText = 'หยุด (กดเพื่อเซฟ)';
+                recordIcon.innerText = '⏹️';
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.classList.remove('recording-pulse');
+                recordText.innerText = 'บันทึก';
+                recordIcon.innerText = '🔴';
+            }
+        });
+
+        // Initialize System
+        const startBtn = document.getElementById('start-btn');
+        const overlay = document.getElementById('start-overlay');
+
+        startBtn.addEventListener('click', () => {
+            initAudioEngine();
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 500);
+            initLute();
+        });
+
+        // Keyboard Support
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            const key = e.key;
+            const keyMap = { '1': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5 };
+
+            if (keyMap.hasOwnProperty(key)) {
+                const s = keyMap[key];
+                playNote(tuning[s], s);
+                const firstCellIndex = s * (NUM_FRETS + 1); 
+                const cell = stringsContainer.children[firstCellIndex];
+                if(cell) {
+                    cell.classList.add('active-touch');
+                    setTimeout(() => cell.classList.remove('active-touch'), 150);
+                }
+            }
+        });
+
+    </script>
+</body>
+</html>

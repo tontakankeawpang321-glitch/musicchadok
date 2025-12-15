@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Harpsichord Mobile</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* ป้องกันการเลือกข้อความและการลากบนมือถือ */
+        body {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            background-color: #2c1e12; /* สีไม้เข้ม */
+            overflow: hidden;
+            font-family: 'Sarabun', sans-serif;
+        }
+
+        /* ลายไม้สำหรับตัวเครื่อง */
+        .wood-texture {
+            background: #5c3a21;
+            background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 2px, transparent 2px, transparent 4px),
+                              linear-gradient(to bottom, #5c3a21, #3e2613);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+        }
+
+        /* ส่วนคีย์บอร์ด */
+        .keyboard-container {
+            overflow-x: auto;
+            overflow-y: hidden;
+            white-space: nowrap;
+            -webkit-overflow-scrolling: touch;
+            /* ซ่อน Scrollbar แต่ยังเลื่อนได้ */
+            scrollbar-width: none; 
+            -ms-overflow-style: none;
+            position: relative;
+            box-shadow: inset 0 5px 10px rgba(0,0,0,0.5);
+        }
+        .keyboard-container::-webkit-scrollbar { 
+            display: none; 
+        }
+
+        /* คีย์ขาว (Natural Keys) */
+        .key-white {
+            display: inline-block;
+            width: 50px; /* ขนาดเหมาะมือนิ้ว */
+            height: 100%;
+            background: linear-gradient(to bottom, #fdf6e3 0%, #e8dcb9 100%); /* สีงาช้าง/ไม้เก่า */
+            border: 1px solid #8b7d6b;
+            border-radius: 0 0 4px 4px;
+            position: relative;
+            z-index: 1;
+            vertical-align: top;
+            box-shadow: inset 0 -2px 5px rgba(0,0,0,0.2);
+            transition: background 0.05s, transform 0.05s;
+        }
+        .key-white.active {
+            background: #d4c5a3;
+            transform: translateY(2px);
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.4);
+        }
+
+        /* คีย์ดำ (Sharp/Flat Keys) */
+        .key-black {
+            display: inline-block;
+            width: 34px;
+            height: 60%;
+            background: linear-gradient(to bottom, #3d2b1f 0%, #1a120b 100%); /* สีไม้ดำ */
+            border: 1px solid #000;
+            border-radius: 0 0 3px 3px;
+            position: absolute;
+            z-index: 2;
+            margin-left: -17px; /* จัดกึ่งกลางระหว่างคีย์ขาว */
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.5), inset 1px 1px 2px rgba(255,255,255,0.1);
+        }
+        .key-black.active {
+            background: #000;
+            height: 59%; /* ลดความสูงลงเล็กน้อยเมื่อกด */
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.8);
+        }
+
+        /* แถบสีทองตกแต่ง */
+        .gold-trim {
+            background: linear-gradient(to right, #b8860b, #ffd700, #b8860b);
+            height: 4px;
+            width: 100%;
+        }
+
+        /* ป้ายชื่อโน้ต */
+        .note-label {
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 10px;
+            color: #5c3a21;
+            pointer-events: none;
+            font-weight: bold;
+            opacity: 0; /* เริ่มต้นซ่อน */
+            transition: opacity 0.2s;
+        }
+        .show-notes .note-label {
+            opacity: 1;
+        }
+        .key-black .note-label {
+            color: #e8dcb9;
+            bottom: 5px;
+        }
+
+        /* ปุ่มควบคุม */
+        .control-btn {
+            @apply px-4 py-2 rounded-lg font-bold text-sm shadow-md transition-all active:scale-95 flex items-center gap-2;
+            background: #3e2613;
+            color: #e8dcb9;
+            border: 1px solid #6b4c30;
+        }
+        .control-btn:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .control-btn.active {
+            background: #e8dcb9;
+            color: #3e2613;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        /* ไฟสถานะ */
+        .led {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #444;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+        }
+        .led.on {
+            background-color: #ff3333;
+            box-shadow: 0 0 5px #ff3333;
+        }
+        .led.play {
+            background-color: #33ff33;
+            box-shadow: 0 0 5px #33ff33;
+        }
+
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col wood-texture">
+
+    <!-- Header / Decoration -->
+    <div class="h-12 flex items-center justify-center relative shadow-lg z-10">
+        <div class="absolute top-0 w-full gold-trim"></div>
+        <h1 class="text-[#e8dcb9] font-serif tracking-widest text-xl mt-2 drop-shadow-md">HARPSICHORD</h1>
+        <div class="absolute bottom-0 w-full bg-[#3e2613] h-[1px] opacity-50"></div>
+    </div>
+
+    <!-- Controls Panel -->
+    <div class="flex-none p-3 bg-[#2c1e12] flex flex-wrap justify-center gap-3 items-center shadow-inner z-10 border-b border-[#3e2613]">
+        
+        <!-- Toggle Notes -->
+        <button id="btn-toggle-notes" class="control-btn">
+            <span>โน้ต</span>
+        </button>
+
+        <div class="w-[1px] h-8 bg-[#5c3a21] mx-1"></div>
+
+        <!-- Recorder Controls -->
+        <button id="btn-record" class="control-btn text-red-300">
+            <div id="led-rec" class="led mr-1"></div> อัด
+        </button>
+        
+        <button id="btn-stop" class="control-btn" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+        </button>
+        
+        <button id="btn-play" class="control-btn text-green-300" disabled>
+            <div id="led-play" class="led mr-1"></div> เล่นวน
+        </button>
+
+        <!-- New Download Button -->
+        <a id="btn-download-link" style="display: none;"></a>
+        <button id="btn-download" class="control-btn bg-blue-900 border-blue-800 text-blue-200 ml-auto" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            โหลด
+        </button>
+
+        <button id="btn-clear" class="control-btn text-xs bg-red-900 border-red-800 ml-1">
+            ลบ
+        </button>
+    </div>
+
+    <!-- Main Keyboard Area -->
+    <div class="flex-grow relative flex items-end justify-center bg-black/30">
+        <!-- เงาตกกระทบ -->
+        <div class="absolute top-0 left-0 w-full h-4 bg-gradient-to-b from-black/50 to-transparent z-0"></div>
+
+        <div class="keyboard-container h-[90%] w-full flex items-start pl-4 pr-4" id="keyboard-wrapper">
+            <!-- Keys will be generated here by JS -->
+        </div>
+    </div>
+
+    <!-- Overlay for Initial Start (Audio Context Policy) -->
+    <div id="start-overlay" class="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div class="text-center animate-bounce cursor-pointer p-6 rounded-xl border border-[#b8860b] bg-[#2c1e12] text-[#e8dcb9]">
+            <p class="text-2xl mb-2 font-serif">แตะเพื่อเริ่ม</p>
+            <p class="text-sm opacity-70">Tap to Start</p>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Harpsichord Engine & Logic (Updated with Audio Download)
+         */
+        
+        // --- Configuration ---
+        const OCTAVES = 4; // จำนวนอ็อกเทฟ
+        const START_OCTAVE = 2; // เริ่มที่ C2
+
+        // --- Audio System ---
+        let audioCtx;
+        let recordingDest; // Node สำหรับส่งเสียงไปบันทึก
+        let mediaRecorder; // ตัวบันทึกเสียง
+        let audioChunks = [];
+        let audioBlob = null;
+        let audioUrl = null;
+
+        const activeOscillators = {}; // Map note names to oscillator nodes
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            // สร้าง Destination สำหรับ Recorder ถ้ายังไม่มี
+            if (!recordingDest) {
+                recordingDest = audioCtx.createMediaStreamDestination();
+            }
+        }
+
+        // สูตรสร้างเสียงฮาร์ปซิคอร์ด
+        function playTone(freq, noteId) {
+            if (!audioCtx) initAudio();
+
+            // หยุดเสียงเดิมถ้ารัวปุ่มเดิม
+            if (activeOscillators[noteId]) {
+                stopTone(noteId);
+            }
+
+            const t = audioCtx.currentTime;
+
+            // 1. Oscillator (แหล่งกำเนิดเสียง)
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, t);
+
+            // 2. Filter (ตัวกรองเสียง)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'highpass';
+            filter.frequency.value = 100;
+
+            const filter2 = audioCtx.createBiquadFilter();
+            filter2.type = 'lowpass';
+            filter2.frequency.setValueAtTime(4000, t);
+            filter2.Q.value = 5;
+
+            // 3. Gain Envelope (ควบคุมความดัง)
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(0.6, t + 0.02); // Attack
+            gain.gain.exponentialRampToValueAtTime(0.2, t + 0.4); // Decay
+
+            // เชื่อมต่อระบบ: Osc -> Filters -> Gain
+            osc.connect(filter);
+            filter.connect(filter2);
+            filter2.connect(gain);
+            
+            // *** สำคัญ: เชื่อมต่อออกลำโพง (Destination) AND ตัวบันทึก (RecordingDest) ***
+            gain.connect(audioCtx.destination);
+            if (recordingDest) {
+                gain.connect(recordingDest);
+            }
+
+            osc.start(t);
+
+            // เก็บ reference ไว้เพื่อหยุดเสียง
+            activeOscillators[noteId] = { osc, gain, filter };
+
+            return { osc, gain };
+        }
+
+        function stopTone(noteId) {
+            if (!activeOscillators[noteId]) return;
+
+            const { osc, gain } = activeOscillators[noteId];
+            const t = audioCtx.currentTime;
+
+            try {
+                gain.gain.cancelScheduledValues(t);
+                gain.gain.setValueAtTime(gain.gain.value, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1); 
+                osc.stop(t + 0.15); 
+            } catch (e) {}
+
+            delete activeOscillators[noteId];
+        }
+
+
+        // --- Keyboard Generation ---
+        const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const keyboardWrapper = document.getElementById('keyboard-wrapper');
+
+        function createKeyboard() {
+            let keysHtml = '';
+            for (let oct = START_OCTAVE; oct < START_OCTAVE + OCTAVES; oct++) {
+                notes.forEach((note, index) => {
+                    const fullNote = `${note}${oct}`;
+                    const freq = getFrequency(note, oct);
+                    const isSharp = note.includes('#');
+
+                    if (!isSharp) {
+                        keysHtml += `<div class="key-white" data-note="${fullNote}" data-freq="${freq}">
+                                        <span class="note-label">${note}</span>`;
+                        
+                        const nextNoteIndex = index + 1;
+                        if (nextNoteIndex < notes.length) {
+                            const nextNote = notes[nextNoteIndex];
+                            if (nextNote.includes('#')) {
+                                const nextFullNote = `${nextNote}${oct}`;
+                                const nextFreq = getFrequency(nextNote, oct);
+                                keysHtml += `<div class="key-black" data-note="${nextFullNote}" data-freq="${nextFreq}">
+                                                <span class="note-label">${nextNote}</span>
+                                             </div>`;
+                            }
+                        }
+                        keysHtml += `</div>`;
+                    }
+                });
+            }
+            keyboardWrapper.innerHTML = keysHtml;
+        }
+
+        function getFrequency(note, octave) {
+            const notesFreq = {'C': 16.35, 'C#': 17.32, 'D': 18.35, 'D#': 19.45, 'E': 20.60, 'F': 21.83, 'F#': 23.12, 'G': 24.50, 'G#': 25.96, 'A': 27.50, 'A#': 29.14, 'B': 30.87};
+            let baseFreq = notesFreq[note.replace('#', '')];
+            if (note.includes('#')) baseFreq = notesFreq[note]; 
+            return baseFreq * Math.pow(2, octave);
+        }
+
+        // --- Interaction Logic ---
+        
+        // Recorder Variables
+        let isRecording = false;
+        let isPlaying = false;
+        let recordedEvents = []; // For in-app visual playback
+        let startTime = 0;
+        let playbackTimeouts = [];
+
+        function handleNoteOn(element) {
+            if (!element || element.classList.contains('active')) return;
+            
+            const note = element.dataset.note;
+            const freq = parseFloat(element.dataset.freq);
+
+            element.classList.add('active');
+            playTone(freq, note);
+
+            // Recording Events (for visual playback)
+            if (isRecording) {
+                recordedEvents.push({
+                    type: 'on',
+                    note: note,
+                    freq: freq,
+                    time: Date.now() - startTime
+                });
+            }
+        }
+
+        function handleNoteOff(element) {
+            if (!element) return;
+            
+            const note = element.dataset.note;
+            element.classList.remove('active');
+            stopTone(note);
+
+            // Recording Events
+            if (isRecording) {
+                recordedEvents.push({
+                    type: 'off',
+                    note: note,
+                    time: Date.now() - startTime
+                });
+            }
+        }
+
+        function setupInteraction() {
+            const keys = document.querySelectorAll('.key-white, .key-black');
+            
+            keys.forEach(key => {
+                key.addEventListener('mousedown', (e) => { e.stopPropagation(); handleNoteOn(key); });
+                key.addEventListener('mouseup', (e) => handleNoteOff(key));
+                key.addEventListener('mouseleave', (e) => { if (key.classList.contains('active')) handleNoteOff(key); });
+                
+                // Touch
+                key.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); handleNoteOn(key); }, { passive: false });
+                key.addEventListener('touchend', (e) => { e.preventDefault(); handleNoteOff(key); }, { passive: false });
+            });
+
+            document.body.addEventListener('mouseup', () => {
+                keys.forEach(k => handleNoteOff(k));
+            });
+        }
+
+
+        // --- Recorder & Download System ---
+        
+        const btnRecord = document.getElementById('btn-record');
+        const btnStop = document.getElementById('btn-stop');
+        const btnPlay = document.getElementById('btn-play');
+        const btnClear = document.getElementById('btn-clear');
+        const btnDownload = document.getElementById('btn-download');
+        const ledRec = document.getElementById('led-rec');
+        const ledPlay = document.getElementById('led-play');
+
+        function setupMediaRecorder() {
+            if (mediaRecorder) return;
+            
+            // Check mime types
+            const options = { mimeType: 'audio/webm' };
+            if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                    options.mimeType = 'audio/mp4';
+                } else {
+                    delete options.mimeType; // Let browser decide
+                }
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(recordingDest.stream, options);
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) {
+                        audioChunks.push(e.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    // Create Blob
+                    const mimeType = mediaRecorder.mimeType || 'audio/webm';
+                    audioBlob = new Blob(audioChunks, { type: mimeType });
+                    audioUrl = URL.createObjectURL(audioBlob);
+                    
+                    // Enable Download
+                    btnDownload.disabled = false;
+                    console.log("Recording stopped. Blob created:", mimeType);
+                };
+            } catch (err) {
+                console.error("Error creating MediaRecorder:", err);
+                alert("อุปกรณ์นี้ไม่รองรับการบันทึกไฟล์เสียง (MediaRecorder Error)");
+            }
+        }
+
+        btnRecord.addEventListener('click', () => {
+            if (isRecording) return;
+            initAudio(); // Ensure context is ready
+            setupMediaRecorder(); // Ensure recorder is ready
+
+            if (isPlaying) stopPlayback();
+
+            // Reset buffers
+            audioChunks = [];
+            recordedEvents = [];
+            
+            // Start Recording
+            isRecording = true;
+            startTime = Date.now();
+            
+            if (mediaRecorder && mediaRecorder.state === 'inactive') {
+                mediaRecorder.start();
+            }
+            
+            // UI
+            ledRec.classList.add('on');
+            btnRecord.classList.add('active');
+            btnStop.disabled = false;
+            btnPlay.disabled = true;
+            btnDownload.disabled = true;
+        });
+
+        btnStop.addEventListener('click', () => {
+            if (isRecording) {
+                isRecording = false;
+                ledRec.classList.remove('on');
+                btnRecord.classList.remove('active');
+                btnPlay.disabled = false;
+                
+                // Stop Media Recorder
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                }
+            }
+            if (isPlaying) {
+                stopPlayback();
+            }
+            btnStop.disabled = true;
+        });
+
+        btnPlay.addEventListener('click', () => {
+            // "เล่นวน" (Play Loop) - เล่นแบบ Visual ย้อนหลัง (ใช้ Event)
+            // ถ้าอยากฟังไฟล์เสียงที่โหลด ให้โหลดเอาดีกว่า อันนี้เอาไว้ดู keys ขยับ
+            if (recordedEvents.length === 0 || isRecording || isPlaying) return;
+            
+            isPlaying = true;
+            ledPlay.classList.add('play');
+            btnPlay.classList.add('active');
+            btnStop.disabled = false;
+            btnRecord.disabled = true;
+
+            recordedEvents.forEach(event => {
+                const t = setTimeout(() => {
+                    const keyEl = document.querySelector(`div[data-note="${event.note}"]`);
+                    if (keyEl) {
+                        if (event.type === 'on') {
+                            keyEl.classList.add('active');
+                            playTone(event.freq, event.note);
+                        } else {
+                            keyEl.classList.remove('active');
+                            stopTone(event.note);
+                        }
+                    }
+                }, event.time);
+                playbackTimeouts.push(t);
+            });
+
+            const lastEventTime = recordedEvents[recordedEvents.length - 1]?.time || 0;
+            const endTimeout = setTimeout(() => {
+                stopPlayback();
+            }, lastEventTime + 500);
+            playbackTimeouts.push(endTimeout);
+        });
+
+        // Download Logic
+        btnDownload.addEventListener('click', () => {
+            if (!audioUrl) return;
+            const link = document.getElementById('btn-download-link');
+            const ext = (audioBlob && audioBlob.type.includes('mp4')) ? 'mp4' : 'webm';
+            const filename = `harpsichord_recording_${new Date().getTime()}.${ext}`;
+            
+            link.href = audioUrl;
+            link.download = filename;
+            link.click();
+        });
+
+        function stopPlayback() {
+            isPlaying = false;
+            ledPlay.classList.remove('play');
+            btnPlay.classList.remove('active');
+            btnRecord.disabled = false;
+            btnStop.disabled = true;
+            
+            playbackTimeouts.forEach(t => clearTimeout(t));
+            playbackTimeouts = [];
+
+            document.querySelectorAll('.active').forEach(el => {
+                el.classList.remove('active');
+                if (el.dataset.note) stopTone(el.dataset.note);
+            });
+        }
+
+        btnClear.addEventListener('click', () => {
+            stopPlayback();
+            recordedEvents = [];
+            audioChunks = [];
+            audioBlob = null;
+            btnPlay.disabled = true;
+            btnDownload.disabled = true;
+            alert('ลบข้อมูลแล้ว');
+        });
+
+        document.getElementById('btn-toggle-notes').addEventListener('click', (e) => {
+            document.getElementById('keyboard-wrapper').classList.toggle('show-notes');
+            e.currentTarget.classList.toggle('active');
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            createKeyboard();
+            setupInteraction();
+
+            setTimeout(() => {
+                const c4 = document.querySelector('div[data-note="C4"]');
+                if (c4) {
+                    c4.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                }
+            }, 500);
+        });
+
+        const overlay = document.getElementById('start-overlay');
+        overlay.addEventListener('click', () => {
+            initAudio();
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 500);
+        });
+        overlay.addEventListener('touchstart', () => {
+            initAudio();
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 500);
+        });
+
+    </script>
+</body>
+</html>

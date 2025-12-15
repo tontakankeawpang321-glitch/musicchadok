@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Double Bass Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #1a1a1a;
+            color: #eee;
+            overflow: hidden; /* Prevent scrolling while playing */
+            touch-action: none; /* Crucial for multi-touch gaming */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Wood Texture Effect */
+        .wood-texture {
+            background: linear-gradient(to bottom, #3e2723, #281813);
+            box-shadow: inset 0 0 50px #000;
+        }
+
+        .fretboard {
+            background: #18100c; /* Very dark ebony wood */
+            position: relative;
+            box-shadow: inset 0 0 20px #000;
+            transition: all 0.3s;
+        }
+
+        /* String Styling */
+        .string-container {
+            position: relative;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .string {
+            width: 100%;
+            background: linear-gradient(to bottom, #999, #eee, #999);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            pointer-events: none; /* Let clicks pass through to the cell */
+            z-index: 10;
+        }
+
+        /* String Thickness variations */
+        .string-g { height: 3px; }
+        .string-d { height: 4px; }
+        .string-a { height: 5px; }
+        .string-e { height: 6px; }
+
+        /* Animation for vibration */
+        @keyframes vibrate {
+            0% { transform: translateY(0); }
+            25% { transform: translateY(-2px); }
+            50% { transform: translateY(0); }
+            75% { transform: translateY(2px); }
+            100% { transform: translateY(0); }
+        }
+
+        .vibrating .string {
+            animation: vibrate 0.1s infinite linear;
+        }
+
+        /* Fret/Note markers */
+        .note-cell {
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            position: relative;
+            transition: background 0.05s;
+        }
+        
+        .note-cell:active, .note-cell.active {
+            background: rgba(255, 215, 0, 0.2); /* Gold tint on press */
+        }
+        
+        /* New class for sustained hold */
+        .note-cell.holding {
+            background: rgba(255, 215, 0, 0.4);
+            box-shadow: inset 0 0 15px rgba(255, 215, 0, 0.3);
+        }
+
+        /* Note Names Display */
+        .note-name {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: bold;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 15;
+            text-shadow: 0 1px 2px black;
+        }
+
+        /* Toggle class to show notes */
+        .show-notes .note-name {
+            opacity: 1;
+        }
+
+        /* Nut (The starting bar) */
+        .nut {
+            background: #d4c4a8; /* Bone color */
+            border-right: 2px solid #888;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+            z-index: 20;
+        }
+
+        /* Position Markers (Dots) */
+        .marker-dot {
+            width: 15px;
+            height: 15px;
+            background-color: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        /* Loading Overlay */
+        #overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            transition: opacity 0.5s;
+        }
+
+        .glow-text {
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.7);
+        }
+
+        /* Custom toggle button style */
+        .toggle-btn {
+            background: #333;
+            border: 1px solid #555;
+            transition: all 0.2s;
+        }
+        .toggle-btn.active {
+            background: #ca8a04; /* yellow-600 */
+            color: black;
+            border-color: #ca8a04;
+        }
+        
+        /* Recording styles */
+        .recording-dot {
+            transition: all 0.3s;
+        }
+        .is-recording .recording-dot {
+            animation: pulse-red 1s infinite;
+            background-color: #ef4444;
+            box-shadow: 0 0 8px #ef4444;
+        }
+        .is-recording span {
+            color: #ef4444;
+        }
+
+        @keyframes pulse-red {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-center wood-texture">
+
+    <!-- Start Overlay -->
+    <div id="overlay">
+        <h1 class="text-4xl md:text-6xl font-bold text-yellow-500 mb-4 glow-text">Double Bass Pro</h1>
+        <p class="text-gray-300 mb-8 text-lg">แตะหน้าจอเพื่อเริ่มเล่น / Click to Start</p>
+        <button id="start-btn" class="px-8 py-3 bg-yellow-600 hover:bg-yellow-500 text-black font-bold rounded-full text-xl shadow-lg transform transition hover:scale-105">
+            เริ่มใช้งาน
+        </button>
+        <p class="mt-4 text-sm text-gray-400">Polyphonic & Multi-touch Support</p>
+    </div>
+
+    <!-- Main Instrument Area -->
+    <div class="w-full max-w-6xl h-[90vh] flex flex-col relative shadow-2xl border-y-8 border-yellow-900 rounded-lg overflow-hidden">
+        
+        <!-- Header / Controls -->
+        <div class="h-14 bg-black flex items-center justify-between px-4 md:px-6 border-b border-gray-700 z-30">
+            <span class="text-yellow-600 font-bold tracking-widest uppercase text-sm md:text-base hidden md:block">Classic Upright</span>
+            
+            <div class="flex items-center gap-4 flex-1 justify-end md:justify-end">
+                
+                <!-- Record Button -->
+                <button id="record-btn" class="toggle-btn px-3 py-1 rounded text-xs md:text-sm text-gray-300 font-bold flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-red-800 recording-dot"></div>
+                    <span id="record-text">REC</span>
+                </button>
+
+                <!-- Toggle Notes Button -->
+                <button id="toggle-notes-btn" class="toggle-btn px-3 py-1 rounded text-xs md:text-sm text-gray-300 font-bold">
+                    แสดงโน้ต
+                </button>
+
+                <!-- Volume Control -->
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-500">Vol</span>
+                    <input type="range" id="volume-slider" min="0" max="100" value="85" class="accent-yellow-600 w-24">
+                </div>
+            </div>
+        </div>
+
+        <!-- Fretboard Container -->
+        <div class="flex-1 flex flex-col fretboard relative" id="fretboard">
+            
+            <!-- String G (High) -->
+            <div class="flex-1 flex w-full relative string-row" data-string="G">
+                <!-- Open String (The Nut) -->
+                <div class="w-16 md:w-24 nut flex-shrink-0 relative flex items-center justify-center note-cell" data-note-index="7" data-octave="2" data-freq="98.00">
+                    <div class="string string-g absolute"></div>
+                    <span class="text-xs text-black font-bold absolute top-2 left-2 z-20">G</span>
+                    <span class="note-name text-black">G</span>
+                </div>
+                <!-- Fretless Area -->
+                <div class="flex-1 flex relative notes-container">
+                    <div class="string string-g absolute top-1/2 w-full transform -translate-y-1/2"></div>
+                </div>
+            </div>
+
+            <!-- String D -->
+            <div class="flex-1 flex w-full relative string-row" data-string="D">
+                <div class="w-16 md:w-24 nut flex-shrink-0 relative flex items-center justify-center note-cell" data-note-index="2" data-octave="2" data-freq="73.42">
+                    <div class="string string-d absolute"></div>
+                    <span class="text-xs text-black font-bold absolute top-2 left-2 z-20">D</span>
+                    <span class="note-name text-black">D</span>
+                </div>
+                <div class="flex-1 flex relative notes-container">
+                    <div class="string string-d absolute top-1/2 w-full transform -translate-y-1/2"></div>
+                </div>
+            </div>
+
+            <!-- String A -->
+            <div class="flex-1 flex w-full relative string-row" data-string="A">
+                <div class="w-16 md:w-24 nut flex-shrink-0 relative flex items-center justify-center note-cell" data-note-index="9" data-octave="1" data-freq="55.00">
+                    <div class="string string-a absolute"></div>
+                    <span class="text-xs text-black font-bold absolute top-2 left-2 z-20">A</span>
+                    <span class="note-name text-black">A</span>
+                </div>
+                <div class="flex-1 flex relative notes-container">
+                    <div class="string string-a absolute top-1/2 w-full transform -translate-y-1/2"></div>
+                </div>
+            </div>
+
+            <!-- String E (Low) -->
+            <div class="flex-1 flex w-full relative string-row" data-string="E">
+                <div class="w-16 md:w-24 nut flex-shrink-0 relative flex items-center justify-center note-cell" data-note-index="4" data-octave="1" data-freq="41.20">
+                    <div class="string string-e absolute"></div>
+                    <span class="text-xs text-black font-bold absolute top-2 left-2 z-20">E</span>
+                    <span class="note-name text-black">E</span>
+                </div>
+                <div class="flex-1 flex relative notes-container">
+                    <div class="string string-e absolute top-1/2 w-full transform -translate-y-1/2"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- Music Theory Data ---
+        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+        // --- Audio Context & Synthesis ---
+        let audioCtx;
+        let masterGain;
+        let compressor;
+        
+        // Recording variables
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        let recordingDest;
+
+        const volumeSlider = document.getElementById('volume-slider');
+        
+        // Track active voices for Note Off handling
+        const activeVoices = {};
+
+        const openStrings = [
+            { name: 'G', base: 98.00, noteIndex: 7, octave: 2 },
+            { name: 'D', base: 73.42, noteIndex: 2, octave: 2 },
+            { name: 'A', base: 55.00, noteIndex: 9, octave: 1 },
+            { name: 'E', base: 41.20, noteIndex: 4, octave: 1 }
+        ];
+
+        const numPositions = 12;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // Dynamics Compressor to handle polyphony without clipping
+                compressor = audioCtx.createDynamicsCompressor();
+                compressor.threshold.setValueAtTime(-10, audioCtx.currentTime);
+                compressor.knee.setValueAtTime(40, audioCtx.currentTime);
+                compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+                compressor.attack.setValueAtTime(0, audioCtx.currentTime);
+                compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+
+                // Master Gain (Volume)
+                masterGain = audioCtx.createGain();
+                
+                // Chain: Compressor -> MasterGain
+                compressor.connect(masterGain);
+                
+                // MasterGain -> Output (Speakers)
+                masterGain.connect(audioCtx.destination);
+                
+                // Setup Recording Stream Destination
+                // We connect MasterGain to this special node to capture the output
+                recordingDest = audioCtx.createMediaStreamDestination();
+                masterGain.connect(recordingDest);
+
+                setupRecorder(recordingDest.stream);
+
+                updateVolume();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function setupRecorder(stream) {
+            try {
+                // Try to use a common format, or let browser decide
+                mediaRecorder = new MediaRecorder(stream);
+                
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) {
+                        audioChunks.push(e.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    // Create blob and download link
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    // Format filename with timestamp
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                    a.download = `double-bass-recording-${timestamp}.webm`;
+                    
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Cleanup
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                    }, 100);
+                    
+                    audioChunks = []; // Reset chunks
+                };
+            } catch (err) {
+                console.error("Recording setup failed:", err);
+                alert("Browser does not support audio recording.");
+            }
+        }
+
+        function updateVolume() {
+            if (masterGain) {
+                masterGain.gain.value = (volumeSlider.value / 100); 
+            }
+        }
+
+        volumeSlider.addEventListener('input', updateVolume);
+
+        // Calculate frequency for a semitone step
+        function getFreq(baseFreq, semitones) {
+            return baseFreq * Math.pow(2, semitones / 12);
+        }
+
+        // --- Sound Generation ---
+        function startNote(element, inputId) {
+            if (!audioCtx) initAudio();
+            
+            if (activeVoices[inputId]) {
+                stopNote(inputId);
+            }
+
+            const freq = parseFloat(element.dataset.freq);
+            if (!freq) return;
+
+            const t = audioCtx.currentTime;
+
+            // --- Voice Creation ---
+            const osc1 = audioCtx.createOscillator();
+            osc1.type = 'triangle';
+            osc1.frequency.setValueAtTime(freq, t);
+
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'sawtooth';
+            osc2.frequency.setValueAtTime(freq, t); 
+            osc2.detune.value = 5; 
+
+            const subOsc = audioCtx.createOscillator();
+            subOsc.type = 'sine';
+            subOsc.frequency.setValueAtTime(freq / 2, t); 
+
+            // Noise Burst (Attack)
+            const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.05, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < noiseBuffer.length; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            const noiseSrc = audioCtx.createBufferSource();
+            noiseSrc.buffer = noiseBuffer;
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'lowpass';
+            noiseFilter.frequency.value = 1000;
+            const noiseGain = audioCtx.createGain();
+            noiseSrc.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(compressor);
+
+            // --- Filters ---
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.Q.value = 1.5; 
+            filter.frequency.setValueAtTime(200, t);
+            filter.frequency.exponentialRampToValueAtTime(1500, t + 0.02);
+            filter.frequency.exponentialRampToValueAtTime(100, t + 1.0);
+
+            // --- Envelope ---
+            const mainGain = audioCtx.createGain();
+            mainGain.gain.setValueAtTime(0, t);
+            mainGain.gain.linearRampToValueAtTime(1.0, t + 0.015); 
+            mainGain.gain.exponentialRampToValueAtTime(0.4, t + 0.2); 
+            mainGain.gain.linearRampToValueAtTime(0, t + 8.0); 
+
+            noiseGain.gain.setValueAtTime(0.3, t);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+
+            // Wiring
+            osc1.connect(filter);
+            osc2.connect(filter);
+            subOsc.connect(mainGain); 
+            filter.connect(mainGain);
+            mainGain.connect(compressor);
+
+            // Start
+            osc1.start(t);
+            osc2.start(t);
+            subOsc.start(t);
+            noiseSrc.start(t);
+            noiseSrc.stop(t + 0.05);
+
+            // Animation
+            animateString(element);
+            element.classList.add('holding');
+
+            activeVoices[inputId] = {
+                gainNode: mainGain,
+                oscillators: [osc1, osc2, subOsc],
+                element: element
+            };
+        }
+
+        function stopNote(inputId) {
+            const voice = activeVoices[inputId];
+            if (!voice) return;
+
+            const t = audioCtx.currentTime;
+            const releaseTime = 0.15; 
+
+            voice.gainNode.gain.cancelScheduledValues(t);
+            voice.gainNode.gain.setValueAtTime(voice.gainNode.gain.value, t);
+            voice.gainNode.gain.exponentialRampToValueAtTime(0.001, t + releaseTime);
+
+            voice.oscillators.forEach(osc => {
+                osc.stop(t + releaseTime + 0.1);
+            });
+
+            if (voice.element) {
+                voice.element.classList.remove('holding');
+            }
+
+            delete activeVoices[inputId];
+        }
+
+        function animateString(element) {
+            const row = element.closest('.string-row');
+            if (row) {
+                const stringLine = row.querySelector('.string');
+                if(stringLine) {
+                    stringLine.animate([
+                        { transform: 'translateY(0)' },
+                        { transform: 'translateY(-2px)' },
+                        { transform: 'translateY(2px)' },
+                        { transform: 'translateY(0)' }
+                    ], {
+                        duration: 80,
+                        iterations: 5
+                    });
+                }
+            }
+        }
+
+
+        // --- UI Generation ---
+        const fretboard = document.getElementById('fretboard');
+        const rows = document.querySelectorAll('.string-row .notes-container');
+
+        rows.forEach((rowContainer, index) => {
+            const stringData = openStrings[index]; 
+            let currentNoteIndex = stringData.noteIndex;
+            let currentOctave = stringData.octave;
+
+            for (let i = 1; i <= numPositions; i++) {
+                currentNoteIndex++;
+                if (currentNoteIndex >= noteNames.length) {
+                    currentNoteIndex = 0;
+                    currentOctave++; 
+                }
+                const noteNameStr = noteNames[currentNoteIndex]; 
+
+                const cell = document.createElement('div');
+                cell.className = 'flex-1 note-cell flex items-center justify-center relative';
+                
+                const freq = getFreq(stringData.base, i);
+                cell.dataset.freq = freq.toFixed(2);
+                cell.dataset.semitone = i;
+
+                const noteLabel = document.createElement('span');
+                noteLabel.className = 'note-name';
+                noteLabel.textContent = noteNameStr;
+                cell.appendChild(noteLabel);
+
+                if ([3, 5, 7, 9, 12].includes(i)) {
+                    const dot = document.createElement('div');
+                    dot.className = 'marker-dot';
+                    if (i === 12) {
+                        dot.style.height = '30px'; 
+                        dot.style.borderRadius = '10px';
+                    }
+                    cell.appendChild(dot);
+                }
+
+                rowContainer.appendChild(cell);
+            }
+        });
+
+        // --- Interaction Logic ---
+        let isMouseDown = false;
+        const MOUSE_ID = 'mouse';
+
+        document.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.note-cell')) {
+                isMouseDown = true;
+                e.preventDefault(); 
+                const cell = e.target.closest('.note-cell');
+                startNote(cell, MOUSE_ID);
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isMouseDown) {
+                isMouseDown = false;
+                stopNote(MOUSE_ID);
+            }
+        });
+
+        const allCells = document.querySelectorAll('.note-cell');
+        allCells.forEach(cell => {
+            cell.addEventListener('mouseenter', (e) => {
+                if (isMouseDown) {
+                    startNote(cell, MOUSE_ID);
+                }
+            });
+        });
+
+        document.addEventListener('mouseleave', () => {
+             if (isMouseDown) stopNote(MOUSE_ID);
+        });
+
+        // Touch
+        fretboard.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                const cell = target ? target.closest('.note-cell') : null;
+                if (cell) startNote(cell, touch.identifier);
+            }
+        }, { passive: false });
+
+        fretboard.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                stopNote(e.changedTouches[i].identifier);
+            }
+        });
+
+        fretboard.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                stopNote(e.changedTouches[i].identifier);
+            }
+        });
+        
+        fretboard.addEventListener('touchmove', (e) => {
+            e.preventDefault(); 
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                const cell = target ? target.closest('.note-cell') : null;
+
+                if (cell) {
+                    const currentVoice = activeVoices[touch.identifier];
+                    if (!currentVoice || currentVoice.element !== cell) {
+                        startNote(cell, touch.identifier);
+                    }
+                } else {
+                    stopNote(touch.identifier);
+                }
+            }
+        }, { passive: false });
+
+
+        // --- Buttons Logic ---
+        const overlay = document.getElementById('overlay');
+        const startBtn = document.getElementById('start-btn');
+        const toggleNotesBtn = document.getElementById('toggle-notes-btn');
+        const recordBtn = document.getElementById('record-btn');
+        const recordText = document.getElementById('record-text');
+        const fretboardEl = document.getElementById('fretboard');
+
+        startBtn.addEventListener('click', () => {
+            initAudio();
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 500);
+        });
+
+        toggleNotesBtn.addEventListener('click', () => {
+            const isShowing = fretboardEl.classList.toggle('show-notes');
+            toggleNotesBtn.classList.toggle('active');
+        });
+
+        // Record Button Logic
+        recordBtn.addEventListener('click', () => {
+            if (!audioCtx) initAudio();
+            
+            if (!mediaRecorder) {
+                // If recorder failed to init inside initAudio, try to init again or alert
+                if(audioCtx && recordingDest) {
+                     setupRecorder(recordingDest.stream);
+                } else {
+                    alert("Recording not initialized yet. Please start audio first.");
+                    return;
+                }
+            }
+
+            if (!isRecording) {
+                // START RECORDING
+                if (mediaRecorder.state === 'inactive') {
+                    audioChunks = [];
+                    mediaRecorder.start();
+                    isRecording = true;
+                    
+                    recordBtn.classList.add('is-recording');
+                    recordText.textContent = "STOP";
+                }
+            } else {
+                // STOP RECORDING
+                if (mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                    isRecording = false;
+                    
+                    recordBtn.classList.remove('is-recording');
+                    recordText.textContent = "REC";
+                }
+            }
+        });
+
+    </script>
+</body>
+</html>

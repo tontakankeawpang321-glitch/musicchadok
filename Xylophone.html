@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Xylophone Simulator</title>
+    <style>
+        :root {
+            --bg-color: #2c3e50;
+            --wood-frame: #8d6e63;
+            --wood-dark: #5d4037;
+            --screw: #eceff1;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden; /* ป้องกันการเลื่อนหน้าจอเวลาเล่น */
+            user-select: none; /* ป้องกันการเลือกข้อความ */
+            -webkit-user-select: none;
+            touch-action: none; /* ป้องกัน default touch action ของ browser */
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+
+        /* ปุ่มควบคุมการบันทึก */
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            z-index: 10;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        .control-btn:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .control-btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .control-btn.record {
+            background: rgba(231, 76, 60, 0.8);
+            border-color: #c0392b;
+        }
+        
+        .control-btn.record:hover:not(:disabled) {
+            background: #c0392b;
+        }
+
+        .control-btn.recording {
+            animation: pulse-red 1.5s infinite;
+            background: #c0392b;
+            box-shadow: 0 0 10px #e74c3c;
+        }
+
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #7f8c8d;
+            border-color: #7f8c8d;
+            transform: none;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ecf0f1;
+        }
+        .recording .status-dot {
+            background: #ff0000;
+        }
+
+        /* กล่องใส่ระนาด */
+        .xylophone-container {
+            background-color: var(--wood-frame);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 
+                0 10px 20px rgba(0,0,0,0.5),
+                inset 0 0 50px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            width: 90%;
+            max-width: 800px;
+            /* ลายไม้ */
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.05) 10px, rgba(0,0,0,0.05) 20px);
+        }
+
+        /* รางยึด */
+        .rail {
+            position: absolute;
+            height: 15px;
+            width: 95%;
+            background: var(--wood-dark);
+            border-radius: 10px;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+            z-index: 0;
+        }
+        .rail.top { top: 15%; transform: rotate(-2deg); }
+        .rail.bottom { bottom: 15%; transform: rotate(2deg); }
+
+        .keys-wrapper {
+            display: flex;
+            gap: 8px;
+            z-index: 1;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+
+        /* ตัวโน้ตแต่ละแท่ง */
+        .key {
+            position: relative;
+            width: 60px; /* ความกว้างฐาน */
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 
+                0 4px 0 rgba(0,0,0,0.2),
+                0 8px 10px rgba(0,0,0,0.3),
+                inset 0 1px 0 rgba(255,255,255,0.4);
+            transition: transform 0.05s, box-shadow 0.05s, filter 0.05s;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: rgba(255,255,255,0.9);
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+            flex-shrink: 1; /* ให้หดได้ในมือถือ */
+        }
+
+        /* Effect ตอนกด */
+        .key:active, .key.active {
+            transform: translateY(4px) scale(0.98);
+            box-shadow: 
+                0 0 0 rgba(0,0,0,0.2),
+                inset 0 0 10px rgba(0,0,0,0.2);
+            filter: brightness(1.2);
+        }
+
+        /* หมุดยึด (น็อต) */
+        .screw {
+            width: 10px;
+            height: 10px;
+            background: var(--screw);
+            border-radius: 50%;
+            position: absolute;
+            box-shadow: 
+                inset -1px -1px 2px rgba(0,0,0,0.5),
+                1px 1px 2px rgba(0,0,0,0.3);
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        .screw.top { top: 10px; }
+        .screw.bottom { bottom: 10px; }
+
+        /* สีและขนาดของแต่ละโน้ต */
+        .key[data-note="C"] { background: #ff5252; height: 300px; }
+        .key[data-note="D"] { background: #ffca28; height: 285px; }
+        .key[data-note="E"] { background: #d4e157; height: 270px; }
+        .key[data-note="F"] { background: #66bb6a; height: 255px; }
+        .key[data-note="G"] { background: #26c6da; height: 240px; }
+        .key[data-note="A"] { background: #42a5f5; height: 225px; }
+        .key[data-note="B"] { background: #7e57c2; height: 210px; }
+        .key[data-note="C2"] { background: #ec407a; height: 195px; }
+
+        .note-name {
+            font-size: 1.2rem;
+            margin-top: 0;
+        }
+        .note-solfa {
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+
+        /* ปุ่มเริ่มใช้งาน */
+        #start-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: white;
+            flex-direction: column;
+        }
+        #start-btn {
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            background: #66bb6a;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 187, 106, 0.4);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* Responsive สำหรับมือถือแนวตั้ง */
+        @media (max-width: 600px) and (orientation: portrait) {
+            .xylophone-container {
+                width: 95%;
+                padding: 10px;
+            }
+            .keys-wrapper {
+                gap: 4px;
+            }
+            .key {
+                width: 12vw; /* ปรับความกว้างตามหน้าจอ */
+                font-size: 0.8rem;
+            }
+            .note-name { font-size: 1rem; }
+            .note-solfa { font-size: 0.6rem; }
+            
+            /* ลดความสูงลงในแนวตั้ง */
+            .key[data-note="C"] { height: 50vh; max-height: 300px; }
+            .key[data-note="D"] { height: 48vh; max-height: 285px; }
+            .key[data-note="E"] { height: 46vh; max-height: 270px; }
+            .key[data-note="F"] { height: 44vh; max-height: 255px; }
+            .key[data-note="G"] { height: 42vh; max-height: 240px; }
+            .key[data-note="A"] { height: 40vh; max-height: 225px; }
+            .key[data-note="B"] { height: 38vh; max-height: 210px; }
+            .key[data-note="C2"] { height: 36vh; max-height: 195px; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="start-overlay">
+        <h1>Xylophone Simulator</h1>
+        <button id="start-btn">แตะเพื่อเริ่มเล่น</button>
+        <p style="margin-top: 10px; opacity: 0.7;">เปิดเสียงอุปกรณ์ของคุณเพื่อประสบการณ์ที่ดีที่สุด</p>
+    </div>
+
+    <h1>Xylophone</h1>
+
+    <!-- แผงควบคุมการบันทึก -->
+    <div class="controls">
+        <button id="btn-record" class="control-btn record">
+            <div class="status-dot"></div>
+            <span>บันทึกเสียง</span>
+        </button>
+        <button id="btn-stop" class="control-btn" disabled>
+            <span>■ หยุด & ดาวน์โหลด</span>
+        </button>
+    </div>
+
+    <div class="xylophone-container">
+        <div class="rail top"></div>
+        <div class="rail bottom"></div>
+        
+        <div class="keys-wrapper">
+            <div class="key" data-note="C" data-freq="261.63">
+                <div class="screw top"></div>
+                <span class="note-name">C</span>
+                <span class="note-solfa">โด</span>
+                <div class="screw bottom"></div>
+            </div>
+            <div class="key" data-note="D" data-freq="293.66">
+                <div class="screw top"></div>
+                <span class="note-name">D</span>
+                <span class="note-solfa">เร</span>
+                <div class="screw bottom"></div>
+            </div>
+            <div class="key" data-note="E" data-freq="329.63">
+                <div class="screw top"></div>
+                <span class="note-name">E</span>
+                <span class="note-solfa">มี</span>
+                <div class="screw bottom"></div>
+            </div>
+            <div class="key" data-note="F" data-freq="349.23">
+                <div class="screw top"></div>
+                <span class="note-name">F</span>
+                <span class="note-solfa">ฟา</span>
+                <div class="screw bottom"></div>
+            </div>
+            <div class="key" data-note="G" data-freq="392.00">
+                <div class="screw top"></div>
+                <span class="note-name">G</span>
+                <span class="note-solfa">ซอล</span>
+                <div class="screw bottom"></div>
+            </div>
+            <div class="key" data-note="A" data-freq="440.00">
+                <div class="screw top"></div>
+                <span class="note-name">A</span>
+                <span class="note-solfa">ลา</span>
+                <div class="screw bottom"></div>
+            </div>
+            <div class="key" data-note="B" data-freq="493.88">
+                <div class="screw top"></div>
+                <span class="note-name">B</span>
+                <span class="note-solfa">ที</span>
+                <div class="screw bottom"></div>
+            </div>
+            <div class="key" data-note="C2" data-freq="523.25">
+                <div class="screw top"></div>
+                <span class="note-name">C</span>
+                <span class="note-solfa">โด</span>
+                <div class="screw bottom"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Audio Context Setup ---
+        let audioCtx;
+        let masterGain; // ตัวคุมเสียงรวมทั้งหมด
+        let dest; // ปลายทางสำหรับอัดเสียง (MediaStream)
+        let mediaRecorder;
+        let chunks = [];
+        
+        const startOverlay = document.getElementById('start-overlay');
+        const startBtn = document.getElementById('start-btn');
+        const btnRecord = document.getElementById('btn-record');
+        const btnStop = document.getElementById('btn-stop');
+
+        // ฟังก์ชันเริ่มระบบเสียง (ต้องทำผ่าน User Gesture)
+        async function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+
+                // สร้าง Master Gain: เพื่อรวมเสียงทั้งหมดก่อนส่งออก
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 1.0;
+                
+                // เชื่อมต่อ 1: Master -> ลำโพง (ให้คนเล่นได้ยิน)
+                masterGain.connect(audioCtx.destination);
+
+                // เชื่อมต่อ 2: เตรียมระบบอัดเสียง
+                setupRecording();
+            }
+            
+            if (audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+            }
+
+            startOverlay.style.opacity = '0';
+            setTimeout(() => {
+                startOverlay.style.display = 'none';
+            }, 500);
+        }
+
+        // ตั้งค่าระบบอัดเสียง
+        function setupRecording() {
+            // สร้าง Destination พิเศษสำหรับอัดเสียง
+            dest = audioCtx.createMediaStreamDestination();
+            
+            // เชื่อมเสียงจาก Master -> Destination นี้ด้วย
+            masterGain.connect(dest);
+
+            // เตรียม MediaRecorder
+            try {
+                // เลือกชนิดไฟล์ที่ Browser รองรับ
+                let options = { mimeType: 'audio/webm' };
+                if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                    options = { mimeType: 'audio/mp4' }; // fallback สำหรับบาง browser
+                }
+
+                mediaRecorder = new MediaRecorder(dest.stream, options);
+                
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) chunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    // รวม chunks เป็น Blob เดียว
+                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    chunks = [];
+                    
+                    // สร้าง URL สำหรับดาวน์โหลด
+                    const url = URL.createObjectURL(blob);
+                    
+                    // สร้างลิงก์หลอกๆ แล้วกดดาวน์โหลดอัตโนมัติ
+                    const a = document.createElement('a');
+                    const timestamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `xylophone_${timestamp}.webm`;
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Cleanup
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                    }, 100);
+                };
+
+            } catch (err) {
+                console.error("Recording setup failed:", err);
+                btnRecord.innerText = "ไม่รองรับการอัด";
+                btnRecord.disabled = true;
+            }
+        }
+
+        // --- Recording Controls Listeners ---
+        btnRecord.addEventListener('click', () => {
+            if (!mediaRecorder) return;
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+            
+            chunks = [];
+            mediaRecorder.start();
+            
+            // Update UI
+            btnRecord.classList.add('recording');
+            btnRecord.querySelector('span').innerText = "กำลังบันทึก...";
+            btnRecord.disabled = true;
+            btnStop.disabled = false;
+        });
+
+        btnStop.addEventListener('click', () => {
+            if (!mediaRecorder) return;
+            if (mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+            
+            // Update UI
+            btnRecord.classList.remove('recording');
+            btnRecord.querySelector('span').innerText = "บันทึกเสียง";
+            btnRecord.disabled = false;
+            btnStop.disabled = true;
+        });
+
+
+        startBtn.addEventListener('click', initAudio);
+        startBtn.addEventListener('touchstart', initAudio, {passive: false});
+
+        // --- Sound Synthesis Logic ---
+        function playNote(frequency) {
+            if (!audioCtx) return;
+
+            const t = audioCtx.currentTime;
+
+            // 1. Fundamental Oscillator (เสียงหลัก)
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.type = 'sine';
+            osc.frequency.value = frequency;
+
+            // Envelope
+            gainNode.gain.setValueAtTime(0, t);
+            gainNode.gain.linearRampToValueAtTime(0.8, t + 0.01); 
+            gainNode.gain.exponentialRampToValueAtTime(0.001, t + 1.5); 
+
+            osc.connect(gainNode);
+            // *** เปลี่ยนจุดเชื่อมต่อ: ส่งเข้า masterGain แทน destination โดยตรง ***
+            gainNode.connect(masterGain);
+            
+            osc.start(t);
+            osc.stop(t + 1.5);
+
+            // 2. Harmonic Oscillator (เสียง Overtone)
+            const osc2 = audioCtx.createOscillator();
+            const gainNode2 = audioCtx.createGain();
+            
+            osc2.type = 'sine';
+            osc2.frequency.value = frequency * 2; 
+
+            gainNode2.gain.setValueAtTime(0, t);
+            gainNode2.gain.linearRampToValueAtTime(0.3, t + 0.01); 
+            gainNode2.gain.exponentialRampToValueAtTime(0.001, t + 0.4); 
+
+            osc2.connect(gainNode2);
+            gainNode2.connect(masterGain); // ส่งเข้า masterGain
+
+            osc2.start(t);
+            osc2.stop(t + 0.4);
+
+            // 3. Impact Noise (เสียงกระแทกเบาๆ)
+            const bufferSize = audioCtx.sampleRate * 0.02; 
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            const noiseGain = audioCtx.createGain();
+            
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 1000;
+
+            noiseGain.gain.setValueAtTime(0.3, t);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.02);
+
+            noise.connect(filter);
+            filter.connect(noiseGain);
+            noiseGain.connect(masterGain); // ส่งเข้า masterGain
+            noise.start(t);
+        }
+
+        // --- Visual Animation ---
+        function animateKey(element) {
+            element.classList.remove('active');
+            void element.offsetWidth; // Trigger reflow
+            element.classList.add('active');
+            setTimeout(() => {
+                element.classList.remove('active');
+            }, 100);
+        }
+
+        // --- Event Handling ---
+        const keys = document.querySelectorAll('.key');
+
+        function triggerKey(keyElement) {
+            if(!keyElement) return;
+            const freq = parseFloat(keyElement.getAttribute('data-freq'));
+            playNote(freq);
+            animateKey(keyElement);
+        }
+
+        // Mouse Events
+        keys.forEach(key => {
+            key.addEventListener('mousedown', (e) => {
+                e.preventDefault(); 
+                triggerKey(key);
+            });
+        });
+
+        // Touch Events (Multi-touch support)
+        const keysWrapper = document.querySelector('.keys-wrapper');
+
+        keys.forEach(key => {
+            key.addEventListener('touchstart', (e) => {
+                e.preventDefault(); 
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    triggerKey(key);
+                }
+            }, { passive: false });
+        });
+
+        // Keyboard Support
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            const keyMap = {
+                'a': 'C', 's': 'D', 'd': 'E', 'f': 'F',
+                'g': 'G', 'h': 'A', 'j': 'B', 'k': 'C2'
+            };
+            const note = keyMap[e.key.toLowerCase()];
+            if (note) {
+                const keyElement = document.querySelector(`.key[data-note="${note}"]`);
+                triggerKey(keyElement);
+            }
+        });
+
+    </script>
+</body>
+</html>
