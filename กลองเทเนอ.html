@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>กลองเทเนอร์จำลอง (Virtual Tenor Drums)</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --drum-rim: #e0e0e0;
+            --drum-head: #f5f5f5;
+            --drum-shell: #2c3e50;
+            --highlight: #3498db;
+            --record-color: #e74c3c;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Sarabun', sans-serif;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #start-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: white;
+            text-align: center;
+            transition: opacity 0.5s;
+        }
+
+        .btn-start {
+            padding: 15px 30px;
+            font-size: 1.5rem;
+            background: var(--highlight);
+            border: none;
+            color: white;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 0 15px rgba(52, 152, 219, 0.5);
+        }
+
+        /* Controls Panel */
+        .controls {
+            position: absolute;
+            top: 20px;
+            display: flex;
+            gap: 15px;
+            z-index: 50;
+            background: rgba(0,0,0,0.3);
+            padding: 10px 20px;
+            border-radius: 30px;
+            backdrop-filter: blur(5px);
+        }
+
+        .btn-control {
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.1);
+            color: white;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-control:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-record.recording {
+            background-color: var(--record-color);
+            border-color: var(--record-color);
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-text {
+            color: var(--record-color);
+            font-weight: bold;
+            display: none;
+            align-items: center;
+            margin-left: 10px;
+            font-size: 0.9rem;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+        }
+
+        /* Container จัดวางกลองเป็นรูปโค้ง */
+        .drum-container {
+            position: relative;
+            width: 95vw;
+            height: 60vh;
+            max-width: 800px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .drum {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, var(--drum-head), #dcdcdc);
+            border: 8px solid var(--drum-shell);
+            box-shadow: 
+                0 0 0 4px var(--drum-rim),
+                0 10px 20px rgba(0,0,0,0.5),
+                inset 0 0 20px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.05s, border-color 0.05s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: rgba(0,0,0,0.2);
+            font-size: 1.5rem;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .drum:active, .drum.hit {
+            transform: scale(0.95);
+            background: radial-gradient(circle at 30% 30%, #fff, #eee);
+            border-color: var(--highlight);
+        }
+
+        #drum-1 { width: 18vmin; height: 18vmin; right: 32%; top: 15%; z-index: 2; }
+        #drum-2 { width: 20vmin; height: 20vmin; left: 30%; top: 15%; z-index: 2; }
+        #drum-3 { width: 24vmin; height: 24vmin; right: 5%; top: 25%; z-index: 1; }
+        #drum-4 { width: 26vmin; height: 26vmin; left: 2%; top: 25%; z-index: 1; }
+        #drum-spock {
+            width: 14vmin; height: 14vmin;
+            left: 50%; top: 5%;
+            transform: translateX(-50%);
+            z-index: 3;
+            background: radial-gradient(circle at 30% 30%, #fff, #bbb);
+        }
+        #drum-spock:active, #drum-spock.hit {
+            transform: translateX(-50%) scale(0.95);
+        }
+
+        .rim-hit-zone {
+            position: absolute;
+            bottom: 12%;
+            width: 100%;
+            text-align: center;
+            color: #666;
+            pointer-events: none;
+            font-size: 0.8rem;
+        }
+
+        .footer {
+            position: absolute;
+            bottom: 20px;
+            color: #888;
+            font-size: 0.8rem;
+        }
+
+        @media (orientation: portrait) {
+            .drum-container { height: 50vh; width: 100vw; }
+            #drum-1 { right: 28%; top: 20%; }
+            #drum-2 { left: 28%; top: 20%; }
+            #drum-3 { right: 2%; top: 35%; }
+            #drum-4 { left: 2%; top: 35%; }
+            #drum-spock { top: 8%; }
+            .controls { top: 10px; flex-wrap: wrap; justify-content: center; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="start-overlay">
+        <h1>กลองเทเนอร์จำลอง</h1>
+        <p>รองรับมัลติทัช • บันทึกเสียงได้</p>
+        <button class="btn-start" onclick="initAudio()">แตะเพื่อเริ่มใช้งาน</button>
+    </div>
+
+    <div class="controls">
+        <button id="btn-record" class="btn-control btn-record" onclick="toggleRecord()">
+            <span class="icon">●</span> บันทึก
+        </button>
+        <button id="btn-stop" class="btn-control" onclick="stopRecord()" disabled>
+            <span class="icon">■</span> หยุด & โหลด
+        </button>
+        <span id="record-status" class="status-text">กำลังบันทึก...</span>
+    </div>
+
+    <div class="drum-container">
+        <div id="drum-spock" class="drum" data-note="spock" data-pitch="466.16">S</div>
+        <div id="drum-2" class="drum" data-note="2" data-pitch="277.18">2</div>
+        <div id="drum-1" class="drum" data-note="1" data-pitch="349.23">1</div>
+        <div id="drum-4" class="drum" data-note="4" data-pitch="196.00">4</div>
+        <div id="drum-3" class="drum" data-note="3" data-pitch="233.08">3</div>
+    </div>
+    
+    <div class="rim-hit-zone">
+        <p>High-Fidelity Audio Synthesis</p>
+    </div>
+
+    <div class="footer">สร้างโดย AI (Gemini)</div>
+
+    <script>
+        let audioCtx;
+        let compressor;
+        // ตัวแปรสำหรับบันทึกเสียง
+        let mediaRecorder;
+        let audioChunks = [];
+        let destNode; // Destination node สำหรับส่งเสียงไปบันทึก
+        let isRecording = false;
+
+        function initAudio() {
+            const overlay = document.getElementById('start-overlay');
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 500);
+
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+
+            // Master Compressor
+            compressor = audioCtx.createDynamicsCompressor();
+            compressor.threshold.setValueAtTime(-24, audioCtx.currentTime);
+            compressor.knee.setValueAtTime(30, audioCtx.currentTime);
+            compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+            compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+            compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+            
+            // เชื่อมต่อ Compressor ไปยังลำโพง
+            compressor.connect(audioCtx.destination);
+
+            // Setup Recording Stream (ดักจับเสียงที่ออกจาก Compressor)
+            destNode = audioCtx.createMediaStreamDestination();
+            compressor.connect(destNode);
+
+            // Setup MediaRecorder
+            try {
+                mediaRecorder = new MediaRecorder(destNode.stream);
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    
+                    // สร้าง Link สำหรับดาวน์โหลดอัตโนมัติ
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = audioUrl;
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                    a.download = `tenor_drums_${timestamp}.webm`;
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Cleanup
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(audioUrl);
+                    }, 100);
+                    
+                    audioChunks = [];
+                    alert('บันทึกเสียงเรียบร้อย! ไฟล์จะถูกดาวน์โหลดลงเครื่อง');
+                };
+            } catch (e) {
+                console.error("MediaRecorder not supported or error:", e);
+                document.getElementById('btn-record').disabled = true;
+                document.getElementById('btn-record').innerText = "ไม่รองรับการอัด";
+            }
+        }
+
+        function toggleRecord() {
+            if (!audioCtx) {
+                alert('กรุณากดเริ่มใช้งานก่อน');
+                return;
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const btnRecord = document.getElementById('btn-record');
+            const btnStop = document.getElementById('btn-stop');
+            const statusText = document.getElementById('record-status');
+
+            if (!isRecording) {
+                // เริ่มบันทึก
+                audioChunks = [];
+                mediaRecorder.start();
+                isRecording = true;
+                
+                btnRecord.classList.add('recording');
+                btnRecord.innerHTML = '<span class="icon">●</span> กำลังอัด...';
+                btnStop.disabled = false;
+                statusText.style.display = 'flex';
+            }
+        }
+
+        function stopRecord() {
+            if (isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+
+                const btnRecord = document.getElementById('btn-record');
+                const btnStop = document.getElementById('btn-stop');
+                const statusText = document.getElementById('record-status');
+
+                btnRecord.classList.remove('recording');
+                btnRecord.innerHTML = '<span class="icon">●</span> บันทึก';
+                btnStop.disabled = true;
+                statusText.style.display = 'none';
+            }
+        }
+
+        function playDrumSound(frequency) {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            const t = audioCtx.currentTime;
+
+            // --- 1. The Tone (Body) ---
+            const osc = audioCtx.createOscillator();
+            const gainOsc = audioCtx.createGain();
+
+            osc.type = 'sine'; 
+            osc.frequency.setValueAtTime(frequency, t);
+            osc.frequency.exponentialRampToValueAtTime(frequency * 0.9, t + 0.1); 
+
+            gainOsc.gain.setValueAtTime(0, t);
+            gainOsc.gain.linearRampToValueAtTime(1.0, t + 0.005); 
+            gainOsc.gain.exponentialRampToValueAtTime(0.01, t + 0.4); 
+
+            osc.connect(gainOsc);
+            gainOsc.connect(compressor); // ส่งเข้า Compressor (ซึ่งจะส่งต่อไปทั้ง Speaker และ Recorder)
+            osc.start(t);
+            osc.stop(t + 0.5);
+
+            // --- 2. The Attack (Snap) ---
+            const bufferSize = audioCtx.sampleRate * 0.05; 
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            const gainNoise = audioCtx.createGain();
+            
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'highpass';
+            filter.frequency.value = 1000;
+
+            gainNoise.gain.setValueAtTime(0.6, t);
+            gainNoise.gain.exponentialRampToValueAtTime(0.01, t + 0.05); 
+
+            noise.connect(filter);
+            filter.connect(gainNoise);
+            gainNoise.connect(compressor);
+            noise.start(t);
+        }
+
+        // Event Handling
+        const drums = document.querySelectorAll('.drum');
+        drums.forEach(drum => {
+            const pitch = parseFloat(drum.dataset.pitch);
+
+            const hit = (e) => {
+                if(e.cancelable) e.preventDefault();
+                drum.classList.add('hit');
+                setTimeout(() => drum.classList.remove('hit'), 100);
+                playDrumSound(pitch);
+            };
+
+            drum.addEventListener('touchstart', hit, { passive: false });
+            drum.addEventListener('mousedown', hit);
+        });
+
+        document.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
+    </script>
+</body>
+</html>

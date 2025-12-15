@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ซอด้วงจำลอง (Virtual Saw Duang)</title>
+    <style>
+        /* --- General Reset & Layout --- */
+        * {
+            box-sizing: border-box;
+            touch-action: none; /* Prevent scroll on mobile */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #1a1a1a;
+            font-family: 'Sarabun', sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            color: white;
+        }
+
+        /* --- UI Controls (Top) --- */
+        .controls {
+            height: 60px;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 10px;
+            z-index: 100;
+            border-bottom: 2px solid #8b4513;
+        }
+
+        .btn {
+            background: #d4a058;
+            border: 2px solid #8b4513;
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #3e1e05;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: all 0.1s;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+            background: #b8863d;
+        }
+
+        .btn.recording {
+            background: #ff4444;
+            color: white;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
+        }
+
+        /* --- Instrument Area (Main) --- */
+        .stage {
+            flex-grow: 1;
+            position: relative;
+            background: radial-gradient(circle at center, #2c2c2c 0%, #000000 100%);
+            display: flex;
+            justify-content: center;
+            align-items: flex-end; /* Instrument sits at bottom */
+            overflow: hidden;
+        }
+
+        /* --- The Saw Duang Visuals --- */
+        .saw-container {
+            position: relative;
+            width: 300px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* The Neck (Thaun) */
+        .neck {
+            width: 24px;
+            height: 100%;
+            background: linear-gradient(90deg, #3e1e05, #8b4513, #3e1e05);
+            position: absolute;
+            top: 0;
+            z-index: 10;
+            border-left: 1px solid rgba(255,255,255,0.1);
+            border-right: 1px solid rgba(0,0,0,0.5);
+        }
+
+        /* Tuning Pegs (Luk Bid) - Stylized */
+        .peg {
+            position: absolute;
+            width: 80px;
+            height: 12px;
+            background: #5c3a21;
+            border-radius: 5px;
+            z-index: 5;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+        }
+        .peg.top { top: 10%; left: -30px; transform: rotate(-10deg); }
+        .peg.bottom { top: 18%; left: -30px; transform: rotate(-10deg); }
+
+        /* The Soundbox (Grabok) */
+        .soundbox {
+            position: absolute;
+            bottom: 20px;
+            width: 140px;
+            height: 160px;
+            background: #4a2c16;
+            border-radius: 10px 10px 30px 30px; /* Slight taper */
+            z-index: 20;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* Snake Skin Texture */
+        .skin {
+            width: 120px;
+            height: 140px;
+            background-color: #e3dcd2;
+            background-image: 
+                radial-gradient(#333 15%, transparent 16%),
+                radial-gradient(#333 15%, transparent 16%);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+            border-radius: 50%; /* Make it look like the face */
+            opacity: 0.9;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        /* Strings (Sai) - The Interactable Area */
+        .strings-area {
+            position: absolute;
+            top: 15%; /* Start below pegs */
+            bottom: 180px; /* Stop above soundbox */
+            width: 160px;
+            z-index: 30;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+
+        .string-col {
+            position: relative;
+            width: 60px;
+            height: 100%;
+            /* border: 1px dashed rgba(255,255,255,0.1); Debugging touch area */
+            display: flex;
+            justify-content: center;
+        }
+
+        /* The actual visual string */
+        .string-line {
+            width: 4px; /* Thicker for visibility */
+            height: 100%;
+            background: linear-gradient(90deg, #fff, #ccc);
+            box-shadow: 0 0 5px rgba(255,255,255,0.5);
+            pointer-events: none; /* Clicks go through to the column */
+        }
+
+        .string-label {
+            position: absolute;
+            bottom: -30px;
+            color: #d4a058;
+            font-size: 12px;
+            width: 100%;
+            text-align: center;
+        }
+
+        /* Note Markers (Optional visual guide) */
+        .fret-marker {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 2px;
+            background: rgba(255, 215, 0, 0.3);
+            pointer-events: none;
+            display: none; /* Hidden by default */
+        }
+        .fret-marker.show { display: block; }
+        .fret-marker::after {
+            content: attr(data-note);
+            position: absolute;
+            right: -25px;
+            top: -8px;
+            font-size: 10px;
+            color: rgba(255, 215, 0, 0.7);
+        }
+
+        /* Visual Feedback on Touch */
+        .string-vibration {
+            animation: vibrate 0.1s infinite;
+        }
+
+        @keyframes vibrate {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(1px); }
+            50% { transform: translateX(0); }
+            75% { transform: translateX(-1px); }
+            100% { transform: translateX(0); }
+        }
+
+        /* --- Overlay for Start --- */
+        #start-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            text-align: center;
+        }
+        
+        #start-overlay h1 { color: #d4a058; font-size: 2em; margin-bottom: 20px; }
+        #start-overlay p { margin-bottom: 30px; color: #ccc; }
+        .start-btn {
+            padding: 15px 40px;
+            font-size: 1.5em;
+            background: #8b4513;
+            color: white;
+            border: 2px solid #d4a058;
+            border-radius: 50px;
+            cursor: pointer;
+        }
+
+        /* --- Notification --- */
+        #notification {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+            z-index: 200;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Start Overlay -->
+    <div id="start-overlay">
+        <h1>ซอด้วงจำลอง</h1>
+        <p>แตะเพื่อเริ่มเล่น (จำเป็นสำหรับระบบเสียง)</p>
+        <button class="start-btn" onclick="initApp()">เริ่มเล่น</button>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+        <button class="btn" id="toggle-notes" onclick="toggleNotes()">แสดงโน้ต</button>
+        <button class="btn" id="record-btn" onclick="toggleRecording()">อัดเสียง</button>
+        <button class="btn" id="play-btn" onclick="playRecording()" disabled>เล่นเสียง</button>
+        <button class="btn" onclick="downloadRecording()" id="download-btn" disabled>ดาวน์โหลด</button>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="notification">Notification</div>
+
+    <!-- Instrument Stage -->
+    <div class="stage">
+        <div class="saw-container">
+            <!-- Decorative Pegs -->
+            <div class="peg top"></div>
+            <div class="peg bottom"></div>
+
+            <!-- Neck -->
+            <div class="neck"></div>
+
+            <!-- Strings Interaction Area -->
+            <div class="strings-area" id="strings-area">
+                <!-- String 1: Sai Tum (Low) - Left -->
+                <div class="string-col" id="string-low" data-string="low">
+                    <div class="string-line"></div>
+                    <div class="string-label">สายทุ้ม (ซ)</div>
+                    <!-- Markers will be injected here via JS -->
+                </div>
+
+                <!-- String 2: Sai Ek (High) - Right -->
+                <div class="string-col" id="string-high" data-string="high">
+                    <div class="string-line"></div>
+                    <div class="string-label">สายเอก (ร)</div>
+                </div>
+            </div>
+
+            <!-- Soundbox -->
+            <div class="soundbox">
+                <div class="skin"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let isAudioContextStarted = false;
+
+        // Frequencies (Approximation for Thai Scale mapped to Western Scale for easy web synth)
+        // Thai scale is equidistant 7-tone. We use closest Western notes.
+        // Base: Low String (Sol/G4), High String (Re/D5)
+        
+        // Define ranges: 0% (Top/Open) to 100% (Bottom)
+        // Low String Notes: G4, A4, B4, C5, D5, E5, F5, G5
+        // High String Notes: D5, E5, F#5, G5, A5, B5, C#6, D6
+        
+        const stringConfig = {
+            low: {
+                baseFreq: 392.00, // G4 (Sol)
+                label: 'Sol',
+                notes: [
+                    { name: 'ซ', en: 'G', pos: 0.05 }, // Open (almost top)
+                    { name: 'ล', en: 'A', pos: 0.20 },
+                    { name: 'ท', en: 'B', pos: 0.35 },
+                    { name: 'ด', en: 'C', pos: 0.48 },
+                    { name: 'ร', en: 'D', pos: 0.60 },
+                    { name: 'ม', en: 'E', pos: 0.72 },
+                    { name: 'ฟ', en: 'F', pos: 0.83 },
+                    { name: 'ซ', en: 'G', pos: 0.95 }
+                ]
+            },
+            high: {
+                baseFreq: 587.33, // D5 (Re)
+                label: 'Re',
+                notes: [
+                    { name: 'ร', en: 'D', pos: 0.05 }, // Open
+                    { name: 'ม', en: 'E', pos: 0.20 },
+                    { name: 'ฟ', en: 'F#', pos: 0.35 },
+                    { name: 'ซ', en: 'G', pos: 0.48 },
+                    { name: 'ล', en: 'A', pos: 0.60 },
+                    { name: 'ท', en: 'B', pos: 0.72 },
+                    { name: 'ด', en: 'C#', pos: 0.83 },
+                    { name: 'ร', en: 'D', pos: 0.95 }
+                ]
+            }
+        };
+
+        // --- Active Sound State ---
+        const activeVoices = {
+            low: null,
+            high: null
+        };
+
+        // --- Recording State ---
+        let mediaRecorder;
+        let recordedChunks = [];
+        let audioBlob = null;
+        let isRecording = false;
+        let destNode; // MediaStreamDestination for recording
+
+        // --- Initialization ---
+        function initApp() {
+            document.getElementById('start-overlay').style.display = 'none';
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            isAudioContextStarted = true;
+            
+            // Setup Recording Node
+            destNode = audioCtx.createMediaStreamDestination();
+
+            // Generate Fret Markers
+            generateMarkers('string-low', stringConfig.low.notes);
+            generateMarkers('string-high', stringConfig.high.notes);
+
+            setupInteractions();
+            showNotification("พร้อมเล่น! แตะที่สายเพื่อสีซอ");
+        }
+
+        function generateMarkers(elementId, notes) {
+            const container = document.getElementById(elementId);
+            notes.forEach(note => {
+                const marker = document.createElement('div');
+                marker.className = 'fret-marker';
+                marker.style.top = (note.pos * 100) + '%';
+                marker.dataset.note = note.name;
+                container.appendChild(marker);
+            });
+        }
+
+        // --- Audio Engine (Synthesizer) ---
+        function createSawVoice(freq) {
+            const t = audioCtx.currentTime;
+
+            // 1. Oscillator: Sawtooth for stringy sound
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, t);
+
+            // 2. Filter: Simulate the wooden body (Lowpass + Peaking)
+            // Cut off high harshness, boost resonance around 2000Hz for "nasal" sound
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 3000;
+            filter.Q.value = 1;
+
+            const resonance = audioCtx.createBiquadFilter();
+            resonance.type = 'peaking';
+            resonance.frequency.value = 1500;
+            resonance.Q.value = 2;
+            resonance.gain.value = 5;
+
+            // 3. Gain (Volume/Envelope)
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0, t);
+            gainNode.gain.linearRampToValueAtTime(0.5, t + 0.05); // Attack
+
+            // 4. LFO for Vibrato (adds realism)
+            const lfo = audioCtx.createOscillator();
+            lfo.frequency.value = 5; // 5Hz vibrato
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = 5; // Vibrato depth
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+            lfo.start();
+
+            // Connection Graph
+            osc.connect(filter);
+            filter.connect(resonance);
+            resonance.connect(gainNode);
+            
+            // Output to both Speakers and Recorder
+            gainNode.connect(audioCtx.destination); 
+            if(destNode) gainNode.connect(destNode);
+
+            osc.start();
+
+            return { osc, gainNode, lfo };
+        }
+
+        function stopVoice(voice) {
+            if (!voice) return;
+            const t = audioCtx.currentTime;
+            // Release envelope
+            voice.gainNode.gain.cancelScheduledValues(t);
+            voice.gainNode.gain.setValueAtTime(voice.gainNode.gain.value, t);
+            voice.gainNode.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+            
+            voice.osc.stop(t + 0.1);
+            voice.lfo.stop(t + 0.1);
+        }
+
+        function updatePitch(voice, freq) {
+            if (!voice) return;
+            // Smooth pitch slide (Glissando)
+            voice.osc.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.02);
+        }
+
+        // --- Fret Calculation ---
+        function calculateFreq(stringType, yPercent) {
+            // yPercent is 0.0 to 1.0 (top to bottom)
+            // Clamp 0-1
+            yPercent = Math.max(0, Math.min(1, yPercent));
+
+            const config = stringConfig[stringType];
+            
+            // Linear interpolation between notes for fretless feel
+            // Find the two notes we are between
+            let lowerNote = config.notes[0];
+            let upperNote = config.notes[config.notes.length - 1];
+
+            // Simple linear mapping of frequency is wrong for music (logarithmic), 
+            // but for sliding UI mapping, we map Position -> Semitones -> Frequency
+            
+            // Let's assume the neck spans about 1 octave (12 semitones)
+            // Top (0) is Base Freq. Bottom (1) is Base * 2.
+            // Using formula: f = f0 * 2^(semitones/12)
+            // Mapping 0-1 position to 0-12 semitones
+            
+            const maxSemitones = 12; 
+            const semitones = yPercent * maxSemitones;
+            
+            const freq = config.baseFreq * Math.pow(2, semitones / 12);
+            return freq;
+        }
+
+        // --- Input Handling ---
+        function setupInteractions() {
+            const strings = ['low', 'high'];
+
+            strings.forEach(strType => {
+                const el = document.getElementById(`string-${strType}`);
+                const line = el.querySelector('.string-line');
+
+                const startPlay = (e) => {
+                    e.preventDefault();
+                    if(!isAudioContextStarted) return;
+
+                    const rect = el.getBoundingClientRect();
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    const yPos = (clientY - rect.top) / rect.height; // 0 to 1
+
+                    const freq = calculateFreq(strType, yPos);
+                    
+                    if (activeVoices[strType]) {
+                        stopVoice(activeVoices[strType]);
+                    }
+                    activeVoices[strType] = createSawVoice(freq);
+                    
+                    line.classList.add('string-vibration');
+                };
+
+                const movePlay = (e) => {
+                    e.preventDefault();
+                    if (!activeVoices[strType]) return;
+
+                    const rect = el.getBoundingClientRect();
+                    // Handle multi-touch correctly would be complex, simplified for single finger per string
+                    const touch = e.touches ? Array.from(e.touches).find(t => t.target === el || el.contains(t.target)) : e;
+                    if(!touch) return;
+
+                    const clientY = touch.clientY;
+                    const yPos = (clientY - rect.top) / rect.height;
+
+                    const freq = calculateFreq(strType, yPos);
+                    updatePitch(activeVoices[strType], freq);
+                };
+
+                const endPlay = (e) => {
+                    e.preventDefault();
+                    if (activeVoices[strType]) {
+                        stopVoice(activeVoices[strType]);
+                        activeVoices[strType] = null;
+                        line.classList.remove('string-vibration');
+                    }
+                };
+
+                // Mouse Events
+                el.addEventListener('mousedown', startPlay);
+                el.addEventListener('mousemove', (e) => {
+                    if(e.buttons === 1) movePlay(e);
+                });
+                el.addEventListener('mouseup', endPlay);
+                el.addEventListener('mouseleave', endPlay);
+
+                // Touch Events
+                el.addEventListener('touchstart', startPlay, {passive: false});
+                el.addEventListener('touchmove', movePlay, {passive: false});
+                el.addEventListener('touchend', endPlay);
+                el.addEventListener('touchcancel', endPlay);
+            });
+        }
+
+        // --- UI Functions ---
+        function toggleNotes() {
+            const markers = document.querySelectorAll('.fret-marker');
+            markers.forEach(m => m.classList.toggle('show'));
+            showNotification(markers[0].classList.contains('show') ? "แสดงโน้ต" : "ซ่อนโน้ต");
+        }
+
+        function showNotification(msg) {
+            const notif = document.getElementById('notification');
+            notif.textContent = msg;
+            notif.style.opacity = 1;
+            setTimeout(() => {
+                notif.style.opacity = 0;
+            }, 2000);
+        }
+
+        // --- Recording Functions ---
+        function toggleRecording() {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        }
+
+        function startRecording() {
+            if (!destNode) return;
+            recordedChunks = [];
+            
+            // Check browser support
+            try {
+                // Use a supported mime type
+                const options = MediaRecorder.isTypeSupported('audio/webm') ? { mimeType: 'audio/webm' } : {};
+                mediaRecorder = new MediaRecorder(destNode.stream, options);
+            } catch (e) {
+                alert("เบราว์เซอร์ของคุณไม่รองรับการอัดเสียง");
+                return;
+            }
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+                document.getElementById('play-btn').disabled = false;
+                document.getElementById('download-btn').disabled = false;
+                showNotification("บันทึกเสร็จสิ้น");
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            document.getElementById('record-btn').textContent = "หยุด";
+            document.getElementById('record-btn').classList.add('recording');
+            showNotification("กำลังบันทึก...");
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                isRecording = false;
+                document.getElementById('record-btn').textContent = "อัดเสียง";
+                document.getElementById('record-btn').classList.remove('recording');
+            }
+        }
+
+        function playRecording() {
+            if (!audioBlob) return;
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            audio.play();
+            showNotification("กำลังเล่นเสียงที่อัด...");
+        }
+
+        function downloadRecording() {
+            if (!audioBlob) return;
+            const url = URL.createObjectURL(audioBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'saw_duang_recording.webm';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            showNotification("กำลังดาวน์โหลด...");
+        }
+
+    </script>
+</body>
+</html>

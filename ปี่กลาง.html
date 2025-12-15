@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ปี่กลางเสมือนจริง (Virtual Pi Klang)</title>
+    <!-- ใช้ Google Fonts เพื่อความสวยงาม -->
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS (ผ่าน CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* CSS เพิ่มเติมสำหรับการตกแต่งเฉพาะจุด */
+        body {
+            font-family: 'Sarabun', sans-serif;
+            touch-action: none; /* ป้องกันการซูมและการเลื่อนหน้าจอขณะเล่น */
+            background-color: #1a1a1a;
+            background-image: radial-gradient(#333, #000);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .pi-body {
+            /* ลายไม้จำลอง */
+            background: linear-gradient(90deg, #3e2723, #5d4037, #3e2723);
+            box-shadow: inset 0 0 20px #000, 5px 5px 15px rgba(0,0,0,0.5);
+            border-radius: 50px;
+            position: relative;
+        }
+
+        .finger-hole {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #555, #000);
+            border: 2px solid #8d6e63;
+            box-shadow: inset 2px 2px 5px #000, 0 0 5px rgba(255,255,255,0.1);
+            transition: transform 0.1s, background 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255, 255, 255, 0.7);
+            font-weight: bold;
+            font-size: 1.2rem;
+            user-select: none;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .finger-hole.active {
+            transform: scale(0.9);
+            background: radial-gradient(circle at 30% 30%, #333, #000);
+            border-color: #d7ccc8;
+            color: #ffeb3b; /* สีเหลืองทองเมื่อกด */
+            box-shadow: 0 0 15px #ffeb3b;
+        }
+
+        /* เอฟเฟกต์บวมตรงกลางปี่ (The bulge of the Pi) */
+        .pi-bulge {
+            position: absolute;
+            top: 10%;
+            left: -5px;
+            right: -5px;
+            height: 20px;
+            background: #4e342e;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+        
+        .pi-bell {
+            /* ปากลำโพงปี่ */
+            background: linear-gradient(180deg, #3e2723, #281a16);
+            border-top: 4px solid #5d4037;
+        }
+
+        /* Animation for Recording */
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+        }
+        .recording-active {
+            animation: pulse-red 1.5s infinite;
+            background-color: #ef4444 !important;
+            color: white !important;
+        }
+
+        /* Overlay สำหรับเริ่มใช้งาน */
+        #start-overlay {
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen text-white">
+
+    <!-- Header / Control Panel -->
+    <header class="flex-none bg-gray-900 p-4 shadow-lg z-20">
+        <div class="flex justify-between items-center max-w-md mx-auto">
+            <div>
+                <h1 class="text-xl font-bold text-yellow-500">ปี่กลาง (Pi Klang)</h1>
+                <div id="note-display" class="text-sm text-gray-400 h-5">รอคำสั่ง...</div>
+            </div>
+            <div class="flex space-x-2">
+                <button id="record-btn" class="bg-gray-700 hover:bg-gray-600 text-white rounded-full p-3 transition focus:outline-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                </button>
+                <button id="play-btn" class="bg-gray-700 hover:bg-gray-600 text-white rounded-full p-3 transition focus:outline-none hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </button>
+                <button id="download-btn" class="bg-gray-700 hover:bg-gray-600 text-white rounded-full p-3 transition focus:outline-none hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Instrument Area -->
+    <main class="flex-grow flex items-center justify-center relative overflow-y-auto py-4">
+        <!-- ตัวปี่ (The Body) -->
+        <div class="pi-body w-24 md:w-32 h-full max-h-[700px] flex flex-col items-center justify-between py-6 relative">
+            
+            <!-- ส่วนบน (ลิ้นปี่จำลอง - Visual Only) -->
+            <div class="absolute -top-4 w-4 h-8 bg-yellow-700 rounded-sm"></div>
+            <div class="pi-bulge"></div>
+
+            <!-- รูนิ้ว (Finger Holes) -->
+            <!-- ใช้ Flex column และ space-even เพื่อกระจายรู -->
+            <div class="flex flex-col items-center justify-center space-y-3 w-full h-full pt-4">
+                
+                <!-- High Register Notes -->
+                <div class="finger-hole" data-note="Re5" data-freq="587.33">รํ</div> <!-- เร สูง -->
+                <div class="finger-hole" data-note="Do5" data-freq="523.25">ดํ</div> <!-- โด สูง -->
+                
+                <!-- Middle Register -->
+                <div class="finger-hole" data-note="Ti4" data-freq="493.88">ท</div>
+                <div class="finger-hole" data-note="La4" data-freq="440.00">ล</div>
+                <div class="finger-hole" data-note="Sol4" data-freq="392.00">ซ</div>
+                <div class="finger-hole" data-note="Fa4" data-freq="349.23">ฟ</div>
+                <div class="finger-hole" data-note="Mi4" data-freq="329.63">ม</div>
+                <div class="finger-hole" data-note="Re4" data-freq="293.66">ร</div>
+                <div class="finger-hole" data-note="Do4" data-freq="261.63">ด</div>
+            </div>
+
+            <!-- ปากลำโพง (Bell) -->
+            <div class="pi-bell w-32 md:w-40 h-16 absolute -bottom-16 rounded-b-3xl shadow-2xl"></div>
+        </div>
+    </main>
+
+    <!-- Start Overlay (จำเป็นสำหรับ Web Audio API) -->
+    <div id="start-overlay" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center cursor-pointer">
+        <div class="text-center p-6 bg-gray-800 rounded-xl border border-yellow-600 shadow-2xl animate-bounce">
+            <h2 class="text-2xl font-bold text-yellow-500 mb-2">แตะเพื่อเริ่มเป่าปี่</h2>
+            <p class="text-gray-300">Tap to Start</p>
+        </div>
+    </div>
+
+    <!-- Audio Player (Hidden) -->
+    <audio id="audio-playback" controls class="hidden"></audio>
+
+    <script>
+        // --- 1. Audio Engine Setup (Web Audio API) ---
+        let audioCtx;
+        let masterGain;
+        let compressor;
+        let recorder;
+        let recordedChunks = [];
+        let isRecording = false;
+        let dest; // MediaStreamDestination for recording
+
+        // Oscillator State
+        let activeOscillator = null;
+        let activeGain = null;
+
+        // Initialize Audio Context (Must be triggered by user interaction)
+        async function initAudio() {
+            if (audioCtx) return;
+            
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            
+            // Master Volume
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.5;
+
+            // Compressor to prevent clipping and smoothen sound
+            compressor = audioCtx.createDynamicsCompressor();
+            compressor.threshold.value = -10;
+            compressor.knee.value = 40;
+            compressor.ratio.value = 12;
+            compressor.attack.value = 0;
+            compressor.release.value = 0.25;
+
+            // Setup Recording Destination
+            dest = audioCtx.createMediaStreamDestination();
+
+            // Connect Graph: Master -> Compressor -> [Speakers & Recorder]
+            masterGain.connect(compressor);
+            compressor.connect(audioCtx.destination);
+            compressor.connect(dest);
+
+            console.log("Audio Engine Started");
+        }
+
+        // --- 2. Synthesizer Logic (Creating the Pi Sound) ---
+        function playNote(freq) {
+            if (!audioCtx) return;
+            
+            // Stop previous note slightly (monophonic instrument style)
+            if (activeOscillator) {
+                stopNote(false); // false = don't full kill, overlap slightly
+            }
+
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            const filterNode = audioCtx.createBiquadFilter();
+
+            // Pi Sound Simulation
+            // 1. Waveform: Sawtooth is best for reed instruments.
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+            // 2. Filter: Lowpass to simulate the wooden body resonance.
+            filterNode.type = 'lowpass';
+            filterNode.frequency.setValueAtTime(2000, audioCtx.currentTime);
+            filterNode.Q.value = 2; // Resonance
+
+            // 3. Envelope (ADSR) - Fast attack, full sustain
+            gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(1, audioCtx.currentTime + 0.05); // Attack
+
+            // 4. Connect: Osc -> Filter -> Gain -> Master
+            osc.connect(filterNode);
+            filterNode.connect(gainNode);
+            gainNode.connect(masterGain);
+
+            osc.start();
+
+            activeOscillator = osc;
+            activeGain = gainNode;
+        }
+
+        function stopNote(fullStop = true) {
+            if (activeOscillator && activeGain) {
+                const now = audioCtx.currentTime;
+                // Release: Fast fade out to avoid clicking
+                activeGain.gain.cancelScheduledValues(now);
+                activeGain.gain.setValueAtTime(activeGain.gain.value, now);
+                activeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                
+                const oldOsc = activeOscillator;
+                oldOsc.stop(now + 0.1);
+                
+                if (fullStop) {
+                    activeOscillator = null;
+                    activeGain = null;
+                }
+            }
+        }
+
+        // --- 3. UI & Interaction Logic ---
+        const holes = document.querySelectorAll('.finger-hole');
+        const display = document.getElementById('note-display');
+        const overlay = document.getElementById('start-overlay');
+
+        // Start Audio on first click
+        overlay.addEventListener('click', async () => {
+            await initAudio();
+            if (audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+            }
+            overlay.classList.add('hidden');
+        });
+
+        // Touch/Mouse Handlers
+        function handleInputStart(e) {
+            e.preventDefault(); // Prevent scrolling
+            if (!audioCtx) return;
+
+            // Handle Multi-touch logic if needed, but Pi is monophonic.
+            // We take the target that triggered the event.
+            const target = e.target.closest('.finger-hole');
+            if (target) {
+                const freq = parseFloat(target.dataset.freq);
+                const noteName = target.innerText;
+                
+                // Visual feedback
+                holes.forEach(h => h.classList.remove('active'));
+                target.classList.add('active');
+                display.innerText = `กำลังเป่า: ${noteName}`;
+
+                playNote(freq);
+            }
+        }
+
+        function handleInputEnd(e) {
+            e.preventDefault();
+            // Check if any fingers are still touching OTHER buttons (optional complex logic)
+            // Simple version: stop if the finger lifts
+            const target = e.target.closest('.finger-hole');
+            if (target) {
+                target.classList.remove('active');
+                display.innerText = "หยุด";
+                stopNote();
+            }
+        }
+
+        // Attach events to all holes
+        holes.forEach(hole => {
+            // Touch events for mobile
+            hole.addEventListener('touchstart', handleInputStart, {passive: false});
+            hole.addEventListener('touchend', handleInputEnd, {passive: false});
+            hole.addEventListener('touchcancel', handleInputEnd, {passive: false});
+
+            // Mouse events for desktop
+            hole.addEventListener('mousedown', handleInputStart);
+            hole.addEventListener('mouseup', handleInputEnd);
+            hole.addEventListener('mouseleave', handleInputEnd);
+        });
+
+
+        // --- 4. Recording Logic ---
+        const recordBtn = document.getElementById('record-btn');
+        const playBtn = document.getElementById('play-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        const audioPlayback = document.getElementById('audio-playback');
+        let audioBlob = null;
+
+        recordBtn.addEventListener('click', () => {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        });
+
+        function startRecording() {
+            if(!audioCtx) return;
+            
+            recordedChunks = [];
+            // Try specific mimeTypes for better browser compatibility
+            const options = { mimeType: 'audio/webm' };
+            
+            try {
+                recorder = new MediaRecorder(dest.stream, options);
+            } catch (e) {
+                // Fallback if webm not supported
+                recorder = new MediaRecorder(dest.stream);
+            }
+
+            recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    recordedChunks.push(e.data);
+                }
+            };
+
+            recorder.onstop = () => {
+                audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                audioPlayback.src = audioUrl;
+                
+                // Show Play/Download buttons
+                playBtn.classList.remove('hidden');
+                downloadBtn.classList.remove('hidden');
+                display.innerText = "บันทึกเสร็จสิ้น";
+            };
+
+            recorder.start();
+            isRecording = true;
+            
+            // UI Updates
+            recordBtn.classList.add('recording-active');
+            playBtn.classList.add('hidden');
+            downloadBtn.classList.add('hidden');
+            display.innerText = "กำลังอัดเสียง...";
+        }
+
+        function stopRecording() {
+            if(recorder && isRecording) {
+                recorder.stop();
+                isRecording = false;
+                recordBtn.classList.remove('recording-active');
+            }
+        }
+
+        playBtn.addEventListener('click', () => {
+            if (audioPlayback.paused) {
+                audioPlayback.play();
+                display.innerText = "กำลังเล่นเสียงที่อัด...";
+                playBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`; // Pause Icon
+            } else {
+                audioPlayback.pause();
+                display.innerText = "หยุดเล่น";
+                playBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`; // Play Icon
+            }
+        });
+
+        audioPlayback.onended = () => {
+            playBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+            display.innerText = "เล่นจบแล้ว";
+        };
+
+        downloadBtn.addEventListener('click', () => {
+            if (audioBlob) {
+                const url = URL.createObjectURL(audioBlob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'my-pi-sound.webm';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+            }
+        });
+
+    </script>
+</body>
+</html>

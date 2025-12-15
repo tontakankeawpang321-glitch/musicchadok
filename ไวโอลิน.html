@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Virtual Violin Pro - บันทึกเสียงได้</title>
+    <style>
+        :root {
+            --wood-dark: #3e2723;
+            --wood-light: #5d4037;
+            --wood-texture: #8d6e63;
+            --string-color: #c0c0c0;
+            --fingerboard-color: #1a1a1a;
+            --active-glow: #ffd700;
+            --record-red: #ff4444;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #121212;
+            color: white;
+            font-family: 'Sarabun', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none; 
+        }
+
+        header {
+            padding: 10px;
+            text-align: center;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: #deb887;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        p {
+            margin: 5px 0 0;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        /* Controls Area */
+        #controls {
+            margin-top: 10px;
+            pointer-events: auto; /* Enable clicks */
+            z-index: 20;
+        }
+
+        #record-btn {
+            background-color: #333;
+            color: white;
+            border: 2px solid #555;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+            outline: none;
+        }
+
+        #record-btn.recording {
+            background-color: var(--record-red);
+            border-color: var(--record-red);
+            animation: pulse-red 1.5s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
+        }
+
+        .rec-icon {
+            width: 12px;
+            height: 12px;
+            background-color: var(--record-red);
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        #record-btn.recording .rec-icon {
+            background-color: white;
+            border-radius: 2px; /* Square for stop */
+        }
+
+        /* Violin Body/Neck Container */
+        #violin-container {
+            position: relative;
+            width: 95%;
+            max-width: 500px;
+            flex-grow: 1;
+            margin: 10px 0 20px 0;
+            background: linear-gradient(to bottom, var(--wood-dark), var(--wood-light));
+            border-radius: 15px 15px 50px 50px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            overflow: hidden;
+            border: 4px solid #2a1b15;
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* The Fingerboard (Black part) */
+        #fingerboard {
+            width: 80%;
+            height: 100%;
+            background-color: var(--fingerboard-color);
+            position: relative;
+            display: flex;
+            justify-content: space-around;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 100% 12%; 
+        }
+
+        /* Strings */
+        .string-lane {
+            position: relative;
+            width: 25%;
+            height: 100%;
+            border-right: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .string-lane:last-child {
+            border-right: none;
+        }
+
+        /* The physical string line */
+        .string-wire {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 2px;
+            background: linear-gradient(to right, #999, #fff, #999);
+            transform: translateX(-50%);
+            pointer-events: none;
+            z-index: 5;
+            box-shadow: 2px 0 4px rgba(0,0,0,0.5);
+        }
+
+        /* String Thickness variation */
+        .s-G .string-wire { width: 4px; } 
+        .s-D .string-wire { width: 3px; }
+        .s-A .string-wire { width: 2px; }
+        .s-E .string-wire { width: 1.5px; } 
+
+        /* Interaction Zones (Notes) */
+        .note-zone {
+            flex-grow: 1;
+            width: 100%;
+            border-bottom: 1px dashed rgba(255,255,255,0.1);
+            position: relative;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.05s;
+        }
+
+        .note-zone span {
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.3);
+            pointer-events: none;
+            z-index: 6;
+            font-weight: bold;
+        }
+
+        /* Active State (Pressed) */
+        .note-zone.active {
+            background: radial-gradient(circle, rgba(255, 215, 0, 0.4) 0%, transparent 70%);
+        }
+
+        .note-zone.active span {
+            color: #fff;
+            text-shadow: 0 0 5px gold;
+        }
+
+        /* String Vibration Animation */
+        @keyframes vibrate {
+            0% { transform: translateX(-50%) translateX(0); }
+            25% { transform: translateX(-50%) translateX(-1px); }
+            75% { transform: translateX(-50%) translateX(1px); }
+            100% { transform: translateX(-50%) translateX(0); }
+        }
+
+        .string-lane.vibrating .string-wire {
+            animation: vibrate 0.1s infinite linear;
+            background: #fff;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+        }
+
+        /* Bridge Area */
+        #bridge {
+            position: absolute;
+            bottom: 50px;
+            width: 90%;
+            height: 15px;
+            background: #4a3b2a;
+            border-radius: 5px;
+            z-index: 4;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+
+        /* Start Button overlay */
+        #start-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        #start-btn {
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            background: #deb887;
+            color: #3e2723;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 0 20px rgba(222, 184, 135, 0.5);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(222, 184, 135, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(222, 184, 135, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(222, 184, 135, 0); }
+        }
+
+        .string-label {
+            position: absolute;
+            top: -25px;
+            width: 100%;
+            text-align: center;
+            color: #deb887;
+            font-weight: bold;
+            pointer-events: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🎻 Violin Pro (Recorder)</h1>
+        <p>เล่นพร้อมกันได้หลายนิ้ว | บันทึกเสียงได้</p>
+    </header>
+
+    <div id="controls">
+        <button id="record-btn">
+            <span class="rec-icon"></span>
+            <span id="rec-text">บันทึกเสียง</span>
+        </button>
+    </div>
+
+    <div id="violin-container">
+        <!-- Visual Bridge -->
+        <div id="bridge" style="bottom: 0; height: 10px;"></div>
+
+        <div id="fingerboard">
+            
+            <!-- String G (Low) -->
+            <div class="string-lane s-G" data-string="G">
+                <div class="string-label">G</div>
+                <div class="string-wire"></div>
+                <div class="note-zone" data-note="G3"><span>G</span></div>
+                <div class="note-zone" data-note="A3"><span>A</span></div>
+                <div class="note-zone" data-note="B3"><span>B</span></div>
+                <div class="note-zone" data-note="C4"><span>C</span></div>
+                <div class="note-zone" data-note="D4"><span>D</span></div>
+                <div class="note-zone" data-note="E4"><span>E</span></div>
+                <div class="note-zone" data-note="F4"><span>F</span></div>
+            </div>
+
+            <!-- String D -->
+            <div class="string-lane s-D" data-string="D">
+                <div class="string-label">D</div>
+                <div class="string-wire"></div>
+                <div class="note-zone" data-note="D4"><span>D</span></div>
+                <div class="note-zone" data-note="E4"><span>E</span></div>
+                <div class="note-zone" data-note="F#4"><span>F#</span></div>
+                <div class="note-zone" data-note="G4"><span>G</span></div>
+                <div class="note-zone" data-note="A4"><span>A</span></div>
+                <div class="note-zone" data-note="B4"><span>B</span></div>
+                <div class="note-zone" data-note="C5"><span>C</span></div>
+            </div>
+
+            <!-- String A -->
+            <div class="string-lane s-A" data-string="A">
+                <div class="string-label">A</div>
+                <div class="string-wire"></div>
+                <div class="note-zone" data-note="A4"><span>A</span></div>
+                <div class="note-zone" data-note="B4"><span>B</span></div>
+                <div class="note-zone" data-note="C#5"><span>C#</span></div>
+                <div class="note-zone" data-note="D5"><span>D</span></div>
+                <div class="note-zone" data-note="E5"><span>E</span></div>
+                <div class="note-zone" data-note="F#5"><span>F#</span></div>
+                <div class="note-zone" data-note="G5"><span>G</span></div>
+            </div>
+
+            <!-- String E (High) -->
+            <div class="string-lane s-E" data-string="E">
+                <div class="string-label">E</div>
+                <div class="string-wire"></div>
+                <div class="note-zone" data-note="E5"><span>E</span></div>
+                <div class="note-zone" data-note="F#5"><span>F#</span></div>
+                <div class="note-zone" data-note="G#5"><span>G#</span></div>
+                <div class="note-zone" data-note="A5"><span>A</span></div>
+                <div class="note-zone" data-note="B5"><span>B</span></div>
+                <div class="note-zone" data-note="C#6"><span>C#</span></div>
+                <div class="note-zone" data-note="D6"><span>D</span></div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="start-overlay">
+        <button id="start-btn">🎵 แตะเพื่อเริ่มเล่น</button>
+        <p style="margin-top:15px; color:#ccc;">รองรับ Multi-touch</p>
+    </div>
+
+    <script>
+        // Note Frequencies
+        const noteFreqs = {
+            "G3": 196.00, "G#3": 207.65, "A3": 220.00, "A#3": 233.08, "B3": 246.94,
+            "C4": 261.63, "C#4": 277.18, "D4": 293.66, "D#4": 311.13, "E4": 329.63,
+            "F4": 349.23, "F#4": 369.99, "G4": 392.00, "G#4": 415.30, "A4": 440.00,
+            "A#4": 466.16, "B4": 493.88, "C5": 523.25, "C#5": 554.37, "D5": 587.33,
+            "D#5": 622.25, "E5": 659.25, "F5": 698.46, "F#5": 739.99, "G5": 783.99,
+            "G#5": 830.61, "A5": 880.00, "A#5": 932.33, "B5": 987.77, "C6": 1046.50,
+            "C#6": 1108.73, "D6": 1174.66
+        };
+
+        let audioCtx;
+        let mainCompressor;
+        let mediaStreamDest;
+        let mediaRecorder;
+        let recordedChunks = [];
+        let isRecording = false;
+
+        const activeNotes = new Map(); 
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Compressor chain
+                mainCompressor = audioCtx.createDynamicsCompressor();
+                mainCompressor.threshold.setValueAtTime(-24, audioCtx.currentTime);
+                mainCompressor.knee.setValueAtTime(30, audioCtx.currentTime);
+                mainCompressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+                mainCompressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+                mainCompressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+                
+                // 1. Connect to Speakers
+                mainCompressor.connect(audioCtx.destination);
+
+                // 2. Connect to Recorder Destination
+                mediaStreamDest = audioCtx.createMediaStreamDestination();
+                mainCompressor.connect(mediaStreamDest);
+
+                // Setup Recorder
+                try {
+                    mediaRecorder = new MediaRecorder(mediaStreamDest.stream);
+                    
+                    mediaRecorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) {
+                            recordedChunks.push(e.data);
+                        }
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                        const url = URL.createObjectURL(blob);
+                        
+                        // Create download link
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        // Timestamp in filename
+                        const date = new Date();
+                        const timestamp = `${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`;
+                        a.download = `violin-recording-${timestamp}.webm`;
+                        
+                        document.body.appendChild(a);
+                        a.click();
+                        
+                        setTimeout(() => {
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(url);
+                        }, 100);
+                        
+                        recordedChunks = []; // Reset chunks
+                    };
+                } catch (e) {
+                    console.error("MediaRecorder not supported", e);
+                    document.getElementById('record-btn').style.display = 'none';
+                }
+            }
+
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            document.getElementById('start-overlay').style.display = 'none';
+        });
+
+        // Recording Button Logic
+        const recordBtn = document.getElementById('record-btn');
+        const recText = document.getElementById('rec-text');
+
+        recordBtn.addEventListener('click', () => {
+            if (!mediaRecorder) return;
+
+            if (!isRecording) {
+                // Start Recording
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                
+                recordedChunks = [];
+                mediaRecorder.start();
+                isRecording = true;
+                
+                // UI Update
+                recordBtn.classList.add('recording');
+                recText.textContent = "หยุดและบันทึก";
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                
+                // UI Update
+                recordBtn.classList.remove('recording');
+                recText.textContent = "บันทึกเสียง";
+            }
+        });
+
+        function playNote(frequency, id) {
+            if (!audioCtx) return;
+            if (activeNotes.has(id)) return;
+
+            const t = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(frequency, t);
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(2200, t);
+            filter.Q.value = 1;
+
+            const lfo = audioCtx.createOscillator();
+            lfo.type = 'sine';
+            lfo.frequency.value = 6; 
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = frequency * 0.01; 
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+            lfo.start(t);
+
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0, t);
+            gainNode.gain.linearRampToValueAtTime(0.4, t + 0.05); 
+            
+            osc.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(mainCompressor); // Goes to both speakers and recorder
+
+            osc.start(t);
+            activeNotes.set(id, { osc, gainNode, lfo, lfoGain, filter });
+        }
+
+        function stopNote(id) {
+            if (!audioCtx || !activeNotes.has(id)) return;
+            const nodes = activeNotes.get(id);
+            const t = audioCtx.currentTime;
+
+            const releaseTime = 0.4;
+            nodes.gainNode.gain.cancelScheduledValues(t);
+            nodes.gainNode.gain.setValueAtTime(nodes.gainNode.gain.value, t);
+            nodes.gainNode.gain.exponentialRampToValueAtTime(0.001, t + releaseTime);
+
+            nodes.osc.stop(t + releaseTime);
+            nodes.lfo.stop(t + releaseTime);
+
+            setTimeout(() => {
+                nodes.osc.disconnect();
+                nodes.lfo.disconnect();
+                nodes.lfoGain.disconnect();
+                nodes.filter.disconnect();
+                nodes.gainNode.disconnect();
+            }, (releaseTime * 1000) + 100);
+
+            activeNotes.delete(id);
+        }
+
+        const noteZones = document.querySelectorAll('.note-zone');
+
+        function updateVisuals(element, isActive) {
+            const stringLane = element.closest('.string-lane');
+            if (isActive) {
+                element.classList.add('active');
+                stringLane.classList.add('vibrating');
+            } else {
+                element.classList.remove('active');
+                const activeSiblings = stringLane.querySelectorAll('.note-zone.active');
+                if (activeSiblings.length === 0) {
+                    stringLane.classList.remove('vibrating');
+                }
+            }
+        }
+
+        let isMouseDown = false;
+
+        noteZones.forEach(zone => {
+            const note = zone.dataset.note;
+            const freq = noteFreqs[note];
+
+            zone.addEventListener('mousedown', (e) => {
+                isMouseDown = true;
+                handleInputStart('mouse', zone, freq);
+            });
+            zone.addEventListener('mouseenter', (e) => {
+                if(isMouseDown) handleInputStart('mouse', zone, freq);
+            });
+            zone.addEventListener('mouseleave', (e) => {
+                if(isMouseDown) handleInputEnd('mouse', zone);
+            });
+            zone.addEventListener('mouseup', (e) => {
+                isMouseDown = false;
+                handleInputEnd('mouse', zone);
+            });
+
+            zone.addEventListener('touchstart', (e) => {
+                e.preventDefault(); 
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const t = e.changedTouches[i];
+                    handleInputStart('touch-' + t.identifier, zone, freq);
+                }
+            }, {passive: false});
+
+            zone.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const t = e.changedTouches[i];
+                    handleInputEnd('touch-' + t.identifier, zone);
+                }
+            }, {passive: false});
+
+            zone.addEventListener('touchcancel', (e) => {
+                e.preventDefault();
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const t = e.changedTouches[i];
+                    handleInputEnd('touch-' + t.identifier, zone);
+                }
+            }, {passive: false});
+        });
+
+        document.addEventListener('mouseup', () => {
+            if(isMouseDown) {
+                isMouseDown = false;
+                stopNote('mouse');
+                document.querySelectorAll('.note-zone.active').forEach(z => {
+                     z.classList.remove('active');
+                     z.closest('.string-lane').classList.remove('vibrating');
+                });
+            }
+        });
+
+        function handleInputStart(id, element, freq) {
+            updateVisuals(element, true);
+            playNote(freq, id);
+        }
+
+        function handleInputEnd(id, element) {
+            updateVisuals(element, false);
+            stopNote(id);
+        }
+
+        document.addEventListener('contextmenu', e => e.preventDefault());
+
+    </script>
+</body>
+</html>

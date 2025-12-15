@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ฆ้องวงเล็กจำลอง (Virtual Khong Wong Lek)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #1a1510; /* Dark wood tone */
+            background-image: radial-gradient(circle at 50% 50%, #2c241b 0%, #0f0c09 100%);
+            overflow: hidden; /* Prevent scroll */
+            touch-action: none; /* Disable default touch actions */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Wood Texture Effect */
+        .wood-frame {
+            background: #5d4037;
+            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 2px, transparent 2px, transparent 4px),
+                              linear-gradient(to bottom, #4e342e, #3e2723);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 10px 20px rgba(0,0,0,0.5);
+            border-radius: 50% 50% 0 0 / 100% 100% 0 0; /* Horseshoe-ish base */
+        }
+
+        /* Gong Styles */
+        .gong-btn {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #ffd700, #b8860b, #5c4010);
+            box-shadow: 2px 5px 10px rgba(0,0,0,0.6), inset 0 0 5px rgba(255,255,255,0.4);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.05s;
+            touch-action: none;
+            z-index: 10;
+        }
+
+        /* The "Boss" (Nipple) of the Gong */
+        .gong-boss {
+            width: 35%;
+            height: 35%;
+            background: radial-gradient(circle at 30% 30%, #ffe44d, #d4af37, #8b4513);
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: #3e2723;
+            font-size: 0.8rem;
+            pointer-events: none; /* Let click pass through to parent */
+        }
+
+        .gong-btn:active, .gong-btn.active-hit {
+            transform: scale(0.92);
+            filter: brightness(1.2);
+        }
+
+        .control-btn {
+            @apply px-4 py-2 rounded-full font-bold text-white shadow-lg transform transition active:scale-95 text-sm sm:text-base;
+            backdrop-filter: blur(5px);
+        }
+
+        #visualizer {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            z-index: 0;
+        }
+        
+        #visualizer-bar {
+            height: 100%;
+            background: #ffd700;
+            width: 0%;
+            transition: width 0.1s;
+        }
+
+        /* Layout Container for the Horseshoe */
+        #instrument-container {
+            width: 95vmin;
+            height: 95vmin;
+            max-width: 600px;
+            max-height: 600px;
+            position: relative;
+            margin: 0 auto;
+        }
+
+        .recorder-status {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* Hidden initially to force interaction for AudioContext */
+        #start-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+        }
+    </style>
+</head>
+<body class="h-[100dvh] w-full flex flex-col items-center justify-between p-2">
+
+    <!-- Top Controls -->
+    <div class="w-full flex justify-between items-center px-4 py-2 z-20 relative">
+        <div class="flex gap-2">
+            <button id="toggle-notes" class="control-btn bg-yellow-700/80 border border-yellow-500">
+                แสดงโน้ต
+            </button>
+        </div>
+        <div class="flex gap-2 items-center">
+            <span id="rec-timer" class="text-red-400 font-mono text-sm hidden">00:00</span>
+            <button id="btn-record" class="control-btn bg-red-600/80 border border-red-400">
+                🔴 อัดเสียง
+            </button>
+            <button id="btn-play" class="control-btn bg-green-600/80 border border-green-400 hidden">
+                ▶ เล่น
+            </button>
+            <button id="btn-download" class="control-btn bg-blue-600/80 border border-blue-400 hidden">
+                ⬇ โหลด
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Instrument Area -->
+    <div class="flex-grow flex items-center justify-center w-full relative">
+        <!-- Visual wood frame background (C-shape) -->
+        <div id="wood-frame" class="absolute w-[90vmin] h-[90vmin] max-w-[550px] max-h-[550px] rounded-full border-[40px] border-[#4e342e] border-b-transparent rotate-45 opacity-50 shadow-2xl pointer-events-none transform translate-y-10"></div>
+        
+        <!-- The actual container for positioning gongs -->
+        <div id="instrument-container">
+            <!-- Gongs will be injected here via JS -->
+        </div>
+    </div>
+
+    <!-- Start Overlay for AudioContext Policy -->
+    <div id="start-overlay">
+        <div class="text-2xl font-bold mb-4">ฆ้องวงเล็ก (Khong Wong Lek)</div>
+        <div class="text-gray-300 mb-8 text-center px-4">แตะเพื่อเริ่มใช้งาน<br>(Touch to Start)</div>
+        <button id="start-btn" class="px-8 py-4 bg-yellow-600 rounded-full text-xl font-bold text-white shadow-xl animate-bounce">
+            เริ่มเล่น
+        </button>
+    </div>
+
+    <!-- Audio Visualizer Line -->
+    <div id="visualizer"><div id="visualizer-bar"></div></div>
+
+    <script>
+        // --- Configuration ---
+        const TOTAL_GONGS = 18;
+        const START_ANGLE = 200; // Degrees
+        const END_ANGLE = -20;   // Degrees
+        
+        // Thai Tuning (Approximately 7-tone equal temperament)
+        // Base freq roughly around C5 for Khong Wong Lek (High circle)
+        // Formula: f = base * (2 ^ (n / 7))
+        const BASE_FREQ = 523.25; // C5
+        
+        let audioCtx;
+        let masterGain;
+        let noteLabelsVisible = true;
+        
+        // Recorder Variables
+        let mediaRecorder;
+        let audioChunks = [];
+        let destNode; // MediaStreamDestination
+        let audioBlob;
+        let audioUrl;
+        let playbackAudio;
+        let isRecording = false;
+        let startTime;
+        let timerInterval;
+
+        // --- DOM Elements ---
+        const container = document.getElementById('instrument-container');
+        const startOverlay = document.getElementById('start-overlay');
+        const startBtn = document.getElementById('start-btn');
+        const btnToggleNotes = document.getElementById('toggle-notes');
+        const btnRecord = document.getElementById('btn-record');
+        const btnPlay = document.getElementById('btn-play');
+        const btnDownload = document.getElementById('btn-download');
+        const recTimer = document.getElementById('rec-timer');
+        const visualizerBar = document.getElementById('visualizer-bar');
+
+        // --- Initialization ---
+        startBtn.addEventListener('click', async () => {
+            initAudio();
+            startOverlay.style.opacity = '0';
+            setTimeout(() => startOverlay.remove(), 500);
+        });
+
+        function initAudio() {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.8; // Master volume
+            
+            // Setup recording destination
+            destNode = audioCtx.createMediaStreamDestination();
+            masterGain.connect(audioCtx.destination); // Speaker
+            masterGain.connect(destNode); // Recorder
+            
+            renderGongs();
+        }
+
+        // --- Audio Synthesis (Physical Modeling-ish) ---
+        function playGong(index) {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            // Calculate Frequency (Thai 7-tone scale)
+            // Khong Wong Lek usually has 18 gongs.
+            // Using 7-TET relative to base frequency
+            const freq = BASE_FREQ * Math.pow(2, index / 7);
+
+            const t = audioCtx.currentTime;
+            const duration = 2.0;
+
+            // 1. Fundamental Tone (Sine) - Body
+            const osc1 = audioCtx.createOscillator();
+            const gain1 = audioCtx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(freq, t);
+            
+            gain1.gain.setValueAtTime(0, t);
+            gain1.gain.linearRampToValueAtTime(0.5, t + 0.005); // Attack
+            gain1.gain.exponentialRampToValueAtTime(0.001, t + duration); // Decay
+
+            // 2. Overtone (Triangle) - Metallic Ring
+            // Non-integer multiples create metallic/bell sound
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.type = 'triangle';
+            osc2.frequency.setValueAtTime(freq * 2.02, t); // Detuned octave
+            
+            gain2.gain.setValueAtTime(0, t);
+            gain2.gain.linearRampToValueAtTime(0.2, t + 0.005);
+            gain2.gain.exponentialRampToValueAtTime(0.001, t + duration * 0.6);
+
+            // 3. High Inharmonic (Sine) - The "Ping"
+            const osc3 = audioCtx.createOscillator();
+            const gain3 = audioCtx.createGain();
+            osc3.type = 'sine';
+            osc3.frequency.setValueAtTime(freq * 3.5, t); 
+            
+            gain3.gain.setValueAtTime(0, t);
+            gain3.gain.linearRampToValueAtTime(0.1, t + 0.002);
+            gain3.gain.exponentialRampToValueAtTime(0.001, t + 0.3); // Very short
+
+            // Connect graph
+            osc1.connect(gain1);
+            osc2.connect(gain2);
+            osc3.connect(gain3);
+
+            gain1.connect(masterGain);
+            gain2.connect(masterGain);
+            gain3.connect(masterGain);
+
+            // Start/Stop
+            osc1.start(t);
+            osc2.start(t);
+            osc3.start(t);
+            
+            osc1.stop(t + duration);
+            osc2.stop(t + duration);
+            osc3.stop(t + duration);
+
+            // Cleanup
+            setTimeout(() => {
+                gain1.disconnect();
+                gain2.disconnect();
+                gain3.disconnect();
+            }, duration * 1000 + 100);
+
+            // Visualizer Kick
+            visualizerBar.style.width = '100%';
+            setTimeout(() => visualizerBar.style.width = '0%', 100);
+        }
+
+        // --- Rendering the Instrument ---
+        function renderGongs() {
+            container.innerHTML = '';
+            
+            // Calculate geometry
+            // Khong Wong Lek is a circle, player sits in center (or slightly off).
+            // Gongs 0 (lowest/left) to 17 (highest/right)
+            
+            // Layout Logic:
+            // We want a C-shape.
+            // Let's use polar coordinates.
+            
+            const radiusX = 42; // % of container
+            const radiusY = 38; // % of container
+            const centerX = 50; // %
+            const centerY = 55; // % (Push down slightly)
+
+            for (let i = 0; i < TOTAL_GONGS; i++) {
+                const gong = document.createElement('div');
+                gong.className = 'gong-btn';
+                
+                // Scale gongs: Lower pitch = bigger gong (slightly)
+                const size = 14 - (i * 0.2); // vmin unit roughly
+                gong.style.width = `${size}%`;
+                gong.style.height = `${size}%`; // Keep aspect ratio via JS logic if needed, but % of square container works
+
+                // Calculate Angle
+                const totalRange = START_ANGLE - END_ANGLE;
+                const step = totalRange / (TOTAL_GONGS - 1);
+                const angleDeg = START_ANGLE - (step * i);
+                const angleRad = (angleDeg * Math.PI) / 180;
+
+                // Polar to Cartesian
+                // Note: Math.cos is x, Math.sin is y. 
+                // Adjust for CSS coordinate system (Top-Left is 0,0)
+                const x = centerX + (radiusX * Math.cos(angleRad));
+                const y = centerY - (radiusY * Math.sin(angleRad)); // Minus because CSS Y goes down
+
+                gong.style.left = `${x}%`;
+                gong.style.top = `${y}%`;
+                // Centering the element on its coordinate
+                gong.style.transform = 'translate(-50%, -50%)';
+
+                // Inner content (Boss)
+                const boss = document.createElement('div');
+                boss.className = 'gong-boss';
+                boss.innerText = noteLabelsVisible ? (i + 1) : ''; // Thai numerals could be used here
+                gong.appendChild(boss);
+
+                // Interaction
+                const triggerSound = (e) => {
+                    e.preventDefault(); // Prevent scroll/zoom
+                    playGong(i);
+                    gong.classList.add('active-hit');
+                    setTimeout(() => gong.classList.remove('active-hit'), 100);
+                };
+
+                gong.addEventListener('touchstart', triggerSound, {passive: false});
+                gong.addEventListener('mousedown', triggerSound);
+
+                container.appendChild(gong);
+            }
+        }
+
+        // --- Controls Logic ---
+
+        // Toggle Notes
+        btnToggleNotes.addEventListener('click', () => {
+            noteLabelsVisible = !noteLabelsVisible;
+            const bosses = document.querySelectorAll('.gong-boss');
+            bosses.forEach((b, i) => {
+                b.innerText = noteLabelsVisible ? (i + 1) : '';
+            });
+            btnToggleNotes.classList.toggle('opacity-50');
+        });
+
+        // Recording Logic
+        btnRecord.addEventListener('click', () => {
+            if (!isRecording) {
+                // Start Recording
+                startRecording();
+            } else {
+                // Stop Recording
+                stopRecording();
+            }
+        });
+
+        function startRecording() {
+            if (playbackAudio) {
+                playbackAudio.pause();
+                playbackAudio = null;
+            }
+            audioChunks = [];
+            
+            const stream = destNode.stream;
+            mediaRecorder = new MediaRecorder(stream);
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                audioUrl = URL.createObjectURL(audioBlob);
+                
+                // Enable Play/Download
+                btnPlay.classList.remove('hidden');
+                btnDownload.classList.remove('hidden');
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            
+            // UI Updates
+            btnRecord.innerHTML = '⬛ หยุด';
+            btnRecord.classList.add('recorder-status');
+            recTimer.classList.remove('hidden');
+            btnPlay.classList.add('hidden');
+            btnDownload.classList.add('hidden');
+
+            startTime = Date.now();
+            timerInterval = setInterval(() => {
+                const diff = Math.floor((Date.now() - startTime) / 1000);
+                const m = Math.floor(diff / 60).toString().padStart(2, '0');
+                const s = (diff % 60).toString().padStart(2, '0');
+                recTimer.innerText = `${m}:${s}`;
+            }, 1000);
+        }
+
+        function stopRecording() {
+            mediaRecorder.stop();
+            isRecording = false;
+            clearInterval(timerInterval);
+            
+            // UI Updates
+            btnRecord.innerHTML = '🔴 อัดเสียงใหม่';
+            btnRecord.classList.remove('recorder-status');
+        }
+
+        // Playback
+        btnPlay.addEventListener('click', () => {
+            if (audioUrl) {
+                if (playbackAudio) playbackAudio.pause();
+                playbackAudio = new Audio(audioUrl);
+                playbackAudio.play();
+                
+                btnPlay.innerHTML = '🔊 กำลังเล่น...';
+                playbackAudio.onended = () => {
+                    btnPlay.innerHTML = '▶ เล่น';
+                };
+            }
+        });
+
+        // Download
+        btnDownload.addEventListener('click', () => {
+            if (audioUrl) {
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = audioUrl;
+                a.download = 'my-khong-wong-lek.webm';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(audioUrl);
+                }, 100);
+            }
+        });
+
+        // Window resize handler for robustness
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(renderGongs, 200);
+        });
+
+    </script>
+</body>
+</html>

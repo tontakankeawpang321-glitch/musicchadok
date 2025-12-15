@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ซอกันตรึมเสมือนจริง (Virtual Sor Kantrum)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #1a1a1a;
+            color: #fff;
+            overflow: hidden; /* ห้ามเลื่อน */
+            touch-action: none; /* ห้าม gesture ของ browser */
+            user-select: none;
+            -webkit-user-select: none;
+            height: 100dvh; /* Dynamic viewport height */
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ลายไม้พื้นหลัง */
+        .wood-bg {
+            background: repeating-linear-gradient(45deg, #3d2516, #3d2516 10px, #2a180d 10px, #2a180d 20px);
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        /* ตัวซอ (กะโหลก) */
+        .sor-body {
+            background: radial-gradient(circle at 30% 30%, #5c3a21, #2a1508);
+            border: 4px solid #1a0f08;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            border-radius: 40% 40% 45% 45%;
+            position: relative;
+        }
+
+        /* หนังซอ */
+        .sor-skin {
+            background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZWRkY2NmIi8+CjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiNkM2I4YWUiLz4KPC9zdmc+');
+            background-size: 4px 4px;
+            border-radius: 35% 35% 40% 40%;
+            opacity: 0.9;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
+        }
+
+        /* คันชัก (The Bow line visual) */
+        .bow-indicator {
+            height: 2px;
+            background: rgba(255, 255, 255, 0.5);
+            position: absolute;
+            width: 120%;
+            left: -10%;
+            pointer-events: none;
+            transition: top 0.1s;
+            display: none;
+        }
+
+        /* สายซอ */
+        .string {
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(90deg, #ccc, #fff, #999);
+            position: absolute;
+            bottom: 0;
+            box-shadow: 2px 0 4px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+        
+        .string.vibrating {
+            animation: vibrate 0.1s infinite;
+        }
+
+        @keyframes vibrate {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(1px); }
+            75% { transform: translateX(-1px); }
+            100% { transform: translateX(0); }
+        }
+
+        /* พื้นที่กดโน้ต (Fretboard Area) */
+        .fretboard-area {
+            position: relative;
+            background: linear-gradient(90deg, #150b06, #2d1a10, #150b06);
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.7);
+        }
+
+        /* ปุ่ม/ตำแหน่งโน้ต */
+        .note-zone {
+            position: absolute;
+            width: 100%;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255,255,255,0.4);
+            font-size: 0.8rem;
+            pointer-events: none; /* Events handled by parent */
+        }
+        
+        .note-active {
+            background: rgba(255, 215, 0, 0.2);
+            color: #fff;
+            text-shadow: 0 0 5px gold;
+        }
+
+        /* ปุ่มควบคุม */
+        .btn-control {
+            background: linear-gradient(145deg, #4a3b32, #2e231d);
+            border: 1px solid #5e4b40;
+            color: #e0d0c0;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 3px 3px 6px #1a1410, -3px -3px 6px #5e483e;
+            transition: all 0.1s;
+        }
+        .btn-control:active {
+            box-shadow: inset 3px 3px 6px #1a1410, inset -3px -3px 6px #5e483e;
+            transform: scale(0.95);
+        }
+        .btn-control.recording {
+            background: #ef4444;
+            color: white;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        /* Modal เริ่มต้น */
+        #start-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+    </style>
+</head>
+<body class="wood-bg">
+
+    <!-- Start Overlay -->
+    <div id="start-overlay">
+        <div class="p-6 bg-[#2a180d] rounded-xl border border-[#5c3a21] shadow-2xl max-w-sm mx-4">
+            <h1 class="text-3xl font-bold text-yellow-500 mb-2">ซอกันตรึม</h1>
+            <p class="text-gray-300 mb-6">แตะเพื่อเริ่มเล่น (ควรใส่หูฟังเพื่อเสียงที่ดีที่สุด)</p>
+            <button id="start-btn" class="px-8 py-3 bg-yellow-600 hover:bg-yellow-500 text-white font-bold rounded-full shadow-lg transform transition active:scale-95">
+                เริ่มเล่นดนตรี
+            </button>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="h-14 flex items-center justify-between px-4 bg-[#150b06] shadow-md z-20">
+        <h2 class="text-lg font-bold text-yellow-500 flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-red-500 hidden" id="rec-dot"></span>
+            ซอกันตรึม
+        </h2>
+        <div class="flex gap-3">
+            <button id="toggle-labels" class="text-xs bg-[#3d2516] px-3 py-1 rounded border border-[#5c3a21] text-gray-300">แสดงโน้ต</button>
+        </div>
+    </header>
+
+    <!-- Main Instrument Area -->
+    <main class="flex-1 flex flex-col relative overflow-hidden">
+        
+        <!-- คอซอ (Neck/Fretboard) -->
+        <div class="flex-1 flex justify-center py-4 relative">
+            <div class="fretboard-area w-24 md:w-32 h-full flex relative border-x-4 border-[#1a0f08]">
+                
+                <!-- String Left (Low - Sai Thum) -->
+                <div class="w-1/2 h-full relative border-r border-white/10" id="string-low-area">
+                    <div class="string" style="right: 15px;" id="string-low-visual"></div>
+                </div>
+
+                <!-- String Right (High - Sai Ek) -->
+                <div class="w-1/2 h-full relative" id="string-high-area">
+                    <div class="string" style="left: 15px;" id="string-high-visual"></div>
+                </div>
+
+                <!-- Note Markers (Generated by JS) -->
+                <div id="markers-container" class="absolute inset-0 pointer-events-none opacity-0 transition-opacity duration-300">
+                    <!-- JS will populate -->
+                </div>
+            </div>
+        </div>
+
+        <!-- กะโหลกซอ (Body) - อยู่ด้านล่าง -->
+        <div class="h-48 flex justify-center items-end pb-4 pointer-events-none z-10 relative mt-[-20px]">
+            <div class="sor-body w-40 h-36 flex items-center justify-center relative">
+                <!-- หย่อง (Bridge) -->
+                <div class="absolute top-10 w-12 h-4 bg-[#e0d0c0] rounded shadow-lg z-20"></div>
+                <div class="sor-skin w-32 h-28 flex items-center justify-center">
+                    <!-- ลวดลายบนหน้าซอ -->
+                </div>
+            </div>
+            <!-- แกนขาตั้ง -->
+            <div class="absolute bottom-0 w-4 h-10 bg-[#2d1a10]"></div>
+        </div>
+
+    </main>
+
+    <!-- Controls Footer -->
+    <footer class="h-24 bg-[#150b06] border-t border-[#3d2516] flex items-center justify-center gap-6 z-30 pb-4">
+        <!-- Record -->
+        <button id="btn-record" class="btn-control" title="อัดเสียง">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+        </button>
+
+        <!-- Playback -->
+        <button id="btn-play" class="btn-control disabled:opacity-30 disabled:cursor-not-allowed" disabled title="เล่นเสียงที่อัด">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </button>
+
+        <!-- Stop Playback -->
+        <button id="btn-stop" class="btn-control disabled:opacity-30 disabled:cursor-not-allowed" disabled title="หยุดเล่น">
+             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12"/></svg>
+        </button>
+
+        <!-- Download -->
+        <button id="btn-download" class="btn-control disabled:opacity-30 disabled:cursor-not-allowed" disabled title="ดาวน์โหลด">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+        </button>
+    </footer>
+
+    <script>
+        // --- Audio Engine Setup ---
+        let audioCtx;
+        let masterGain;
+        let compressor;
+        let destStream; // For recording
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordedAudioBlob;
+        let playbackAudio = new Audio();
+
+        // Instruments Map
+        const activeOscillators = {}; // Keep track of playing notes to stop them
+
+        // Kantrum Sor typically tuned: Low String (G3/C4) High String (D4/G4)
+        // Let's use a standard runnable range (Open String + Finger Positions)
+        // High String (Sai Ek): Open=D5, 1=E5, 2=F#5, 3=G5, 4=A5, 5=B5
+        // Low String (Sai Thum): Open=G4, 1=A4, 2=B4, 3=C5, 4=D5, 5=E5
+        
+        const stringHighNotes = [
+            { note: 'D5', freq: 587.33, label: 'ซอล (Open)', pos: 0 },   // Open
+            { note: 'E5', freq: 659.25, label: 'ลา', pos: 15 },
+            { note: 'F#5', freq: 739.99, label: 'ที', pos: 30 },
+            { note: 'G5', freq: 783.99, label: 'โด', pos: 45 },
+            { note: 'A5', freq: 880.00, label: 'เร', pos: 60 },
+            { note: 'B5', freq: 987.77, label: 'มี', pos: 75 }
+        ];
+
+        const stringLowNotes = [
+            { note: 'G4', freq: 392.00, label: 'ด (Open)', pos: 0 }, // Open
+            { note: 'A4', freq: 440.00, label: 'ร', pos: 15 },
+            { note: 'B4', freq: 493.88, label: 'ม', pos: 30 },
+            { note: 'C5', freq: 523.25, label: 'ฟ', pos: 45 },
+            { note: 'D5', freq: 587.33, label: 'ซ', pos: 60 },
+            { note: 'E5', freq: 659.25, label: 'ล', pos: 75 }
+        ];
+
+        // --- Initialization ---
+        const startOverlay = document.getElementById('start-overlay');
+        const startBtn = document.getElementById('start-btn');
+
+        startBtn.addEventListener('click', async () => {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Set up Master Chain
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.6; // Overall volume
+
+            compressor = audioCtx.createDynamicsCompressor();
+            compressor.threshold.value = -24;
+            compressor.knee.value = 30;
+            compressor.ratio.value = 12;
+            compressor.attack.value = 0.003;
+            compressor.release.value = 0.25;
+
+            // Destination for recording
+            destStream = audioCtx.createMediaStreamDestination();
+
+            masterGain.connect(compressor);
+            compressor.connect(audioCtx.destination);
+            compressor.connect(destStream); // Connect to recorder
+
+            startOverlay.style.display = 'none';
+            initUI();
+        });
+
+        // --- Synthesis Function (The Sor Sound) ---
+        function playSound(freq, stringId) {
+            if (activeOscillators[stringId]) return; // Already playing
+
+            const t = audioCtx.currentTime;
+
+            // 1. Main Oscillator (Sawtooth for string buzz)
+            const osc1 = audioCtx.createOscillator();
+            osc1.type = 'sawtooth';
+            osc1.frequency.setValueAtTime(freq, t);
+
+            // 2. Body Resonance (Triangle for hollow sound)
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'triangle';
+            osc2.frequency.setValueAtTime(freq, t);
+
+            // 3. Filter (Formant filter to mimic coconut shell)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 1200; // Nasal quality
+            filter.Q.value = 0.8;
+
+            const lowFilter = audioCtx.createBiquadFilter();
+            lowFilter.type = 'lowpass';
+            lowFilter.frequency.value = 4000; // Cut off harsh highs
+
+            // 4. Envelope (Attack/Decay)
+            const noteGain = audioCtx.createGain();
+            
+            // Simulating Bow Attack (not instant, ramps up slightly)
+            noteGain.gain.setValueAtTime(0, t);
+            noteGain.gain.linearRampToValueAtTime(0.8, t + 0.1); // Bow attack
+            noteGain.gain.setValueAtTime(0.8, t + 0.5); // Sustain
+
+            // Connection Graph
+            osc1.connect(lowFilter);
+            osc2.connect(lowFilter);
+            lowFilter.connect(filter);
+            filter.connect(noteGain);
+            noteGain.connect(masterGain);
+
+            osc1.start(t);
+            osc2.start(t);
+
+            // Visual Vibration
+            const visualString = document.getElementById(stringId === 'low' ? 'string-low-visual' : 'string-high-visual');
+            visualString.classList.add('vibrating');
+
+            activeOscillators[stringId] = {
+                oscs: [osc1, osc2],
+                gain: noteGain,
+                stop: function() {
+                    const stopTime = audioCtx.currentTime;
+                    // Release envelope (string doesn't stop instantly but quick)
+                    this.gain.gain.cancelScheduledValues(stopTime);
+                    this.gain.gain.setValueAtTime(this.gain.gain.value, stopTime);
+                    this.gain.gain.exponentialRampToValueAtTime(0.001, stopTime + 0.2);
+                    
+                    this.oscs.forEach(o => o.stop(stopTime + 0.25));
+                    
+                    visualString.classList.remove('vibrating');
+                    delete activeOscillators[stringId];
+                }
+            };
+        }
+
+        function stopSound(stringId) {
+            if (activeOscillators[stringId]) {
+                activeOscillators[stringId].stop();
+            }
+        }
+
+        // --- Interaction Logic (Touch/Mouse) ---
+        function initUI() {
+            const lowArea = document.getElementById('string-low-area');
+            const highArea = document.getElementById('string-high-area');
+            const markersContainer = document.getElementById('markers-container');
+
+            // Generate Note Markers UI
+            function createMarkers(notes, side) {
+                notes.forEach((n, index) => {
+                    if (index === 0) return; // Skip open string marker visual
+                    const el = document.createElement('div');
+                    el.className = `note-zone ${side === 'left' ? 'left-0 pr-2 justify-end' : 'right-0 pl-2 justify-start'}`;
+                    el.style.top = `${n.pos}%`;
+                    el.style.height = '15%'; // Zone height
+                    el.style.width = '50%';
+                    el.innerHTML = `<span>${n.label}</span>`;
+                    el.dataset.note = n.note;
+                    markersContainer.appendChild(el);
+                });
+            }
+            createMarkers(stringLowNotes, 'left');
+            createMarkers(stringHighNotes, 'right');
+
+            // Handle Input
+            const handleInput = (e, stringId, notes) => {
+                e.preventDefault();
+                const rect = e.target.getBoundingClientRect();
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                
+                // Calculate position percentage (0 to 100 from top)
+                let y = clientY - rect.top;
+                let percent = (y / rect.height) * 100;
+                if (percent < 0) percent = 0;
+                if (percent > 100) percent = 100;
+
+                // Find closest note
+                // Logic: If touch is near a defined position, play that note. 
+                // If at top (< 10%), play Open string.
+                let selectedNote = notes[0]; // Default Open
+
+                for (let i = 1; i < notes.length; i++) {
+                    // Simple range check: if within +/- 7% of the note position
+                    if (Math.abs(percent - notes[i].pos) < 8) {
+                        selectedNote = notes[i];
+                        break;
+                    }
+                }
+
+                // Highlight UI
+                highlightNote(selectedNote.note);
+
+                // Play
+                playSound(selectedNote.freq, stringId);
+            };
+
+            const endInput = (e, stringId) => {
+                e.preventDefault();
+                stopSound(stringId);
+                clearHighlights();
+            };
+
+            // Events for Low String
+            lowArea.addEventListener('mousedown', (e) => handleInput(e, 'low', stringLowNotes));
+            lowArea.addEventListener('mousemove', (e) => {
+                if(e.buttons === 1) handleInput(e, 'low', stringLowNotes);
+            });
+            lowArea.addEventListener('mouseup', (e) => endInput(e, 'low'));
+            lowArea.addEventListener('mouseleave', (e) => endInput(e, 'low'));
+            
+            lowArea.addEventListener('touchstart', (e) => handleInput(e, 'low', stringLowNotes));
+            lowArea.addEventListener('touchmove', (e) => handleInput(e, 'low', stringLowNotes));
+            lowArea.addEventListener('touchend', (e) => endInput(e, 'low'));
+
+            // Events for High String
+            highArea.addEventListener('mousedown', (e) => handleInput(e, 'high', stringHighNotes));
+            highArea.addEventListener('mousemove', (e) => {
+                if(e.buttons === 1) handleInput(e, 'high', stringHighNotes);
+            });
+            highArea.addEventListener('mouseup', (e) => endInput(e, 'high'));
+            highArea.addEventListener('mouseleave', (e) => endInput(e, 'high'));
+
+            highArea.addEventListener('touchstart', (e) => handleInput(e, 'high', stringHighNotes));
+            highArea.addEventListener('touchmove', (e) => handleInput(e, 'high', stringHighNotes));
+            highArea.addEventListener('touchend', (e) => endInput(e, 'high'));
+        }
+
+        function highlightNote(noteName) {
+            // Find marker with this note name
+            const markers = document.querySelectorAll('.note-zone');
+            markers.forEach(m => {
+                if (m.dataset.note === noteName) m.classList.add('note-active');
+                else m.classList.remove('note-active');
+            });
+        }
+
+        function clearHighlights() {
+            const markers = document.querySelectorAll('.note-zone');
+            markers.forEach(m => m.classList.remove('note-active'));
+        }
+
+        // --- Toggle Labels ---
+        const toggleBtn = document.getElementById('toggle-labels');
+        const markersContainer = document.getElementById('markers-container');
+        let labelsVisible = false;
+
+        toggleBtn.addEventListener('click', () => {
+            labelsVisible = !labelsVisible;
+            markersContainer.style.opacity = labelsVisible ? '1' : '0';
+            toggleBtn.style.background = labelsVisible ? '#5c3a21' : '#3d2516';
+            toggleBtn.style.color = labelsVisible ? '#fff' : '#ccc';
+        });
+
+        // --- Recording Logic ---
+        const btnRecord = document.getElementById('btn-record');
+        const btnPlay = document.getElementById('btn-play');
+        const btnStop = document.getElementById('btn-stop');
+        const btnDownload = document.getElementById('btn-download');
+        const recDot = document.getElementById('rec-dot');
+        let isRecording = false;
+
+        btnRecord.addEventListener('click', () => {
+            if (!isRecording) {
+                // Start Recording
+                audioChunks = [];
+                mediaRecorder = new MediaRecorder(destStream.stream);
+                
+                mediaRecorder.ondataavailable = (e) => {
+                    audioChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const audioURL = URL.createObjectURL(recordedAudioBlob);
+                    playbackAudio.src = audioURL;
+                    
+                    // Enable Buttons
+                    btnPlay.disabled = false;
+                    btnDownload.disabled = false;
+                    btnStop.disabled = true;
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                btnRecord.classList.add('recording');
+                recDot.classList.remove('hidden');
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                btnRecord.classList.remove('recording');
+                recDot.classList.add('hidden');
+            }
+        });
+
+        btnPlay.addEventListener('click', () => {
+            if (playbackAudio.src) {
+                playbackAudio.play();
+                btnStop.disabled = false;
+            }
+        });
+
+        btnStop.addEventListener('click', () => {
+            playbackAudio.pause();
+            playbackAudio.currentTime = 0;
+            btnStop.disabled = true;
+        });
+
+        btnDownload.addEventListener('click', () => {
+            if (recordedAudioBlob) {
+                const url = URL.createObjectURL(recordedAudioBlob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'sor-kantrum-recording.webm';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+            }
+        });
+
+    </script>
+</body>
+</html>

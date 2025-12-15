@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>กลองสองหน้าเสมือนจริง</title>
+    <style>
+        /* รีเซ็ตและตั้งค่าพื้นฐาน */
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #1a1a1a;
+            background: radial-gradient(circle, #2c2c2c 0%, #000000 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden; /* ป้องกันการเลื่อน */
+            font-family: 'Sarabun', sans-serif;
+            touch-action: none; /* ป้องกัน gesture ของ browser */
+        }
+
+        /* แผงควบคุมด้านบน */
+        .controls {
+            position: absolute;
+            top: 20px;
+            display: flex;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 20px;
+            backdrop-filter: blur(5px);
+            z-index: 100;
+        }
+
+        .btn {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn.recording {
+            background: #ff4444;
+            animation: pulse 1s infinite;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* ตัวกลอง */
+        .drum-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 90vw;
+            height: 60vh;
+            position: relative;
+        }
+
+        /* โครงสร้างกลอง (บอดี้ไม้) */
+        .drum-body {
+            width: 80%;
+            height: 100%;
+            background: linear-gradient(90deg, #5d4037 0%, #8d6e63 20%, #a1887f 50%, #8d6e63 80%, #5d4037 100%);
+            border-radius: 20px;
+            position: absolute;
+            z-index: 1;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8) inset, 0 20px 50px rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* ลายไม้ */
+        .wood-texture {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            opacity: 0.3;
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, #3e2723 10px, #3e2723 12px);
+            border-radius: 20px;
+            pointer-events: none;
+        }
+
+        /* หนังกลอง (Head) */
+        .drum-head {
+            position: relative;
+            z-index: 2;
+            background: radial-gradient(circle at 30% 30%, #fff3e0, #d7ccc8, #a1887f);
+            border-radius: 50%;
+            box-shadow: 
+                inset 0 0 20px rgba(0,0,0,0.5),
+                0 0 0 8px #3e2723, /* ขอบไม้ */
+                0 0 0 12px #5d4037, /* ขอบเชือก */
+                5px 0 15px rgba(0,0,0,0.5);
+            cursor: pointer;
+            transition: transform 0.05s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .drum-head:active, .drum-head.active {
+            transform: scale(0.96);
+            background: radial-gradient(circle at 30% 30%, #ffe0b2, #d7ccc8, #8d6e63);
+        }
+
+        /* หน้าซ้าย (เสียงทุ้ม/ใหญ่) */
+        .head-left {
+            width: 35vh;
+            height: 35vh;
+            max-width: 45vw;
+            max-height: 45vw;
+            margin-left: -5%;
+        }
+
+        /* หน้าขวา (เสียงแหลม/เล็ก) */
+        .head-right {
+            width: 30vh;
+            height: 30vh;
+            max-width: 40vw;
+            max-height: 40vw;
+            margin-right: -5%;
+        }
+
+        /* เชือกรัดหน้ากลอง (Decoration) */
+        .ropes {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+        
+        .rope-line {
+            position: absolute;
+            height: 2px;
+            background: #3e2723;
+            box-shadow: 0 1px 1px rgba(0,0,0,0.5);
+        }
+
+        /* การแสดงโน้ต */
+        .note-label {
+            position: absolute;
+            color: rgba(62, 39, 35, 0.8);
+            font-weight: bold;
+            font-size: 2rem;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            text-shadow: 1px 1px 0px rgba(255,255,255,0.3);
+        }
+        
+        .show-notes .note-label {
+            opacity: 1;
+        }
+
+        /* Visual Feedback effect */
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.4);
+            transform: scale(0);
+            animation: ripple-anim 0.4s linear;
+            pointer-events: none;
+        }
+
+        @keyframes ripple-anim {
+            to {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(255, 68, 68, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
+        }
+
+        .footer-text {
+            position: absolute;
+            bottom: 10px;
+            color: #666;
+            font-size: 12px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <button class="btn" id="btnNotes">🎵 โน้ต</button>
+        <button class="btn" id="btnRecord">🔴 อัดเสียง</button>
+        <button class="btn" id="btnStop" disabled>⏹️ หยุด</button>
+        <button class="btn" id="btnPlay" disabled>▶️ เล่น</button>
+        <button class="btn" id="btnDownload" disabled>⬇️ โหลด</button>
+    </div>
+
+    <div class="drum-container" id="drumContainer">
+        <div class="drum-body">
+            <div class="wood-texture"></div>
+            <!-- Ropes decoration (CSS drawn) -->
+            <div style="width:100%; height: 2px; background:#3e2723; position:absolute; top:20%;"></div>
+            <div style="width:100%; height: 2px; background:#3e2723; position:absolute; bottom:20%;"></div>
+            <div style="width:100%; height: 2px; background:#3e2723; position:absolute; top:50%;"></div>
+        </div>
+
+        <!-- หน้าซ้าย (ทุ้ม) -->
+        <div class="drum-head head-left" id="padLeft" data-note="ตุ้ม">
+            <span class="note-label">ตุ้ม</span>
+        </div>
+
+        <!-- หน้าขวา (แหลม) -->
+        <div class="drum-head head-right" id="padRight" data-note="ตึง">
+            <span class="note-label">ตึง</span>
+        </div>
+    </div>
+
+    <div class="footer-text">แตะหน้าจอเพื่อเล่น | ใส่หูฟังเพื่อเสียงที่ดีที่สุด</div>
+
+    <script>
+        // --- Audio Context Setup ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        let masterGain;
+        let dest; // For recording
+        let mediaRecorder;
+        let chunks = [];
+        let recordedBlob;
+        let audioURL;
+        let playbackAudio = new Audio();
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.8;
+                
+                // Setup recording destination
+                dest = audioCtx.createMediaStreamDestination();
+                masterGain.connect(audioCtx.destination);
+                masterGain.connect(dest);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // --- Sound Synthesis (Physical Modeling Approximation) ---
+        
+        function playSound(type) {
+            initAudio();
+            const t = audioCtx.currentTime;
+            
+            // 1. Impact Sound (Click/Attack)
+            const oscNoise = audioCtx.createOscillator();
+            const gainNoise = audioCtx.createGain();
+            oscNoise.type = 'square'; // Rich harmonic for initial slap
+            
+            // 2. Body Resonance (The Tone)
+            const oscTone = audioCtx.createOscillator();
+            const gainTone = audioCtx.createGain();
+            oscTone.type = 'sine';
+
+            // Parameters based on type
+            if (type === 'low') { // "ตุ้ม" - Left Side
+                // Pitch drop for realistic drum tension
+                oscTone.frequency.setValueAtTime(120, t);
+                oscTone.frequency.exponentialRampToValueAtTime(60, t + 0.5);
+                
+                gainTone.gain.setValueAtTime(1.0, t);
+                gainTone.gain.exponentialRampToValueAtTime(0.01, t + 0.8);
+
+                oscNoise.frequency.setValueAtTime(100, t);
+                gainNoise.gain.setValueAtTime(0.3, t);
+                gainNoise.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+
+            } else if (type === 'high') { // "ตึง" - Right Side
+                oscTone.frequency.setValueAtTime(280, t);
+                oscTone.frequency.exponentialRampToValueAtTime(180, t + 0.3);
+                
+                gainTone.gain.setValueAtTime(0.8, t);
+                gainTone.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
+
+                oscNoise.frequency.setValueAtTime(300, t);
+                gainNoise.gain.setValueAtTime(0.4, t);
+                gainNoise.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+            }
+
+            // Connect graph
+            oscTone.connect(gainTone);
+            gainTone.connect(masterGain);
+            
+            oscNoise.connect(gainNoise);
+            gainNoise.connect(masterGain);
+
+            // Start/Stop
+            oscTone.start(t);
+            oscTone.stop(t + 1);
+            oscNoise.start(t);
+            oscNoise.stop(t + 0.1);
+        }
+
+        // --- Interaction Logic ---
+        const padLeft = document.getElementById('padLeft');
+        const padRight = document.getElementById('padRight');
+        const container = document.getElementById('drumContainer');
+
+        function triggerPad(pad, type) {
+            playSound(type);
+            
+            // Visual Animation
+            pad.classList.add('active');
+            setTimeout(() => pad.classList.remove('active'), 100);
+
+            // Ripple Effect
+            const ripple = document.createElement('div');
+            ripple.className = 'ripple';
+            // Center the ripple roughly
+            const rect = pad.getBoundingClientRect();
+            ripple.style.width = rect.width + 'px';
+            ripple.style.height = rect.height + 'px';
+            ripple.style.left = '0';
+            ripple.style.top = '0';
+            pad.appendChild(ripple);
+            
+            setTimeout(() => ripple.remove(), 400);
+        }
+
+        // Touch Events
+        padLeft.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            triggerPad(padLeft, 'low');
+        }, {passive: false});
+
+        padRight.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            triggerPad(padRight, 'high');
+        }, {passive: false});
+
+        // Mouse Events
+        padLeft.addEventListener('mousedown', () => triggerPad(padLeft, 'low'));
+        padRight.addEventListener('mousedown', () => triggerPad(padRight, 'high'));
+
+        // Keyboard Support (A/D or Left/Right Arrows)
+        document.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            if (e.key === 'a' || e.key === 'ArrowLeft') triggerPad(padLeft, 'low');
+            if (e.key === 'd' || e.key === 'ArrowRight') triggerPad(padRight, 'high');
+        });
+
+        // --- Controls Logic ---
+        
+        // Toggle Notes
+        const btnNotes = document.getElementById('btnNotes');
+        btnNotes.addEventListener('click', () => {
+            container.classList.toggle('show-notes');
+            btnNotes.textContent = container.classList.contains('show-notes') ? "🎵 ซ่อนโน้ต" : "🎵 โน้ต";
+        });
+
+        // Recording
+        const btnRecord = document.getElementById('btnRecord');
+        const btnStop = document.getElementById('btnStop');
+        const btnPlay = document.getElementById('btnPlay');
+        const btnDownload = document.getElementById('btnDownload');
+
+        btnRecord.addEventListener('click', () => {
+            initAudio(); // Ensure context is ready
+            chunks = [];
+            // Create recorder from destination stream
+            // Check browser support for types
+            let options = { mimeType: 'audio/webm' };
+            if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                 options = { mimeType: 'audio/mp4' }; // Safari fallback usually
+            }
+            
+            try {
+                mediaRecorder = new MediaRecorder(dest.stream, options);
+            } catch (err) {
+                alert("เบราว์เซอร์นี้อาจไม่รองรับการอัดเสียงแบบนี้สมบูรณ์");
+                mediaRecorder = new MediaRecorder(dest.stream);
+            }
+
+            mediaRecorder.ondataavailable = (evt) => {
+                chunks.push(evt.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                recordedBlob = new Blob(chunks, { type: 'audio/webm' });
+                audioURL = URL.createObjectURL(recordedBlob);
+                playbackAudio.src = audioURL;
+                btnPlay.disabled = false;
+                btnDownload.disabled = false;
+            };
+
+            mediaRecorder.start();
+            btnRecord.classList.add('recording');
+            btnRecord.disabled = true;
+            btnStop.disabled = false;
+            btnPlay.disabled = true;
+            btnDownload.disabled = true;
+        });
+
+        btnStop.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                btnRecord.classList.remove('recording');
+                btnRecord.disabled = false;
+                btnStop.disabled = true;
+            }
+        });
+
+        btnPlay.addEventListener('click', () => {
+            if (audioURL) {
+                playbackAudio.play();
+            }
+        });
+
+        btnDownload.addEventListener('click', () => {
+            if (audioURL) {
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = audioURL;
+                a.download = 'my-drum-solo.webm';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    // window.URL.revokeObjectURL(audioURL); // Keep it for replay
+                }, 100);
+            }
+        });
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>โปงลางจำลอง (Virtual Pong Lang)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            overflow: hidden; /* ห้ามเลื่อนหน้าจอ */
+            touch-action: none; /* ปิด zoom/pan ของ browser */
+            background-color: #1a1510;
+            background-image: radial-gradient(circle at center, #2c241b 0%, #0f0c09 100%);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* เอฟเฟกต์ลายไม้ */
+        .wood-texture {
+            background: linear-gradient(90deg, #5D4037 0%, #8D6E63 20%, #5D4037 40%, #4E342E 60%, #6D4C41 80%, #3E2723 100%);
+            box-shadow: inset 0px 2px 5px rgba(0,0,0,0.6), 
+                        5px 5px 10px rgba(0,0,0,0.5);
+            border-radius: 50px; /* ท่อนกลม */
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* ไฮไลท์แสงบนไม้ */
+        .wood-texture::after {
+            content: '';
+            position: absolute;
+            top: 10%;
+            left: 5%;
+            right: 5%;
+            height: 20%;
+            background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 100%);
+            border-radius: 50px;
+            pointer-events: none;
+        }
+
+        /* เชือก */
+        .rope {
+            background-image: repeating-linear-gradient(45deg, #d4a373 0px, #d4a373 5px, #a98467 5px, #a98467 10px);
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+            z-index: 0;
+        }
+
+        /* Animation เวลาตี */
+        .hit-anim {
+            animation: shake 0.1s ease-in-out;
+            filter: brightness(1.3);
+        }
+
+        @keyframes shake {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.98); }
+            100% { transform: scale(1); }
+        }
+
+        /* ปุ่มควบคุม */
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.2s;
+        }
+        .control-btn:active {
+            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.2);
+        }
+        .control-btn.active {
+            background: rgba(239, 68, 68, 0.8); /* Red for recording */
+            border-color: red;
+        }
+
+        /* ซ่อน Scrollbar */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-between relative text-white">
+
+    <!-- Header / Controls -->
+    <div class="w-full flex justify-between items-center p-3 z-10 bg-black/30 backdrop-blur-sm fixed top-0 left-0 right-0 h-14">
+        <div class="flex items-center gap-2">
+            <span class="text-xl font-bold text-amber-500">โปงลาง</span>
+        </div>
+        <div class="flex gap-2">
+            <button id="toggleNoteBtn" class="control-btn p-2 rounded-full text-xs w-10 h-10 flex items-center justify-center">
+                โน้ต
+            </button>
+            <button id="recordBtn" class="control-btn p-2 rounded-full text-xs w-10 h-10 flex items-center justify-center text-red-400">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 1A5 5 0 1 0 8 3a5 5 0 0 0 0 10z"/></svg>
+            </button>
+            <button id="playBtn" class="control-btn p-2 rounded-full text-xs w-10 h-10 flex items-center justify-center hidden">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/></svg>
+            </button>
+            <button id="downloadBtn" class="control-btn p-2 rounded-full text-xs w-10 h-10 flex items-center justify-center hidden text-blue-400">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- สถานะการอัด -->
+    <div id="statusText" class="fixed top-16 right-4 text-xs text-red-500 font-bold hidden animate-pulse bg-black/50 px-2 py-1 rounded">
+        กำลังบันทึก...
+    </div>
+
+    <!-- Main Instrument Area -->
+    <div class="flex-grow w-full flex justify-center items-center relative pt-16 pb-4 overflow-hidden">
+        
+        <!-- เชือกแขวน -->
+        <div class="rope absolute h-[95%] w-2 left-[5%] top-14 rounded-full"></div>
+        <div class="rope absolute h-[95%] w-2 right-[5%] top-14 rounded-full"></div>
+
+        <!-- รางไม้ (The Bars Container) -->
+        <div id="ponglang-container" class="w-[85%] h-full flex flex-col justify-between items-center py-2 z-10">
+            <!-- Bars will be injected here by JS -->
+        </div>
+
+    </div>
+
+    <!-- Overlay "Tap to Start" for Audio Context -->
+    <div id="startOverlay" class="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center text-center cursor-pointer">
+        <div class="bg-white/10 p-6 rounded-2xl backdrop-blur-md border border-white/20">
+            <h1 class="text-3xl font-bold text-amber-500 mb-2">โปงลาง</h1>
+            <p class="text-gray-300 text-sm mb-4">แตะเพื่อเริ่มเล่น (Tap to Start)</p>
+            <div class="animate-bounce mt-2 text-4xl">👆</div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. Audio Engine (Synthesis) ---
+        // ใช้ Web Audio API เพื่อสร้างเสียงไม้โปงลางที่สมจริงโดยไม่ต้องโหลดไฟล์
+        let audioCtx;
+        let masterGain;
+        let compressor;
+        
+        // Recording variables
+        let mediaDest;
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        let recordedBlob = null;
+
+        const NOTE_FREQS = {
+            'La1': 220.00, // A3 (ลูกเสพ - ใหญ่สุด)
+            'Do1': 261.63, // C4
+            'Re1': 293.66, // D4
+            'Mi1': 329.63, // E4
+            'Fa1': 349.23, // F4 (บางลายไม่มี แต่ใส่เผื่อให้ครบสเกล)
+            'Sol1': 392.00, // G4
+            'La2': 440.00, // A4
+            'Do2': 523.25, // C5
+            'Re2': 587.33, // D5
+            'Mi2': 659.25, // E5
+            'Sol2': 783.99, // G5
+            'La3': 880.00  // A5 (ลูกเล็กสุด)
+        };
+
+        // การเรียงลูกโปงลาง (จากบนลงล่าง = เสียงต่ำไปสูง)
+        const BARS_CONFIG = [
+            { id: 'b1', note: 'La1', label: 'ลา (ล)', color: '#5D4037', width: '95%' },
+            { id: 'b2', note: 'Do1', label: 'โด (ด)', color: '#604239', width: '90%' },
+            { id: 'b3', note: 'Re1', label: 'เร (ร)', color: '#63453B', width: '85%' },
+            { id: 'b4', note: 'Mi1', label: 'มี (ม)', color: '#66473D', width: '80%' },
+            { id: 'b5', note: 'Sol1', label: 'ซอล (ซ)', color: '#69493F', width: '75%' },
+            { id: 'b6', note: 'La2', label: 'ลา (ล)', color: '#6C4C41', width: '70%' },
+            { id: 'b7', note: 'Do2', label: 'โด (ด)', color: '#6F4E43', width: '65%' },
+            { id: 'b8', note: 'Re2', label: 'เร (ร)', color: '#725045', width: '60%' },
+            { id: 'b9', note: 'Mi2', label: 'มี (ม)', color: '#755347', width: '55%' },
+            { id: 'b10', note: 'Sol2', label: 'ซอล (ซ)', color: '#785549', width: '50%' },
+            { id: 'b11', note: 'La3', label: 'ลา (ล)', color: '#7B574B', width: '45%' }
+        ];
+
+        function initAudio() {
+            if (audioCtx) return;
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+
+            // Create Master Dynamics
+            compressor = audioCtx.createDynamicsCompressor();
+            compressor.threshold.setValueAtTime(-24, audioCtx.currentTime);
+            compressor.knee.setValueAtTime(30, audioCtx.currentTime);
+            compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+            compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+            compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.8;
+
+            // Connect graph
+            compressor.connect(masterGain);
+            masterGain.connect(audioCtx.destination);
+
+            // Setup Recording Destination
+            mediaDest = audioCtx.createMediaStreamDestination();
+            masterGain.connect(mediaDest);
+        }
+
+        function playSound(noteKey) {
+            if (!audioCtx) initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const freq = NOTE_FREQS[noteKey];
+            const t = audioCtx.currentTime;
+
+            // 1. The Fundamental Tone (Sine/Triangle hybrid for body)
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, t);
+
+            // 2. The "Wood" Attack (Higher harmonic, fast decay)
+            const attackOsc = audioCtx.createOscillator();
+            attackOsc.type = 'triangle';
+            attackOsc.frequency.setValueAtTime(freq * 2.5, t); // Metallic/Woody overtone
+
+            // Envelopes
+            const mainGain = audioCtx.createGain();
+            const attackGain = audioCtx.createGain();
+
+            // Main Body Envelope (Percussive but resonant)
+            mainGain.gain.setValueAtTime(0, t);
+            mainGain.gain.linearRampToValueAtTime(1, t + 0.005); // Attack
+            mainGain.gain.exponentialRampToValueAtTime(0.01, t + 0.6); // Decay
+
+            // Stick Impact Envelope (Click/Thud)
+            attackGain.gain.setValueAtTime(0, t);
+            attackGain.gain.linearRampToValueAtTime(0.5, t + 0.002);
+            attackGain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+
+            // Connect
+            osc.connect(mainGain);
+            attackOsc.connect(attackGain);
+            
+            mainGain.connect(compressor);
+            attackGain.connect(compressor);
+
+            // Start & Stop
+            osc.start(t);
+            attackOsc.start(t);
+            
+            osc.stop(t + 0.7);
+            attackOsc.stop(t + 0.1);
+        }
+
+        // --- 2. UI Generation & Interaction ---
+        
+        const container = document.getElementById('ponglang-container');
+
+        // Create Bars
+        BARS_CONFIG.forEach((bar) => {
+            const el = document.createElement('div');
+            el.className = 'wood-texture flex items-center justify-center text-white/90 font-bold shadow-lg select-none cursor-pointer active:scale-95 transition-transform duration-75 touch-manipulation';
+            el.style.width = bar.width;
+            el.style.height = `calc(100% / ${BARS_CONFIG.length + 1})`; // Dynamic height
+            el.style.marginBottom = '6px'; // Gap
+            el.dataset.note = bar.note;
+            el.id = bar.id;
+            
+            // Label
+            const span = document.createElement('span');
+            span.className = 'note-label opacity-0 transition-opacity duration-300 drop-shadow-md text-sm sm:text-lg';
+            span.innerText = bar.label;
+            el.appendChild(span);
+
+            container.appendChild(el);
+
+            // Interactions
+            const hit = (e) => {
+                if(e.cancelable) e.preventDefault(); // Prevent scroll/zoom
+                playSound(bar.note);
+                
+                // Visual Effect
+                el.classList.add('hit-anim');
+                setTimeout(() => el.classList.remove('hit-anim'), 100);
+            };
+
+            el.addEventListener('touchstart', hit, { passive: false });
+            el.addEventListener('mousedown', hit);
+        });
+
+        // Toggle Labels
+        let labelsVisible = false;
+        document.getElementById('toggleNoteBtn').addEventListener('click', () => {
+            labelsVisible = !labelsVisible;
+            document.querySelectorAll('.note-label').forEach(l => {
+                l.style.opacity = labelsVisible ? '1' : '0';
+            });
+            document.getElementById('toggleNoteBtn').classList.toggle('bg-white/30');
+        });
+
+        // --- 3. Recording Logic ---
+
+        const recordBtn = document.getElementById('recordBtn');
+        const playBtn = document.getElementById('playBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const statusText = document.getElementById('statusText');
+
+        recordBtn.addEventListener('click', () => {
+            if(!audioCtx) initAudio();
+
+            if (!isRecording) {
+                // Start Recording
+                audioChunks = [];
+                // Create recorder from destination node (captures generated audio)
+                try {
+                    mediaRecorder = new MediaRecorder(mediaDest.stream, { mimeType: 'audio/webm' });
+                } catch (e) {
+                    // Safari fallback or error
+                    mediaRecorder = new MediaRecorder(mediaDest.stream);
+                }
+
+                mediaRecorder.ondataavailable = evt => audioChunks.push(evt.data);
+                mediaRecorder.onstop = () => {
+                    recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    // Enable Play/Download buttons
+                    playBtn.classList.remove('hidden');
+                    downloadBtn.classList.remove('hidden');
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.classList.add('active');
+                statusText.classList.remove('hidden');
+                
+                // Hide Play/Download while recording
+                playBtn.classList.add('hidden');
+                downloadBtn.classList.add('hidden');
+
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.classList.remove('active');
+                statusText.classList.add('hidden');
+            }
+        });
+
+        // Playback Logic
+        playBtn.addEventListener('click', () => {
+            if (!recordedBlob) return;
+            const audioUrl = URL.createObjectURL(recordedBlob);
+            const audio = new Audio(audioUrl);
+            audio.play();
+        });
+
+        // Download Logic
+        downloadBtn.addEventListener('click', () => {
+            if (!recordedBlob) return;
+            const url = URL.createObjectURL(recordedBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `ponglang-recording-${Date.now()}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+        });
+
+        // Initialize Overlay
+        document.getElementById('startOverlay').addEventListener('click', function() {
+            initAudio();
+            this.style.opacity = '0';
+            setTimeout(() => this.remove(), 500);
+        });
+
+    </script>
+</body>
+</html>

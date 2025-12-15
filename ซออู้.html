@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ซออู้เสมือนจริง (Virtual Saw U)</title>
+    <style>
+        /* CSS Reset & Basic Setup */
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: white;
+            font-family: 'Sarabun', sans-serif;
+            overflow: hidden; /* ป้องกันการเลื่อน */
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: radial-gradient(circle at center, #2c2c2c 0%, #000000 100%);
+        }
+
+        /* Top Control Panel */
+        .controls {
+            width: 100%;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            z-index: 100;
+            border-bottom: 1px solid #444;
+        }
+
+        button {
+            background: #4a3b2a; /* Wood tone */
+            border: 1px solid #6d543e;
+            color: #f0e6d2;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        button:active {
+            transform: scale(0.95);
+            background: #382c1f;
+        }
+
+        button.active {
+            background: #d4a017;
+            color: #000;
+            font-weight: bold;
+        }
+
+        button.recording {
+            background: #ff4444;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
+        }
+
+        /* Saw U Container */
+        .instrument-area {
+            flex-grow: 1;
+            width: 100%;
+            max-width: 600px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end; /* Body at bottom */
+            padding-bottom: 20px;
+        }
+
+        /* The Neck (Tuan) */
+        .neck {
+            width: 60px;
+            height: 100%;
+            background: linear-gradient(90deg, #2b1d0e 0%, #5c4024 40%, #5c4024 60%, #2b1d0e 100%);
+            border-radius: 10px 10px 0 0;
+            position: absolute;
+            top: 0;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            z-index: 10;
+        }
+
+        /* The Body (Kalo - Coconut Shell) */
+        .soundbox {
+            width: 280px;
+            height: 260px;
+            background: radial-gradient(circle at 30% 30%, #5a3f23 0%, #261608 70%, #0d0601 100%);
+            border-radius: 50% 50% 45% 45%;
+            position: relative;
+            z-index: 20;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.9), inset 0 0 20px rgba(0,0,0,0.8);
+            border: 4px solid #3d2b18;
+            margin-bottom: 2vh;
+        }
+
+        /* Texture on Soundbox */
+        .soundbox::after {
+            content: '';
+            position: absolute;
+            top: 15%;
+            left: 15%;
+            width: 70%;
+            height: 70%;
+            background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 60%);
+            border-radius: 50%;
+        }
+
+        /* The Bridge (Yong) */
+        .bridge {
+            width: 40px;
+            height: 10px;
+            background: #e0d0b0;
+            position: absolute;
+            top: 35%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 2px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.8);
+            z-index: 25;
+        }
+
+        /* The Face Skin (Na So) */
+        .face-skin {
+            width: 200px;
+            height: 180px;
+            background: radial-gradient(#d3c0a3, #a68b6c);
+            border-radius: 45%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.1; /* Subtle texture overlay */
+        }
+
+        /* Strings Container */
+        .strings-container {
+            position: absolute;
+            top: 0;
+            bottom: 300px; /* Stop before bridge area roughly */
+            width: 60px;
+            z-index: 30;
+            display: flex;
+            justify-content: space-around;
+            padding: 0 10px;
+        }
+
+        /* Physical String Lines */
+        .string-line {
+            width: 3px;
+            height: 120%; /* Extend down to body */
+            background: linear-gradient(90deg, #ddd, #fff, #bbb);
+            position: relative;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+        }
+        
+        .string-line.vibrating {
+            animation: vibrate 0.1s infinite;
+        }
+
+        @keyframes vibrate {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(1px); }
+            50% { transform: translateX(0); }
+            75% { transform: translateX(-1px); }
+            100% { transform: translateX(0); }
+        }
+
+        /* Fret/Touch Zones */
+        .fret-board {
+            position: absolute;
+            top: 60px; /* Start below tuning pegs area */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 140px; /* Wider than neck for easier touching */
+            height: 70%;
+            z-index: 50;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: repeat(5, 1fr); /* 5 positions: Open + 4 fingers */
+        }
+
+        .touch-zone {
+            /* border: 1px solid rgba(255,255,255,0.1); Debugging grid */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        /* Note markers */
+        .note-marker {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(212, 160, 23, 0.0);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            text-shadow: 0 2px 4px black;
+            transition: background 0.2s;
+            pointer-events: none; /* Let touch pass through to div */
+        }
+
+        .show-notes .note-marker {
+            background: rgba(212, 160, 23, 0.3);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .touch-zone:active .note-marker, .touch-zone.active .note-marker {
+            background: rgba(255, 255, 255, 0.8);
+            color: #000;
+            transform: scale(1.1);
+            box-shadow: 0 0 15px #d4a017;
+        }
+
+        /* Loop string decorations at the top (Rat-Ok) */
+        .rat-ok {
+            position: absolute;
+            top: 40px;
+            width: 100%;
+            height: 15px;
+            background: #d4a017;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            z-index: 35;
+        }
+
+        /* Tuning Pegs (Luk Bid) - Decorative */
+        .peg {
+            position: absolute;
+            width: 60px;
+            height: 15px;
+            background: #3e2b18;
+            border-radius: 5px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+        }
+        .peg-left { top: 10px; left: -25px; transform: rotate(-10deg); }
+        .peg-right { top: 25px; right: -25px; transform: rotate(10deg); }
+
+        /* Notification Toast */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(50, 50, 50, 0.9);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 200;
+        }
+
+        .show-toast {
+            opacity: 1;
+        }
+
+        /* Mobile Landscape Warning */
+        @media screen and (orientation: landscape) and (max-height: 500px) {
+            .instrument-area {
+                transform: scale(0.6);
+                transform-origin: top center;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <button id="btn-notes" onclick="toggleNotes()">แสดงโน้ต</button>
+        <button id="btn-record" onclick="toggleRecord()">🔴 อัดเสียง</button>
+        <button id="btn-play" onclick="playRecording()" disabled>▶️ เล่น</button>
+        <button id="btn-download" onclick="downloadAudio()" disabled>💾 โหลด</button>
+    </div>
+
+    <div class="instrument-area">
+        <!-- Neck Structure -->
+        <div class="neck">
+            <div class="peg peg-left"></div>
+            <div class="peg peg-right"></div>
+            <div class="rat-ok"></div>
+            
+            <!-- Strings Visuals -->
+            <div class="strings-container">
+                <div class="string-line" id="string-thum"></div> <!-- Low String -->
+                <div class="string-line" id="string-ek"></div>   <!-- High String -->
+            </div>
+        </div>
+
+        <!-- Touch Area / Fretboard -->
+        <div class="fret-board" id="fretboard">
+            <!-- Dynamically populated by JS -->
+        </div>
+
+        <!-- Soundbox Structure -->
+        <div class="soundbox">
+            <div class="face-skin"></div>
+            <div class="bridge"></div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast">ข้อความแจ้งเตือน</div>
+
+    <script>
+        // --- Audio Engine (Web Audio API) ---
+        let audioCtx;
+        let masterGain;
+        let dest; // For recording
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordedBlob;
+        let audioUrl;
+
+        // Notes Frequencies (Thai tuning approximation / Western Scale)
+        // ซออู้: สายทุ้ม (Low) ~ C3-G3, สายเอก (High) ~ G3-D4
+        // ใช้ระบบเสียงแบบ Thai/Western Hybrid เพื่อให้เล่นเพลงสากลได้ด้วย
+        const notes = {
+            // สายทุ้ม (Left String - Thum)
+            'L0': { note: 'ซ', freq: 130.81, name: 'C3 (ซ)' }, // Open String C
+            'L1': { note: 'ร', freq: 146.83, name: 'D3 (ร)' },
+            'L2': { note: 'ม', freq: 164.81, name: 'E3 (ม)' },
+            'L3': { note: 'ฟ', freq: 174.61, name: 'F3 (ฟ)' },
+            'L4': { note: 'ซ', freq: 196.00, name: 'G3 (ซ)' },
+
+            // สายเอก (Right String - Ek)
+            'R0': { note: 'ซ', freq: 196.00, name: 'G3 (ซ)' }, // Open String G
+            'R1': { note: 'ล', freq: 220.00, name: 'A3 (ล)' },
+            'R2': { note: 'ท', freq: 246.94, name: 'B3 (ท)' },
+            'R3': { note: 'ด', freq: 261.63, name: 'C4 (ด)' },
+            'R4': { note: 'ร', freq: 293.66, name: 'D4 (ร)' },
+        };
+
+        const activeOscillators = {};
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // Master Gain for volume control
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.8;
+                
+                // Destination for recording
+                dest = audioCtx.createMediaStreamDestination();
+                masterGain.connect(audioCtx.destination);
+                masterGain.connect(dest);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Synthesis Function for Saw U Sound
+        // ซออู้ has a mellow, nasal, but low resonance. 
+        // We use Sawtooth (rich) + Sine (fundamental) + Lowpass Filter (muffle).
+        function playTone(id, freq) {
+            initAudio();
+            
+            // Stop existing note on this string/finger if any (monophonic per touch)
+            if (activeOscillators[id]) {
+                stopTone(id);
+            }
+
+            const now = audioCtx.currentTime;
+
+            // 1. Oscillators
+            const oscSaw = audioCtx.createOscillator();
+            oscSaw.type = 'sawtooth';
+            oscSaw.frequency.value = freq;
+
+            const oscSine = audioCtx.createOscillator();
+            oscSine.type = 'sine';
+            oscSine.frequency.value = freq;
+
+            // 2. Filter (The "Coconut Shell" body simulation)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 800; // Cut off high fizz
+            filter.Q.value = 1.5; // Little resonance
+
+            // 3. Envelope (ADSR) - Bowing effect
+            const gainNode = audioCtx.createGain();
+            
+            // Connecting
+            oscSaw.connect(filter);
+            oscSine.connect(filter); // Add sine for body
+            filter.connect(gainNode);
+            gainNode.connect(masterGain);
+
+            // Envelope Settings (Bow attack is not instant like piano)
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(0.5, now + 0.1); // Attack
+            gainNode.gain.linearRampToValueAtTime(0.4, now + 0.3); // Decay to Sustain
+
+            // Vibrato (LFO) - Human touch
+            const lfo = audioCtx.createOscillator();
+            lfo.frequency.value = 5; // 5Hz vibrato
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = 2; // Depth
+            lfo.connect(lfoGain);
+            lfoGain.connect(oscSaw.frequency);
+            lfoGain.connect(oscSine.frequency);
+
+            oscSaw.start(now);
+            oscSine.start(now);
+            lfo.start(now);
+
+            // Store ref to stop later
+            activeOscillators[id] = { 
+                nodes: [oscSaw, oscSine, lfo, gainNode], 
+                gain: gainNode 
+            };
+
+            // Visual feedback
+            const stringId = id.startsWith('L') ? 'string-thum' : 'string-ek';
+            document.getElementById(stringId).classList.add('vibrating');
+        }
+
+        function stopTone(id) {
+            if (activeOscillators[id]) {
+                const now = audioCtx.currentTime;
+                const { nodes, gain } = activeOscillators[id];
+                
+                // Release (Bow stops)
+                gain.gain.cancelScheduledValues(now);
+                gain.gain.setValueAtTime(gain.gain.value, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.2); // Release tail
+
+                nodes.forEach(node => {
+                    if(node.stop) node.stop(now + 0.2);
+                });
+
+                // Cleanup
+                setTimeout(() => {
+                    nodes.forEach(node => node.disconnect());
+                }, 300);
+
+                delete activeOscillators[id];
+            }
+
+            // Check if any notes still playing on that string to stop vibration
+            const stringId = id.startsWith('L') ? 'string-thum' : 'string-ek';
+            const isPlaying = Object.keys(activeOscillators).some(k => k.startsWith(id.charAt(0)));
+            if (!isPlaying) {
+                document.getElementById(stringId).classList.remove('vibrating');
+            }
+        }
+
+        // --- UI Setup ---
+        const fretboard = document.getElementById('fretboard');
+        
+        // Define layout: Left String (L), Right String (R) x 5 positions (0-4)
+        const layout = [
+            ['L0', 'R0'], // Open strings (Top)
+            ['L1', 'R1'],
+            ['L2', 'R2'],
+            ['L3', 'R3'],
+            ['L4', 'R4']
+        ];
+
+        layout.forEach((row, index) => {
+            row.forEach(noteKey => {
+                const data = notes[noteKey];
+                const div = document.createElement('div');
+                div.className = 'touch-zone';
+                div.dataset.key = noteKey;
+                
+                // Add Marker
+                const marker = document.createElement('div');
+                marker.className = 'note-marker';
+                
+                // Label: Show "สายเปล่า" for index 0, else show Note
+                if (index === 0) {
+                    marker.innerText = "○"; // Open string symbol
+                    marker.style.border = "2px solid rgba(255,255,255,0.2)";
+                } else {
+                    marker.innerText = data.note;
+                }
+                
+                div.appendChild(marker);
+                fretboard.appendChild(div);
+
+                // Touch Events
+                const handleStart = (e) => {
+                    e.preventDefault();
+                    div.classList.add('active');
+                    playTone(noteKey, data.freq);
+                };
+                
+                const handleEnd = (e) => {
+                    e.preventDefault();
+                    div.classList.remove('active');
+                    stopTone(noteKey);
+                };
+
+                div.addEventListener('touchstart', handleStart, {passive: false});
+                div.addEventListener('touchend', handleEnd, {passive: false});
+                div.addEventListener('mousedown', handleStart);
+                div.addEventListener('mouseup', handleEnd);
+                div.addEventListener('mouseleave', handleEnd);
+            });
+        });
+
+        // --- Controls Logic ---
+
+        function toggleNotes() {
+            document.body.classList.toggle('show-notes');
+            const btn = document.getElementById('btn-notes');
+            btn.classList.toggle('active');
+            showToast(document.body.classList.contains('show-notes') ? "แสดงโน้ต" : "ซ่อนโน้ต");
+        }
+
+        // Recording
+        function toggleRecord() {
+            initAudio(); // Ensure context is ready
+            const btn = document.getElementById('btn-record');
+            
+            if (btn.classList.contains('recording')) {
+                // Stop Recording
+                mediaRecorder.stop();
+                btn.classList.remove('recording');
+                btn.innerHTML = "🔴 อัดเสียง";
+                showToast("หยุดอัดเสียงแล้ว");
+            } else {
+                // Start Recording
+                audioChunks = [];
+                // Check if browser supports exact mimetype, fallback if not
+                let options = { mimeType: 'audio/webm' };
+                if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                    options = { mimeType: 'audio/mp4' }; // Safari fallback sometimes
+                }
+                
+                try {
+                    mediaRecorder = new MediaRecorder(dest.stream, options);
+                } catch (e) {
+                    mediaRecorder = new MediaRecorder(dest.stream); // Default
+                }
+
+                mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    recordedBlob = new Blob(audioChunks, { type: 'audio/wav' }); // Generic container
+                    audioUrl = URL.createObjectURL(recordedBlob);
+                    document.getElementById('btn-play').disabled = false;
+                    document.getElementById('btn-download').disabled = false;
+                };
+
+                mediaRecorder.start();
+                btn.classList.add('recording');
+                btn.innerHTML = "⏹ หยุด";
+                showToast("กำลังอัดเสียง...");
+            }
+        }
+
+        function playRecording() {
+            if (!audioUrl) return;
+            const audio = new Audio(audioUrl);
+            audio.play();
+            showToast("กำลังเล่นเสียงที่อัด...");
+        }
+
+        function downloadAudio() {
+            if (!audioUrl) return;
+            const a = document.createElement('a');
+            a.href = audioUrl;
+            a.download = `saw-u-recording-${Date.now()}.wav`; // naming
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast("ดาวน์โหลดเรียบร้อย");
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.add('show-toast');
+            setTimeout(() => {
+                toast.classList.remove('show-toast');
+            }, 2000);
+        }
+        
+        // Prevent context menu on long press
+        window.oncontextmenu = function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            return false;
+        };
+
+    </script>
+</body>
+</html>

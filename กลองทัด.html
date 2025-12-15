@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>กลองทัดโปร - Klong Tad Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --wood-dark: #3e2723;
+            --wood-light: #5d4037;
+            --skin-color: #d7ccc8;
+            --skin-shadow: #a1887f;
+        }
+
+        body, html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* ป้องกันการเลื่อน */
+            background-color: #121212;
+            font-family: 'Sarabun', sans-serif;
+            touch-action: none; /* ป้องกัน default touch actions ของ browser */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* พื้นหลังเวที */
+        .stage-bg {
+            background: radial-gradient(circle at center, #2c1e18 0%, #000000 100%);
+            height: 100%;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* ดีไซน์ตัวกลอง */
+        .drum-container {
+            position: relative;
+            transition: transform 0.05s ease;
+        }
+        
+        .drum-container:active {
+            transform: scale(0.97);
+        }
+
+        .drum-body {
+            border-radius: 50%;
+            background: repeating-linear-gradient(
+                45deg,
+                var(--wood-dark),
+                var(--wood-dark) 10px,
+                var(--wood-light) 10px,
+                var(--wood-light) 20px
+            );
+            box-shadow: 0 10px 20px rgba(0,0,0,0.8), inset 0 -10px 20px rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* หนังกลอง */
+        .drum-skin {
+            border-radius: 50%;
+            background: radial-gradient(circle, #f0e6dd 20%, #d7ccc8 60%, #8d6e63 100%);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            border: 4px solid #5d4037; /* ขอบหนัง */
+        }
+
+        /* เอฟเฟกต์รอยเก่าบนหนังกลอง */
+        .drum-skin::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.1'/%3E%3C/svg%3E");
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        /* หมุดยึดหนังกลอง (จำลอง) */
+        .pegs {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 2px dashed rgba(255,255,255,0.2);
+            pointer-events: none;
+        }
+
+        /* Animation เวลาตี */
+        @keyframes hit-vibration {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.98); }
+            100% { transform: scale(1); }
+        }
+        
+        .hit-anim {
+            animation: hit-vibration 0.1s ease-out;
+        }
+
+        /* ปุ่มควบคุม */
+        .control-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: env(safe-area-inset-bottom); /* รองรับ iPhone X+ */
+        }
+
+        .btn-glass {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.2s;
+        }
+        .btn-glass:active {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(2px);
+        }
+
+        .note-label {
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .show-notes .note-label {
+            opacity: 1;
+        }
+
+        .visual-feedback {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 60%);
+            opacity: 0;
+            pointer-events: none;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app" class="stage-bg">
+        
+        <!-- Header -->
+        <header class="w-full p-4 flex justify-between items-center z-10">
+            <div>
+                <h1 class="text-white text-xl md:text-2xl font-bold tracking-wider">กลองทัด <span class="text-yellow-500 text-sm font-normal">Virtual</span></h1>
+            </div>
+            <div id="status-indicator" class="text-xs text-gray-400 font-mono">Ready</div>
+        </header>
+
+        <!-- Main Drum Area -->
+        <div class="flex-grow w-full flex items-center justify-center space-x-2 md:space-x-8 px-2">
+            
+            <!-- กลองตัวเมีย (เสียงสูง) - ด้านซ้าย -->
+            <div class="drum-container w-[45vw] h-[45vw] max-w-[300px] max-h-[300px]" onclick="playDrum('high')">
+                <div class="drum-body w-full h-full p-2 md:p-4">
+                    <div id="drum-high" class="drum-skin w-full h-full">
+                        <div class="pegs"></div>
+                        <div class="visual-feedback"></div>
+                        <div class="note-label text-gray-800 font-bold text-lg md:text-2xl z-10">ตัวเมีย (L)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- กลองตัวผู้ (เสียงต่ำ) - ด้านขวา -->
+            <div class="drum-container w-[50vw] h-[50vw] max-w-[350px] max-h-[350px]" onclick="playDrum('low')">
+                <div class="drum-body w-full h-full p-2 md:p-4">
+                    <div id="drum-low" class="drum-skin w-full h-full">
+                        <div class="pegs"></div>
+                        <div class="visual-feedback"></div>
+                        <div class="note-label text-gray-800 font-bold text-lg md:text-2xl z-10">ตัวผู้ (A)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="control-panel w-full p-4 rounded-t-3xl">
+            <div class="flex justify-around items-center max-w-lg mx-auto gap-2">
+                
+                <!-- Toggle Notes -->
+                <button onclick="toggleNotes()" class="btn-glass p-3 rounded-full text-white flex flex-col items-center justify-center w-16 h-16">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                    <span class="text-[10px] mt-1">โน้ต</span>
+                </button>
+
+                <!-- Record -->
+                <button id="btn-record" onclick="toggleRecord()" class="btn-glass p-3 rounded-full text-red-400 flex flex-col items-center justify-center w-20 h-20 border-red-400/30 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
+                    <div id="rec-icon" class="w-4 h-4 rounded-full bg-red-500 mb-1"></div>
+                    <span id="rec-text" class="text-[10px]">อัดเสียง</span>
+                </button>
+
+                <!-- Stop/Play -->
+                <button id="btn-play" onclick="playRecording()" disabled class="btn-glass p-3 rounded-full text-green-400 flex flex-col items-center justify-center w-16 h-16 disabled:opacity-30 disabled:cursor-not-allowed">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    <span class="text-[10px] mt-1">เล่น</span>
+                </button>
+
+                <!-- Download -->
+                <button id="btn-download" onclick="downloadAudio()" disabled class="btn-glass p-3 rounded-full text-blue-400 flex flex-col items-center justify-center w-16 h-16 disabled:opacity-30 disabled:cursor-not-allowed">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    <span class="text-[10px] mt-1">โหลด</span>
+                </button>
+
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Audio Context & Tone.js Setup ---
+        let isAudioStarted = false;
+        let drumSynth;
+        let recorder;
+        let recordingBlob = null;
+
+        // Drum Settings (ปรับจูนเสียงให้เหมือนกลองทัด)
+        // กลองทัดเสียงจะมีความอ้วน (Boomy) และหางเสียงยาว (Decay)
+        const setupAudio = async () => {
+            if (isAudioStarted) return;
+            await Tone.start();
+            
+            // ใช้ MembraneSynth สำหรับเสียงกลองหนัง
+            drumSynth = new Tone.MembraneSynth({
+                pitchDecay: 0.05,
+                octaves: 4,
+                oscillator: { type: "sine" },
+                envelope: {
+                    attack: 0.001,
+                    decay: 0.4,     // หางเสียงยาวพอประมาณ
+                    sustain: 0.01,
+                    release: 1.4,
+                    attackCurve: "exponential"
+                }
+            }).toDestination();
+
+            // เพิ่ม Reverb เล็กน้อยเพื่อจำลองเสียงในลานวัด
+            const reverb = new Tone.Reverb({
+                decay: 2.5,
+                preDelay: 0.1
+            }).toDestination();
+            drumSynth.connect(reverb);
+
+            // ตั้งค่าเครื่องอัดเสียง (บันทึก Output ทั้งหมด)
+            recorder = new Tone.Recorder();
+            Tone.getDestination().connect(recorder);
+
+            isAudioStarted = true;
+            document.getElementById('status-indicator').innerText = "Audio Active";
+            document.getElementById('status-indicator').classList.add('text-green-500');
+        };
+
+        // --- Logic การเล่น ---
+        // ตัวผู้ (Low) = A1, ตัวเมีย (High) = D2 (ปรับ Pitch ให้เหมาะสมกับกลองทัด)
+        const NOTES = {
+            'low': 'G1', // เสียงทุ้ม ลึก
+            'high': 'C2' // เสียงสูงกว่า กังวาน
+        };
+
+        // สำหรับเก็บข้อมูลการเล่น (Sequence)
+        let isRecording = false;
+        let recordingStartTime = 0;
+        let recordedEvents = []; // { time: number, type: 'low'|'high' }
+        let isPlayingBack = false;
+
+        async function playDrum(type) {
+            if (!isAudioStarted) await setupAudio();
+
+            // 1. Play Sound
+            const note = NOTES[type];
+            // random velocity เล็กน้อยเพื่อความสมจริง
+            const velocity = 0.8 + Math.random() * 0.2; 
+            drumSynth.triggerAttackRelease(note, "8n", Tone.now(), velocity);
+
+            // 2. Visual Animation
+            const drumElement = document.getElementById(type === 'high' ? 'drum-high' : 'drum-low');
+            const feedback = drumElement.querySelector('.visual-feedback');
+            
+            // Reset animation
+            feedback.style.transition = 'none';
+            feedback.style.opacity = '1';
+            requestAnimationFrame(() => {
+                feedback.style.transition = 'opacity 0.2s ease-out';
+                feedback.style.opacity = '0';
+            });
+
+            // 3. Record Event (ถ้ากำลังอัด)
+            if (isRecording) {
+                const timeSinceStart = Date.now() - recordingStartTime;
+                recordedEvents.push({ time: timeSinceStart, type: type });
+            }
+        }
+
+        // --- Recording Logic ---
+        
+        const btnRecord = document.getElementById('btn-record');
+        const recIcon = document.getElementById('rec-icon');
+        const recText = document.getElementById('rec-text');
+        const btnPlay = document.getElementById('btn-play');
+        const btnDownload = document.getElementById('btn-download');
+
+        async function toggleRecord() {
+            if (!isAudioStarted) await setupAudio();
+
+            if (!isRecording) {
+                // เริ่มอัด
+                isRecording = true;
+                recordedEvents = [];
+                recordingStartTime = Date.now();
+                
+                // Tone.Recorder Start
+                recorder.start();
+
+                // UI Updates
+                btnRecord.classList.add('bg-red-500/20');
+                recIcon.classList.add('animate-pulse');
+                recText.innerText = "กำลังอัด...";
+                btnPlay.disabled = true;
+                btnDownload.disabled = true;
+                
+            } else {
+                // หยุดอัด
+                isRecording = false;
+                
+                // Tone.Recorder Stop -> Get Blob
+                recordingBlob = await recorder.stop();
+
+                // UI Updates
+                btnRecord.classList.remove('bg-red-500/20');
+                recIcon.classList.remove('animate-pulse');
+                recText.innerText = "อัดเสียง";
+                btnPlay.disabled = false;
+                btnDownload.disabled = false;
+            }
+        }
+
+        function playRecording() {
+            if (recordedEvents.length === 0 || isPlayingBack) return;
+            
+            isPlayingBack = true;
+            btnPlay.classList.add('text-green-200');
+            
+            // เล่นตาม Timeline
+            recordedEvents.forEach((event, index) => {
+                setTimeout(() => {
+                    playDrum(event.type);
+                    if (index === recordedEvents.length - 1) {
+                        isPlayingBack = false;
+                        btnPlay.classList.remove('text-green-200');
+                    }
+                }, event.time);
+            });
+        }
+
+        function downloadAudio() {
+            if (!recordingBlob) return;
+            
+            const url = URL.createObjectURL(recordingBlob);
+            const anchor = document.createElement("a");
+            anchor.download = "klong_tad_recording.webm";
+            anchor.href = url;
+            anchor.click();
+        }
+
+        // --- Utilities ---
+        function toggleNotes() {
+            document.body.classList.toggle('show-notes');
+        }
+
+        // --- Keyboard Controls ---
+        document.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            const key = e.key.toLowerCase();
+            if (key === 'a') {
+                playDrum('low'); // ซ้าย หรือ ล่าง (Mapping ตามความถนัด)
+            } else if (key === 'l' || key === ';') {
+                playDrum('high'); // ขวา
+            } else if (key === ' ') {
+                // Spacebar to toggle record (optional)
+                // toggleRecord();
+            }
+        });
+
+        // --- Touch Event Handling (Prevent Scroll) ---
+        // ป้องกันการซูมและการเลื่อนบนมือถือ
+        document.addEventListener('touchmove', function(event) {
+            event.preventDefault();
+        }, { passive: false });
+
+        // Bind touch events to drums explicitly to prevent delay
+        const drums = document.querySelectorAll('.drum-container');
+        drums.forEach(d => {
+            d.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // prevent mouse emulation
+                d.click();
+                d.classList.add('active');
+            }, { passive: false });
+            
+            d.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                d.classList.remove('active');
+            });
+        });
+
+    </script>
+</body>
+</html>

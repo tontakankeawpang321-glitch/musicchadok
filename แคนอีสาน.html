@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>แคนอีสานเสมือนจริง (Virtual Khaen)</title>
+    <style>
+        :root {
+            --bamboo-light: #eecfa1;
+            --bamboo-dark: #8b5a2b;
+            --bg-color: #2c1e12;
+            --text-color: #fff;
+            --active-color: #ff9800;
+        }
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        header {
+            text-align: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            width: 100%;
+            z-index: 10;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: var(--bamboo-light);
+            text-shadow: 1px 1px 2px black;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+            justify-content: center;
+        }
+
+        button {
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: none;
+            font-size: 0.9rem;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            background: #4e342e;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        button.record { background: #d32f2f; }
+        button.record.recording { background: #ff0000; animation: pulse 1.5s infinite; }
+        button.play { background: #388e3c; }
+        button.stop { background: #f57c00; }
+        button.download { background: #1976d2; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+        }
+
+        .status-bar {
+            font-size: 0.8rem;
+            margin-top: 5px;
+            color: #aaa;
+            height: 15px;
+        }
+
+        /* Khaen Layout */
+        .khaen-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            width: 100%;
+            padding-bottom: 20px;
+            position: relative;
+            max-width: 600px;
+        }
+
+        /* The wooden mouth piece box */
+        .mouth-piece {
+            position: absolute;
+            bottom: 15%;
+            width: 100%;
+            height: 120px;
+            background: linear-gradient(90deg, #3e2723, #5d4037, #3e2723);
+            border-radius: 10px;
+            z-index: 5;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            pointer-events: none; /* Let touches pass through to pipes if needed, or overlay */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .mouth-piece::after {
+            content: "เต้าแคน";
+            color: rgba(255,255,255,0.2);
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .pipes-wrapper {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            height: 90%;
+            width: 95%;
+            z-index: 6; /* Clickable above mouthpiece */
+        }
+
+        .pipe {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(90deg, #d7ccc8, var(--bamboo-light), #a1887f);
+            border-radius: 10px 10px 0 0;
+            position: relative;
+            cursor: pointer;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.4);
+            transition: transform 0.1s, filter 0.1s;
+            height: 100%; /* Will be adjusted by inline styles */
+            touch-action: none;
+            border: 1px solid #5d4037;
+        }
+
+        /* Simulate different pipe lengths visually */
+        .pipe:nth-child(odd) { margin-top: 20px; }
+        .pipe:nth-child(even) { margin-top: 0px; }
+
+        .pipe::before {
+            content: '';
+            width: 100%;
+            height: 5px;
+            background: rgba(0,0,0,0.1);
+            position: absolute;
+            top: 20%;
+        }
+        .pipe::after {
+            content: '';
+            width: 100%;
+            height: 5px;
+            background: rgba(0,0,0,0.1);
+            position: absolute;
+            bottom: 30%;
+        }
+
+        .pipe.active {
+            background: linear-gradient(90deg, #ffcc80, #ffa726, #fb8c00);
+            transform: translateY(4px);
+            box-shadow: 0 0 15px var(--active-color);
+        }
+
+        /* Hole (fingering position) */
+        .finger-hole {
+            width: 24px;
+            height: 24px;
+            background-color: #3e2723;
+            border-radius: 50%;
+            margin-bottom: 40px; /* Position near the "mouthpiece" area */
+            box-shadow: inset 1px 1px 3px rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 0.8rem;
+            font-weight: bold;
+            border: 2px solid #8d6e63;
+        }
+        
+        .pipe.active .finger-hole {
+            background-color: #fff;
+            color: #d84315;
+            box-shadow: 0 0 5px #fff;
+        }
+
+        .note-name {
+            margin-top: 10px;
+            font-weight: bold;
+            color: #3e2723;
+            font-size: 1rem;
+            text-shadow: 0px 0px 2px rgba(255,255,255,0.5);
+        }
+        
+        .key-hint {
+            position: absolute;
+            bottom: 5px;
+            font-size: 0.6rem;
+            color: #555;
+            display: none; /* Hidden on mobile */
+        }
+
+        @media (min-width: 768px) {
+            .key-hint { display: block; }
+            .khaen-container { max-width: 800px; }
+            .finger-hole { width: 30px; height: 30px; margin-bottom: 60px; font-size: 0.9rem;}
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>แคนอีสาน (Virtual Khaen)</h1>
+        <div class="controls">
+            <button class="record" id="btnRecord" onclick="toggleRecording()">🔴 อัดเสียง</button>
+            <button class="play" id="btnPlay" onclick="playRecording()" disabled>▶️ ฟังเสียง</button>
+            <button class="download" id="btnDownload" onclick="downloadAudio()" disabled>💾 โหลด</button>
+        </div>
+        <div class="status-bar" id="statusBar">แตะที่รูเพื่อเป่าแคน</div>
+    </header>
+
+    <div class="khaen-container">
+        <!-- Decoration -->
+        <div class="mouth-piece"></div>
+
+        <div class="pipes-wrapper" id="pipesContainer">
+            <!-- Pipes will be generated by JS -->
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        // Scale: Am Pentatonic/Diatonic mix common in Isan music
+        // Frequencies adjusted for just intonation feel or equal temperament
+        const notes = [
+            { note: 'ลา', key: 'A3', freq: 220.00, label: 'ล' }, // Low A
+            { note: 'โด', key: 'C4', freq: 261.63, label: 'ด' },
+            { note: 'เร', key: 'D4', freq: 293.66, label: 'ร' },
+            { note: 'มี', key: 'E4', freq: 329.63, label: 'ม' },
+            { note: 'ซอล', key: 'G4', freq: 392.00, label: 'ซ' },
+            { note: 'ลา', key: 'A4', freq: 440.00, label: 'ล' },
+            { note: 'โด', key: 'C5', freq: 523.25, label: 'ด' }, // High C
+            { note: 'เร', key: 'D5', freq: 587.33, label: 'ร' }, // High D
+            { note: 'มี', key: 'E5', freq: 659.25, label: 'ม' }, // High E
+            { note: 'ซอล', key: 'G5', freq: 783.99, label: 'ซ' }, // High G
+            { note: 'ลา', key: 'A5', freq: 880.00, label: 'ล' }  // High A
+        ];
+
+        // --- Audio Context & Synth ---
+        let audioCtx;
+        let masterGain;
+        let dest; // For recording
+        let activeOscillators = {}; // Map to track playing notes
+        
+        // Recorder variables
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob = null;
+        let isRecording = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // Master volume
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.4; // Prevent clipping with multiple notes
+                
+                // Compressor to unify volume
+                const compressor = audioCtx.createDynamicsCompressor();
+                compressor.threshold.value = -10;
+                compressor.knee.value = 40;
+                compressor.ratio.value = 12;
+                compressor.attack.value = 0;
+                compressor.release.value = 0.25;
+
+                masterGain.connect(compressor);
+                compressor.connect(audioCtx.destination);
+
+                // Setup recording destination
+                dest = audioCtx.createMediaStreamDestination();
+                compressor.connect(dest);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // --- Sound Synthesis ---
+        function playTone(index) {
+            initAudio();
+            if (activeOscillators[index]) return; // Already playing
+
+            const noteData = notes[index];
+            const now = audioCtx.currentTime;
+
+            // Create oscillators for Khaen sound (Harmonica/Reed-like)
+            // Khaen sound is rich in harmonics. Sawtooth is good base.
+            const osc1 = audioCtx.createOscillator();
+            const osc2 = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            osc1.type = 'sawtooth';
+            osc2.type = 'square'; // Adding square for hollow wooden sound
+
+            osc1.frequency.value = noteData.freq;
+            osc2.frequency.value = noteData.freq;
+            
+            // Detune slightly for realism (chorus effect)
+            osc2.detune.value = 5; 
+
+            // Filter to remove harshness
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 2000; // Cutoff high fizz
+            filter.Q.value = 1;
+
+            // Envelope (ADSR)
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(0.6, now + 0.05); // Attack
+            gainNode.gain.exponentialRampToValueAtTime(0.5, now + 0.1); // Decay
+
+            // Connections
+            osc1.connect(filter);
+            osc2.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(masterGain);
+
+            osc1.start(now);
+            osc2.start(now);
+
+            // Store ref to stop later
+            activeOscillators[index] = { osc1, osc2, gainNode, filter };
+
+            // Visual feedback
+            const pipeEl = document.getElementById(`pipe-${index}`);
+            if(pipeEl) pipeEl.classList.add('active');
+        }
+
+        function stopTone(index) {
+            if (!activeOscillators[index]) return;
+
+            const { osc1, osc2, gainNode } = activeOscillators[index];
+            const now = audioCtx.currentTime;
+            
+            // Release envelope
+            gainNode.gain.cancelScheduledValues(now);
+            gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.15); // Release time
+
+            osc1.stop(now + 0.15);
+            osc2.stop(now + 0.15);
+
+            delete activeOscillators[index];
+
+            // Visual feedback
+            const pipeEl = document.getElementById(`pipe-${index}`);
+            if(pipeEl) pipeEl.classList.remove('active');
+        }
+
+        // --- UI Generation ---
+        function createPipes() {
+            const container = document.getElementById('pipesContainer');
+            
+            // Reorder notes visually if needed, but linear is fine for mobile screen width
+            // Standard Khaen has pipes in pairs, but linear is easier for touch.
+            
+            notes.forEach((n, index) => {
+                const pipe = document.createElement('div');
+                pipe.className = 'pipe';
+                pipe.id = `pipe-${index}`;
+                // Visual height variation
+                const heightPercent = 60 + (Math.random() * 40); 
+                pipe.style.height = `${heightPercent}%`;
+
+                // Calculate color slightly
+                
+                const noteName = document.createElement('div');
+                noteName.className = 'note-name';
+                noteName.innerText = n.label;
+
+                const hole = document.createElement('div');
+                hole.className = 'finger-hole';
+                hole.innerText = n.key.replace(/\d/, ''); // Show C, D, E without octave
+
+                pipe.appendChild(noteName);
+                pipe.appendChild(hole);
+                
+                // Event Listeners (Mouse & Touch)
+                // Use Pointer Events for better unification
+                pipe.addEventListener('pointerdown', (e) => {
+                    e.preventDefault();
+                    playTone(index);
+                    pipe.setPointerCapture(e.pointerId);
+                });
+
+                pipe.addEventListener('pointerup', (e) => {
+                    e.preventDefault();
+                    stopTone(index);
+                    pipe.releasePointerCapture(e.pointerId);
+                });
+
+                pipe.addEventListener('pointerleave', (e) => {
+                    stopTone(index); // Safety stop
+                });
+                
+                // Multi-touch fallback/support specifically for mobile chords
+                pipe.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); // Prevent scroll
+                    playTone(index);
+                }, {passive: false});
+
+                pipe.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    stopTone(index);
+                }, {passive: false});
+
+                container.appendChild(pipe);
+            });
+        }
+
+        // --- Recording Logic ---
+        function toggleRecording() {
+            initAudio();
+            const btn = document.getElementById('btnRecord');
+            const status = document.getElementById('statusBar');
+            
+            if (!isRecording) {
+                // Start Recording
+                audioChunks = [];
+                // Use MediaRecorder on the destination stream
+                // Note: MimeType support varies.
+                let options = { mimeType: 'audio/webm' };
+                if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                    options = { mimeType: 'audio/mp4' }; // Safari fallback often
+                }
+                
+                try {
+                    mediaRecorder = new MediaRecorder(dest.stream, options);
+                } catch (e) {
+                    mediaRecorder = new MediaRecorder(dest.stream); // Default
+                }
+
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    document.getElementById('btnPlay').disabled = false;
+                    document.getElementById('btnDownload').disabled = false;
+                    status.innerText = "บันทึกเสร็จสิ้น พร้อมฟังหรือดาวน์โหลด";
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                btn.innerText = "⏹ หยุด";
+                btn.classList.add('recording');
+                status.innerText = "กำลังอัดเสียง... (เล่นแคนได้เลย)";
+                
+                // Disable play/download while recording
+                document.getElementById('btnPlay').disabled = true;
+                document.getElementById('btnDownload').disabled = true;
+
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                btn.innerText = "🔴 อัดเสียง";
+                btn.classList.remove('recording');
+            }
+        }
+
+        function playRecording() {
+            if (!audioBlob) return;
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            audio.play();
+            document.getElementById('statusBar').innerText = "กำลังเล่นเสียงที่อัดไว้...";
+            audio.onended = () => {
+                document.getElementById('statusBar').innerText = "เล่นจบแล้ว";
+            };
+        }
+
+        function downloadAudio() {
+            if (!audioBlob) return;
+            const url = URL.createObjectURL(audioBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            // Generate timestamp for filename
+            const date = new Date();
+            const ts = `${date.getHours()}-${date.getMinutes()}`;
+            a.download = `my-khaen-song-${ts}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+        }
+
+        // --- Keyboard Support (for PC debugging or hybrid devices) ---
+        const keyMap = {
+            'a': 0, 's': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5, 'j': 6, 'k': 7, 'l': 8, ';': 9, "'": 10
+        };
+
+        window.addEventListener('keydown', (e) => {
+            if (!e.repeat && keyMap.hasOwnProperty(e.key.toLowerCase())) {
+                playTone(keyMap[e.key.toLowerCase()]);
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (keyMap.hasOwnProperty(e.key.toLowerCase())) {
+                stopTone(keyMap[e.key.toLowerCase()]);
+            }
+        });
+
+        // Initialize
+        createPipes();
+
+        // Prevent context menu on long press
+        window.oncontextmenu = function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            return false;
+        };
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ปี่ไฉนจำลอง (Virtual Pi Chanai)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        :root {
+            --wood-dark: #3e1e0a;
+            --wood-light: #8b4513;
+            --gold: #ffd700;
+            --gold-shadow: #b8860b;
+            --bg-color: #1a1a1a;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: white;
+            font-family: 'Sarabun', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+        }
+
+        header {
+            width: 100%;
+            padding: 10px;
+            background: linear-gradient(180deg, #000, #333);
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            z-index: 10;
+            position: relative;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: var(--gold);
+            text-shadow: 0 0 5px var(--gold-shadow);
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .btn {
+            background: linear-gradient(145deg, #444, #222);
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            outline: none;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+            background: #222;
+        }
+
+        .btn.recording {
+            background: #b91c1c;
+            color: white;
+            border-color: red;
+            animation: pulse 1.5s infinite;
+        }
+
+        #btn-settings {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            padding: 8px;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            justify-content: center;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+        }
+
+        .instrument-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            width: 100%;
+            padding: 20px 0;
+        }
+
+        /* ตัวปี่ */
+        .pi-body {
+            width: 60px;
+            height: 95%;
+            background: linear-gradient(90deg, var(--wood-dark), var(--wood-light), var(--wood-dark));
+            border-radius: 10px 10px 30px 30px;
+            position: relative;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-evenly;
+            padding: 20px 0;
+            border: 2px solid #2a1505;
+        }
+
+        .ring {
+            position: absolute;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--gold-shadow), var(--gold), var(--gold-shadow));
+            z-index: 1;
+        }
+
+        .ring:nth-child(1) { top: 5%; }
+        .ring:nth-child(2) { top: 15%; }
+        .ring:nth-child(3) { bottom: 15%; }
+        .ring:nth-child(4) { bottom: 5%; }
+
+        .bell {
+            position: absolute;
+            bottom: -20px;
+            width: 100px;
+            height: 40px;
+            background: linear-gradient(90deg, var(--wood-dark), var(--wood-light), var(--wood-dark));
+            border-radius: 0 0 50% 50%;
+            clip-path: polygon(20% 0, 80% 0, 100% 100%, 0% 100%);
+            z-index: 0;
+        }
+
+        .finger-hole {
+            width: 45px;
+            height: 45px;
+            background: radial-gradient(circle at 30% 30%, #555, #000);
+            border-radius: 50%;
+            border: 2px solid var(--gold-shadow);
+            z-index: 2;
+            cursor: pointer;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.1s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .finger-hole::after {
+            content: attr(data-note);
+            font-size: 14px;
+            color: rgba(255,255,255,0.7);
+            font-weight: bold;
+            pointer-events: none;
+        }
+
+        .finger-hole.active {
+            background: radial-gradient(circle at 30% 30%, var(--gold), #b8860b);
+            transform: scale(0.95);
+            box-shadow: 0 0 15px var(--gold);
+            border-color: white;
+        }
+
+        .finger-hole.active::after {
+            color: #3e1e0a;
+        }
+
+        .finger-hole.has-custom::before {
+            content: '🎵';
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            font-size: 10px;
+            background: var(--gold);
+            border-radius: 50%;
+            padding: 2px;
+            color: black;
+            box-shadow: 0 2px 2px rgba(0,0,0,0.5);
+        }
+
+        #status-msg {
+            position: absolute;
+            bottom: 80px;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            text-align: center;
+        }
+
+        /* Modal Settings */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: #2a2a2a;
+            width: 90%;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid var(--gold);
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            color: white;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: var(--gold);
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .note-setting {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            background: #333;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .note-label {
+            font-weight: bold;
+            width: 40px;
+            color: var(--gold);
+        }
+
+        .file-input-wrapper {
+            flex-grow: 1;
+            margin: 0 10px;
+        }
+        
+        input[type="file"] {
+            width: 100%;
+            font-size: 0.8rem;
+            color: #ccc;
+        }
+
+        .clear-btn {
+            background: #b91c1c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 5px 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>ปี่ไฉนจำลอง</h1>
+        <button id="btn-settings" class="btn">⚙️</button>
+        <div class="controls">
+            <button id="btn-record" class="btn">
+                <span>🔴</span> บันทึก
+            </button>
+            <button id="btn-play" class="btn" disabled>
+                <span>▶️</span> เล่นเสียง
+            </button>
+            <button id="btn-download" class="btn" disabled>
+                <span>⬇️</span> โหลด
+            </button>
+        </div>
+    </header>
+
+    <div class="instrument-container">
+        <div class="bell"></div>
+        <div class="pi-body">
+            <div class="ring"></div>
+            <div class="ring"></div>
+            
+            <!-- Notes -->
+            <div class="finger-hole" id="hole-0" data-note="ดํ"></div>
+            <div class="finger-hole" id="hole-1" data-note="ท"></div>
+            <div class="finger-hole" id="hole-2" data-note="ล"></div>
+            <div class="finger-hole" id="hole-3" data-note="ซ"></div>
+            <div class="finger-hole" id="hole-4" data-note="ฟ"></div>
+            <div class="finger-hole" id="hole-5" data-note="ม"></div>
+            <div class="finger-hole" id="hole-6" data-note="ร"></div>
+            <div class="finger-hole" id="hole-7" data-note="ด"></div>
+
+            <div class="ring"></div>
+            <div class="ring"></div>
+        </div>
+        <div id="status-msg"></div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>ตั้งค่าเสียง (Sound Settings)</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <p style="font-size: 0.9rem; color: #aaa; margin-bottom: 15px;">
+                <strong>ยังไม่มีเสียง:</strong> กรุณาอัปโหลดไฟล์เสียง (.mp3, .wav) หรือใส่ลิงค์ในโค้ด
+            </p>
+            <div id="note-settings-list">
+                <!-- Javascript will populate this -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // ส่วนการตั้งค่าเสียง (User Configuration)
+        // ============================================
+        
+        // หากต้องการใส่ลิงค์เสียงถาวร ให้ใส่ URL ในเครื่องหมายคำพูดด้านล่าง
+        // ตัวอย่าง: "https://example.com/sound_do.mp3"
+        // หมายเหตุ: ลิงค์ต้องรองรับ CORS (Access-Control-Allow-Origin) มิฉะนั้นจะเล่นไม่ได้
+        
+        const soundUrls = [
+            "", // โน้ตที่ 0 (ดํ)
+            "", // โน้ตที่ 1 (ท)
+            "", // โน้ตที่ 2 (ล)
+            "", // โน้ตที่ 3 (ซ)
+            "", // โน้ตที่ 4 (ฟ)
+            "", // โน้ตที่ 5 (ม)
+            "", // โน้ตที่ 6 (ร)
+            "", // โน้ตที่ 7 (ด)
+        ];
+
+        // ============================================
+        // ระบบเสียง (Audio Engine)
+        // ============================================
+
+        let audioCtx;
+        let masterGain;
+        let compressor;
+        let dest;
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob;
+        let audioUrl;
+        let playbackAudio = new Audio();
+        
+        const activeSources = {}; 
+        const customBuffers = {}; // เก็บข้อมูลเสียงที่พร้อมเล่น
+        let isRecording = false;
+
+        const notes = [
+            { label: "ดํ (High Do)", id: 0 },
+            { label: "ท (Ti)", id: 1 },
+            { label: "ล (La)", id: 2 },
+            { label: "ซ (Sol)", id: 3 },
+            { label: "ฟ (Fa)", id: 4 },
+            { label: "ม (Mi)", id: 5 },
+            { label: "ร (Re)", id: 6 },
+            { label: "ด (Low Do)", id: 7 }
+        ];
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.8;
+
+                compressor = audioCtx.createDynamicsCompressor();
+                compressor.threshold.value = -10;
+                compressor.ratio.value = 12;
+
+                dest = audioCtx.createMediaStreamDestination();
+
+                masterGain.connect(compressor);
+                compressor.connect(audioCtx.destination);
+                compressor.connect(dest);
+
+                // โหลดเสียงจากลิงค์ที่ใส่ไว้ในตัวแปร soundUrls (ถ้ามี)
+                loadPredefinedSounds();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // โหลดเสียงจาก URL ที่กำหนดในโค้ด
+        function loadPredefinedSounds() {
+            soundUrls.forEach((url, index) => {
+                if (url && url.trim() !== "") {
+                    fetch(url)
+                        .then(response => response.arrayBuffer())
+                        .then(arrayBuffer => audioCtx.decodeAudioData(arrayBuffer))
+                        .then(audioBuffer => {
+                            customBuffers[index] = audioBuffer;
+                            document.getElementById(`hole-${index}`).classList.add('has-custom');
+                            console.log(`Loaded sound for note ${index} from URL`);
+                        })
+                        .catch(e => console.error(`Error loading sound for note ${index}:`, e));
+                }
+            });
+        }
+
+        function playSound(index) {
+            initAudio();
+            stopSound(index); 
+
+            // ตรวจสอบว่ามีไฟล์เสียงหรือไม่ ถ้าไม่มี ให้เงียบ (Return)
+            if (!customBuffers[index]) {
+                showStatus("ไม่มีไฟล์เสียง (Empty)");
+                return;
+            }
+
+            const t = audioCtx.currentTime;
+            const source = audioCtx.createBufferSource();
+            
+            source.buffer = customBuffers[index];
+            source.loop = true; // เล่นวนลูป
+            
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0, t);
+            gainNode.gain.linearRampToValueAtTime(1, t + 0.05); // Attack
+
+            source.connect(gainNode);
+            gainNode.connect(masterGain);
+            
+            source.start(t);
+            activeSources[index] = { source: source, gain: gainNode };
+        }
+
+        function stopSound(index) {
+            if (activeSources[index]) {
+                const t = audioCtx.currentTime;
+                const sound = activeSources[index];
+
+                sound.gain.gain.cancelScheduledValues(t);
+                sound.gain.gain.setValueAtTime(sound.gain.gain.value, t);
+                sound.gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+
+                sound.source.stop(t + 0.1);
+                
+                setTimeout(() => { 
+                    try {
+                        sound.source.disconnect(); 
+                        sound.gain.disconnect(); 
+                    } catch(e) {}
+                }, 200);
+
+                delete activeSources[index];
+            }
+        }
+
+        // --- UI & Interactions ---
+
+        const holes = document.querySelectorAll('.finger-hole');
+        holes.forEach((hole, i) => {
+            const start = (e) => {
+                e.preventDefault();
+                hole.classList.add('active');
+                playSound(i);
+            };
+            const end = (e) => {
+                e.preventDefault();
+                hole.classList.remove('active');
+                stopSound(i);
+            };
+
+            hole.addEventListener('touchstart', start, { passive: false });
+            hole.addEventListener('touchend', end);
+            hole.addEventListener('touchcancel', end);
+            hole.addEventListener('mousedown', start);
+            hole.addEventListener('mouseup', end);
+            hole.addEventListener('mouseleave', end);
+        });
+
+        // --- Settings Modal Logic ---
+        const modal = document.getElementById('settings-modal');
+        const btnSettings = document.getElementById('btn-settings');
+        const closeBtn = document.querySelector('.close-modal');
+        const settingsList = document.getElementById('note-settings-list');
+
+        btnSettings.addEventListener('click', () => {
+            modal.style.display = 'flex';
+        });
+
+        closeBtn.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        window.onclick = (event) => {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        };
+
+        notes.forEach(note => {
+            const row = document.createElement('div');
+            row.className = 'note-setting';
+            row.innerHTML = `
+                <span class="note-label">${note.label}</span>
+                <div class="file-input-wrapper">
+                    <input type="file" accept="audio/*" id="file-${note.id}">
+                </div>
+                <button class="clear-btn" id="clear-${note.id}">ลบ</button>
+            `;
+            settingsList.appendChild(row);
+
+            const fileInput = row.querySelector(`#file-${note.id}`);
+            const clearBtn = row.querySelector(`#clear-${note.id}`);
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        initAudio();
+                        audioCtx.decodeAudioData(ev.target.result, (buffer) => {
+                            customBuffers[note.id] = buffer;
+                            document.getElementById(`hole-${note.id}`).classList.add('has-custom');
+                            showStatus(`โหลดเสียง ${note.label} สำเร็จ`);
+                        }, (e) => {
+                            showStatus("Error decoding audio");
+                        });
+                    };
+                    reader.readAsArrayBuffer(file);
+                }
+            });
+
+            clearBtn.addEventListener('click', () => {
+                delete customBuffers[note.id];
+                fileInput.value = '';
+                document.getElementById(`hole-${note.id}`).classList.remove('has-custom');
+                showStatus(`รีเซ็ตเสียง ${note.label}`);
+            });
+        });
+
+        // --- Recording Logic ---
+        const btnRecord = document.getElementById('btn-record');
+        const btnPlay = document.getElementById('btn-play');
+        const btnDownload = document.getElementById('btn-download');
+        const statusMsg = document.getElementById('status-msg');
+
+        function showStatus(text) {
+            statusMsg.innerText = text;
+            statusMsg.style.opacity = 1;
+            setTimeout(() => { statusMsg.style.opacity = 0; }, 2000);
+        }
+
+        btnRecord.addEventListener('click', () => {
+            initAudio();
+            if (!isRecording) {
+                audioChunks = [];
+                const mimeTypes = ['audio/webm', 'audio/ogg', 'audio/mp4'];
+                let selectedMimeType = 'audio/webm'; 
+                if (MediaRecorder.isTypeSupported('audio/mp4')) selectedMimeType = 'audio/mp4';
+
+                try {
+                    mediaRecorder = new MediaRecorder(dest.stream, { mimeType: selectedMimeType });
+                } catch (e) {
+                    mediaRecorder = new MediaRecorder(dest.stream);
+                }
+
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+                    audioUrl = URL.createObjectURL(audioBlob);
+                    playbackAudio.src = audioUrl;
+                    btnPlay.disabled = false;
+                    btnDownload.disabled = false;
+                    showStatus("บันทึกเสร็จสิ้น");
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                btnRecord.classList.add('recording');
+                btnRecord.innerHTML = "<span>⏹</span> หยุด";
+                btnPlay.disabled = true;
+                btnDownload.disabled = true;
+                showStatus("กำลังบันทึก...");
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                btnRecord.classList.remove('recording');
+                btnRecord.innerHTML = "<span>🔴</span> บันทึก";
+            }
+        });
+
+        btnPlay.addEventListener('click', () => {
+            if (audioUrl) {
+                playbackAudio.play();
+                showStatus("กำลังเล่นเสียง...");
+            }
+        });
+
+        btnDownload.addEventListener('click', () => {
+            if (audioUrl) {
+                const a = document.createElement('a');
+                a.href = audioUrl;
+                const ext = mediaRecorder.mimeType.includes('mp4') ? 'mp4' : 'webm';
+                a.download = `pi_chanai_recording.${ext}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        });
+
+    </script>
+</body>
+</html>

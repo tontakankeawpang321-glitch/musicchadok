@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ขลุ่ยเพียงออเสมือนจริง (Virtual Khlui)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #1a1510;
+            background-image: radial-gradient(#3a2e22 1px, transparent 1px);
+            background-size: 20px 20px;
+            touch-action: none; /* Prevent zoom/scroll on touch */
+            overflow: hidden;
+        }
+
+        /* Bamboo Texture */
+        .bamboo {
+            background: linear-gradient(90deg, #5d4037 0%, #8d6e63 20%, #a1887f 45%, #8d6e63 80%, #5d4037 100%);
+            box-shadow: inset 0 0 20px #3e2723, 5px 0 15px rgba(0,0,0,0.5);
+            border-radius: 50px;
+            position: relative;
+        }
+
+        /* Bamboo Joint (Knots) */
+        .joint {
+            height: 4px;
+            background: #3e2723;
+            width: 100%;
+            margin: 15px 0;
+            box-shadow: 0 1px 2px rgba(255,255,255,0.2);
+            opacity: 0.7;
+        }
+
+        /* Finger Holes */
+        .hole-btn {
+            width: 60px;
+            height: 60px;
+            background: radial-gradient(circle at 30% 30%, #3e2723, #000);
+            border-radius: 50%;
+            border: 2px solid #5d4037;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.8), 0 0 5px rgba(255,255,255,0.1);
+            transition: all 0.1s;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #d7ccc8;
+            font-weight: bold;
+            font-size: 1.2rem;
+            user-select: none;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .hole-btn:active, .hole-btn.active {
+            background: radial-gradient(circle at 30% 30%, #5d4037, #2d1e18);
+            transform: scale(0.95);
+            box-shadow: inset 0 0 15px #000;
+            color: #ffcc80;
+            border-color: #ffcc80;
+        }
+
+        /* Visual Feedback Ring */
+        .hole-btn::after {
+            content: '';
+            position: absolute;
+            top: -5px; left: -5px; right: -5px; bottom: -5px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            transition: 0.2s;
+        }
+        .hole-btn.active::after {
+            border-color: rgba(255, 204, 128, 0.5);
+            transform: scale(1.1);
+        }
+
+        .control-btn {
+            transition: all 0.2s;
+        }
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .recording-dot {
+            width: 12px;
+            height: 12px;
+            background-color: red;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        /* Scrollbar hide */
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-between py-4 text-white">
+
+    <!-- Header -->
+    <header class="text-center z-10 w-full px-4">
+        <h1 class="text-2xl font-bold text-[#ffcc80] drop-shadow-md">ขลุ่ยเพียงออ</h1>
+        <p class="text-xs text-gray-400">กดที่รูเพื่อเป่าเสียง (แตะหลายนิ้วได้)</p>
+    </header>
+
+    <!-- The Flute (Instrument) -->
+    <div class="flex-grow flex items-center justify-center w-full py-2 overflow-hidden relative">
+        <!-- Bamboo Body -->
+        <div class="bamboo w-24 md:w-32 h-full flex flex-col items-center justify-evenly py-8 relative">
+            
+            <!-- Top Joint -->
+            <div class="joint absolute top-[5%]"></div>
+            
+            <!-- Mouthpiece area (Visual only) -->
+            <div class="w-16 h-8 bg-[#2d1e18] rounded mb-4 shadow-inner opacity-80 flex items-center justify-center">
+                <span class="text-[10px] text-gray-500">ปากนกแก้ว</span>
+            </div>
+
+            <!-- Notes Container -->
+            <div class="flex flex-col gap-3 md:gap-5 w-full items-center h-full justify-center overflow-y-auto" id="holes-container">
+                <!-- Holes will be injected by JS -->
+            </div>
+
+            <!-- Bottom Joint -->
+            <div class="joint absolute bottom-[5%]"></div>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="w-full max-w-md px-6 pb-6 z-10">
+        <div class="bg-[#2d1e18] bg-opacity-90 backdrop-blur-sm rounded-xl p-4 shadow-xl border border-[#5d4037]">
+            
+            <div class="flex justify-between items-center mb-2">
+                <span id="status-text" class="text-xs text-gray-400">พร้อมใช้งาน</span>
+                <div id="timer" class="text-sm font-mono text-[#ffcc80] hidden">00:00</div>
+            </div>
+
+            <div class="grid grid-cols-4 gap-2">
+                <button id="btn-record" class="control-btn bg-red-900 hover:bg-red-700 text-white py-2 rounded-lg flex flex-col items-center justify-center border border-red-800">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                    <span class="text-[10px] mt-1">อัดเสียง</span>
+                </button>
+
+                <button id="btn-stop" disabled class="control-btn bg-gray-700 text-gray-400 py-2 rounded-lg flex flex-col items-center justify-center border border-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+                    <span class="text-[10px] mt-1">หยุด</span>
+                </button>
+
+                <button id="btn-play" disabled class="control-btn bg-green-900 hover:bg-green-700 text-gray-400 py-2 rounded-lg flex flex-col items-center justify-center border border-green-800">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    <span class="text-[10px] mt-1">ฟัง</span>
+                </button>
+
+                <button id="btn-download" disabled class="control-btn bg-blue-900 hover:bg-blue-700 text-gray-400 py-2 rounded-lg flex flex-col items-center justify-center border border-blue-800">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                    <span class="text-[10px] mt-1">โหลด</span>
+                </button>
+            </div>
+            
+            <audio id="audio-player" class="hidden"></audio>
+        </div>
+    </div>
+
+    <script>
+        // --- Audio Engine Configuration ---
+        // Frequencies for Khlui Phiang Aw (approximate C Major scale for universal playability)
+        // Starting from C5 to C6
+        const NOTES = [
+            { id: 'do-high', name: 'ดํ', freq: 1046.50 }, // C6
+            { id: 'ti', name: 'ท', freq: 987.77 },   // B5
+            { id: 'la', name: 'ล', freq: 880.00 },   // A5
+            { id: 'sol', name: 'ซ', freq: 783.99 },   // G5
+            { id: 'fa', name: 'ฟ', freq: 698.46 },   // F5
+            { id: 'mi', name: 'ม', freq: 659.25 },   // E5
+            { id: 're', name: 'ร', freq: 587.33 },   // D5
+            { id: 'do', name: 'ด', freq: 523.25 }    // C5
+        ];
+
+        let audioCtx;
+        let masterGain;
+        let compressor;
+        let reverbNode;
+        let recorder;
+        let recordedChunks = [];
+        let recordingStartTime;
+        let timerInterval;
+        let audioDestination; // For recording
+
+        // State
+        const activeNotes = {}; // Stores oscillators for each note
+        let isRecording = false;
+
+        // --- Initialization ---
+        async function initAudio() {
+            if (audioCtx) return;
+            
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            
+            // Master Compressor to prevent clipping
+            compressor = audioCtx.createDynamicsCompressor();
+            compressor.threshold.setValueAtTime(-24, audioCtx.currentTime);
+            compressor.knee.setValueAtTime(30, audioCtx.currentTime);
+            compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+            compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+            compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+
+            // Reverb (Convolution) for realistic space
+            reverbNode = audioCtx.createConvolver();
+            reverbNode.buffer = await createImpulseResponse(2, 2, false); // 2 seconds reverb
+
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.6; // Overall volume
+
+            // Routing: Input -> Reverb -> Compressor -> Master -> Destination
+            // We want some dry signal mixed with wet reverb
+            const dryGain = audioCtx.createGain();
+            const wetGain = audioCtx.createGain();
+            dryGain.gain.value = 0.7;
+            wetGain.gain.value = 0.3;
+
+            // Connect graph
+            reverbNode.connect(wetGain);
+            
+            wetGain.connect(compressor);
+            dryGain.connect(compressor);
+            
+            compressor.connect(masterGain);
+            masterGain.connect(audioCtx.destination);
+            
+            // Setup recording destination
+            audioDestination = audioCtx.createMediaStreamDestination();
+            masterGain.connect(audioDestination);
+        }
+
+        // Create synthesized impulse response for reverb
+        async function createImpulseResponse(duration, decay, reverse) {
+            const rate = audioCtx.sampleRate;
+            const length = rate * duration;
+            const impulse = audioCtx.createBuffer(2, length, rate);
+            const left = impulse.getChannelData(0);
+            const right = impulse.getChannelData(1);
+
+            for (let i = 0; i < length; i++) {
+                const n = reverse ? length - i : i;
+                // Simple exponential decay
+                left[i] = (Math.random() * 2 - 1) * Math.pow(1 - n / length, decay);
+                right[i] = (Math.random() * 2 - 1) * Math.pow(1 - n / length, decay);
+            }
+            return impulse;
+        }
+
+        // --- Flute Sound Synthesis ---
+        function playNote(freq, noteId) {
+            if (!audioCtx) initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            // If note already playing, don't re-trigger
+            if (activeNotes[noteId]) return;
+
+            const t = audioCtx.currentTime;
+
+            // 1. Oscillator: Sine Wave (Fundamental)
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, t);
+
+            // 2. Oscillator: Triangle Wave (Harmonics - subtle)
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'triangle';
+            osc2.frequency.setValueAtTime(freq, t);
+
+            // 3. Noise (Breath sound/Chiff)
+            const bufferSize = audioCtx.sampleRate * 2; // 2 sec buffer
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            noise.loop = true;
+            
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'lowpass';
+            noiseFilter.frequency.value = 1000;
+
+            // 4. Vibrato (LFO)
+            const lfo = audioCtx.createOscillator();
+            lfo.frequency.value = 5; // 5Hz vibrato
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = 2; // Depth of vibrato
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+            lfoGain.connect(osc2.frequency);
+
+            // Envelopes (Gain Nodes)
+            const mainEnv = audioCtx.createGain();
+            const osc2Env = audioCtx.createGain();
+            const noiseEnv = audioCtx.createGain();
+
+            // Routing note specific graph
+            osc.connect(mainEnv);
+            osc2.connect(osc2Env);
+            noise.connect(noiseFilter).connect(noiseEnv);
+            
+            // Connect to processing chain (before reverb split)
+            // Need to connect to both dry and wet paths inputs (using compressor input as merge point for simplicity in this logic, but better to follow graph above)
+            // Let's connect to the inputs of Dry/Reverb defined in initAudio. 
+            // Re-accessing nodes via closure isn't clean, let's connect to ReverbNode AND Compressor (Dry) directly here?
+            // Correction: Connect to `reverbNode` and `compressor` via intermediate gain? 
+            // Better: Create a noteMasterGain and connect THAT to reverbNode and Compressor inputs logic.
+            // Simplified: Connect to ReverbNode (input) and Compressor (input) via `masterGain`'s predecessors. 
+            // Actually, let's just connect to reverbNode and direct to master's input chain.
+            // To keep it simple: Connect to ReverbNode and MasterGain directly? No, that bypasses dry/wet mix.
+            // Let's attach to `reverbNode` and `compressor` (assuming compressor is the dry path entry point effectively).
+            
+            // Quick fix: Connect to ReverbNode and Compressor input? No.
+            // Let's assume `reverbNode` is Wet Input and `compressor` is Dry+Wet mixed.
+            // We need a 'Note Output' node. Let's create one.
+            const noteOutput = audioCtx.createGain();
+            noteOutput.gain.value = 0.5; // Individual note volume
+            
+            // Re-connect graph logic dynamically
+            // Note Output -> ReverbNode (Wet)
+            // Note Output -> Compressor (Dry path needs a gain to balance)
+            // For simplicity in this function scope, I will connect noteOutput to ReverbNode and Compressor directly, 
+            // assuming the previous initAudio setup handles the mix. 
+            // Wait, ReverbNode output goes to WetGain. 
+            // So: Note -> ReverbNode. AND Note -> DryGain (which goes to Compressor).
+            // But DryGain isn't global scope. Let's make a simple bus.
+            // RE-DO initAudio logic slightly: Global `inputNode`
+            
+            // *Hack for robust sound:* Connect directly to `reverbNode` and `compressor`.
+            // The reverbNode output is handled. The compressor input is handled.
+            // But we need Dry signal. 
+            // Let's just connect to `reverbNode` (for wet) and `masterGain` (for dry/direct).
+            // Actually, connecting to `reverbNode` creates wet. Connecting to `compressor` creates dry (mostly).
+            
+            mainEnv.connect(noteOutput);
+            osc2Env.connect(noteOutput);
+            noiseEnv.connect(noteOutput);
+            
+            noteOutput.connect(reverbNode); 
+            // Also connect dry
+            noteOutput.connect(compressor); 
+
+            // Envelope Settings (ADSR)
+            const attack = 0.04;
+            const decay = 0.1;
+            const sustain = 0.8;
+            const release = 0.1; // Handled in stopNote
+
+            // 1. Main Sine
+            mainEnv.gain.setValueAtTime(0, t);
+            mainEnv.gain.linearRampToValueAtTime(1.0, t + attack);
+            mainEnv.gain.exponentialRampToValueAtTime(sustain, t + attack + decay);
+
+            // 2. Triangle (Harmonics) - lower volume
+            osc2Env.gain.setValueAtTime(0, t);
+            osc2Env.gain.linearRampToValueAtTime(0.3, t + attack);
+            osc2Env.gain.exponentialRampToValueAtTime(sustain * 0.3, t + attack + decay);
+
+            // 3. Breath Noise - Short burst at start + low sustain
+            noiseEnv.gain.setValueAtTime(0, t);
+            noiseEnv.gain.linearRampToValueAtTime(0.15, t + 0.02); // "Chiff"
+            noiseEnv.gain.exponentialRampToValueAtTime(0.02, t + 0.2); // Low steady breath
+
+            // Start sources
+            osc.start(t);
+            osc2.start(t);
+            noise.start(t);
+            lfo.start(t);
+
+            // Store ref for stopping
+            activeNotes[noteId] = {
+                sources: [osc, osc2, noise, lfo],
+                gains: [mainEnv, osc2Env, noiseEnv, noteOutput]
+            };
+        }
+
+        function stopNote(noteId) {
+            const voice = activeNotes[noteId];
+            if (!voice) return;
+
+            const t = audioCtx.currentTime;
+            const release = 0.15;
+
+            // Release Envelope
+            voice.gains.forEach(g => {
+                g.gain.cancelScheduledValues(t);
+                g.gain.setValueAtTime(g.gain.value, t);
+                g.gain.linearRampToValueAtTime(0, t + release);
+            });
+
+            // Stop sources after release
+            voice.sources.forEach(s => s.stop(t + release + 0.05));
+
+            // Cleanup
+            setTimeout(() => {
+                delete activeNotes[noteId];
+            }, (release + 0.1) * 1000);
+        }
+
+        // --- UI Construction ---
+        const container = document.getElementById('holes-container');
+
+        NOTES.forEach((note, index) => {
+            const btn = document.createElement('div');
+            btn.className = 'hole-btn';
+            btn.dataset.note = note.id;
+            btn.dataset.freq = note.freq;
+            btn.innerHTML = note.name;
+            
+            // Touch/Mouse Events
+            const startHandler = (e) => {
+                e.preventDefault();
+                btn.classList.add('active');
+                playNote(note.freq, note.id);
+            };
+            
+            const endHandler = (e) => {
+                e.preventDefault();
+                btn.classList.remove('active');
+                stopNote(note.id);
+            };
+
+            btn.addEventListener('mousedown', startHandler);
+            btn.addEventListener('touchstart', startHandler);
+            
+            btn.addEventListener('mouseup', endHandler);
+            btn.addEventListener('mouseleave', endHandler);
+            btn.addEventListener('touchend', endHandler);
+            // btn.addEventListener('touchcancel', endHandler); // Sometimes triggers prematurely on scroll
+
+            container.appendChild(btn);
+
+            // Decorate with joint after 3rd and 6th hole for visual realism
+            if (index === 0 || index === 3) {
+               // const spacer = document.createElement('div');
+               // spacer.className = 'w-full h-1 bg-[#3e2723] opacity-50 my-1';
+               // container.appendChild(spacer);
+            }
+        });
+
+        // --- Recording Logic ---
+        const btnRecord = document.getElementById('btn-record');
+        const btnStop = document.getElementById('btn-stop');
+        const btnPlay = document.getElementById('btn-play');
+        const btnDownload = document.getElementById('btn-download');
+        const statusText = document.getElementById('status-text');
+        const timerDisplay = document.getElementById('timer');
+        const audioPlayer = document.getElementById('audio-player');
+        
+        let audioBlob = null;
+
+        btnRecord.addEventListener('click', async () => {
+            await initAudio(); // Ensure context is ready
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+            // Prepare MediaRecorder
+            const dest = audioDestination;
+            recordedChunks = [];
+            
+            // Check mimeType support
+            let mimeType = 'audio/webm';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'audio/mp4'; // Safari fallback
+                if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = ''; // Default
+            }
+
+            try {
+                recorder = new MediaRecorder(dest.stream, { mimeType: mimeType });
+            } catch (e) {
+                recorder = new MediaRecorder(dest.stream); // Try generic
+            }
+
+            recorder.ondataavailable = e => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            recorder.onstop = () => {
+                audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                audioPlayer.src = audioUrl;
+                
+                // Enable buttons
+                btnPlay.disabled = false;
+                btnPlay.classList.remove('text-gray-400');
+                btnPlay.classList.add('text-white');
+                
+                btnDownload.disabled = false;
+                btnDownload.classList.remove('text-gray-400');
+                btnDownload.classList.add('text-white');
+                
+                statusText.innerHTML = "บันทึกเสร็จสิ้น";
+            };
+
+            recorder.start();
+            isRecording = true;
+            recordingStartTime = Date.now();
+            
+            // UI Update
+            statusText.innerHTML = '<span class="recording-dot"></span>กำลังบันทึก...';
+            btnRecord.disabled = true;
+            btnRecord.classList.add('opacity-50');
+            btnStop.disabled = false;
+            btnStop.classList.remove('text-gray-400');
+            btnStop.classList.add('text-white', 'bg-red-600');
+            
+            timerDisplay.classList.remove('hidden');
+            timerInterval = setInterval(updateTimer, 1000);
+        });
+
+        btnStop.addEventListener('click', () => {
+            if (!isRecording) return;
+            recorder.stop();
+            isRecording = false;
+            clearInterval(timerInterval);
+            
+            // UI Reset
+            btnRecord.disabled = false;
+            btnRecord.classList.remove('opacity-50');
+            btnStop.disabled = true;
+            btnStop.classList.add('text-gray-400');
+            btnStop.classList.remove('text-white', 'bg-red-600');
+        });
+
+        btnPlay.addEventListener('click', () => {
+            if (!audioBlob) return;
+            audioPlayer.play();
+            statusText.innerText = "กำลังเล่นเสียง...";
+            audioPlayer.onended = () => {
+                statusText.innerText = "เล่นจบแล้ว";
+            };
+        });
+
+        btnDownload.addEventListener('click', () => {
+            if (!audioBlob) return;
+            const url = URL.createObjectURL(audioBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'my_khlui_song_' + new Date().toISOString().slice(0,19).replace(/:/g,"-") + '.webm';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            statusText.innerText = "ดาวน์โหลดแล้ว";
+        });
+
+        function updateTimer() {
+            const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+            const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
+            const s = (elapsed % 60).toString().padStart(2, '0');
+            timerDisplay.innerText = `${m}:${s}`;
+        }
+
+        // Initialize Audio on first interaction (Touch or Click anywhere)
+        document.body.addEventListener('click', initAudio, { once: true });
+        document.body.addEventListener('touchstart', initAudio, { once: true });
+
+    </script>
+</body>
+</html>

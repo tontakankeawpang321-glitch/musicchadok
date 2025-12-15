@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ฆ้องมอญจำลอง (Virtual Khong Mon)</title>
+    <style>
+        /* Import Font (optional look) */
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        :root {
+            --wood-color: #5d4037;
+            --wood-dark: #3e2723;
+            --gold-light: #ffd700;
+            --gold-dark: #b8860b;
+            --gong-base: #e6c200;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            background-image: radial-gradient(circle at center, #2a2a2a, #000);
+            font-family: 'Sarabun', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            touch-action: none; /* Prevent scroll/zoom on mobile */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Control Panel */
+        #controls {
+            width: 100%;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+            box-sizing: border-box;
+            height: 10vh;
+            min-height: 60px;
+        }
+
+        button {
+            background: linear-gradient(145deg, #444, #222);
+            border: 1px solid #555;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            white-space: nowrap;
+        }
+
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 3px rgba(0,0,0,0.3);
+        }
+
+        button.active {
+            background: linear-gradient(145deg, #c0392b, #922b21);
+            border-color: #e74c3c;
+            color: white;
+        }
+
+        button.playing {
+            background: linear-gradient(145deg, #27ae60, #1e8449);
+        }
+
+        /* Instrument Area */
+        #instrument-container {
+            position: relative;
+            width: 100vw;
+            height: 90vh; /* Remaining height */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* The Frame (Khong Mon Shape - U-Shape/Horseshoe) */
+        #khong-frame {
+            position: relative;
+            /* Use vmin to fit smallest dimension to ensure visibility */
+            width: 90vmin; 
+            height: 85vmin;
+            /* Border representing the wood frame */
+            /* We will use SVG or complex CSS shapes, here simplified with borders */
+            /* Actually, positioning gongs absolutely is easier than drawing the frame first */
+        }
+
+        .frame-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50% 50% 10% 10%; /* Makes a horseshoe-ish shape base */
+            border: 25px solid transparent;
+            /* Visual guide for the frame path - stylized */
+            background: transparent;
+            pointer-events: none;
+            filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));
+            z-index: 0;
+        }
+
+        /* The Gong Button */
+        .gong {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, var(--gold-light), var(--gold-dark), var(--wood-color));
+            box-shadow: 
+                0 5px 15px rgba(0,0,0,0.5),
+                inset 0 0 10px rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #3e2723;
+            font-weight: bold;
+            font-size: 1.2rem;
+            cursor: pointer;
+            z-index: 10;
+            transform: translate(-50%, -50%); /* Center on coordinate */
+            touch-action: none;
+            transition: transform 0.05s;
+        }
+
+        /* The "Chom" (Nipple of the gong) */
+        .gong::after {
+            content: '';
+            position: absolute;
+            width: 35%;
+            height: 35%;
+            background: radial-gradient(circle at 30% 30%, #fffacd, var(--gold-dark));
+            border-radius: 50%;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.6);
+        }
+
+        .gong:active, .gong.hit {
+            transform: translate(-50%, -50%) scale(0.95);
+            filter: brightness(1.2);
+        }
+
+        .note-label {
+            position: absolute;
+            bottom: -25px;
+            color: #ddd;
+            font-size: 0.8rem;
+            text-shadow: 0 1px 2px black;
+            pointer-events: none;
+            display: none; /* Hidden by default */
+        }
+
+        .show-notes .note-label {
+            display: block;
+        }
+
+        /* Decorative ends of the frame */
+        .frame-deco {
+            position: absolute;
+            width: 15%;
+            height: 15%;
+            background: linear-gradient(45deg, var(--wood-color), var(--gold-dark));
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            z-index: 5;
+        }
+
+        /* Overlay for "Click to Start" (Audio Context policy) */
+        #start-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            color: var(--gold-light);
+            text-align: center;
+        }
+
+        #start-btn {
+            margin-top: 20px;
+            padding: 15px 30px;
+            font-size: 1.5rem;
+            background: var(--gold-dark);
+            border: 2px solid var(--gold-light);
+            border-radius: 50px;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(255, 215, 0, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
+        }
+
+        /* Recording Status */
+        #rec-status {
+            color: #e74c3c;
+            font-weight: bold;
+            display: none;
+            margin-left: 10px;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+
+    </style>
+</head>
+<body>
+
+    <!-- Audio Start Overlay -->
+    <div id="start-overlay">
+        <h1>ฆ้องมอญจำลอง</h1>
+        <p>Virtual Khong Mon</p>
+        <button id="start-btn">แตะเพื่อเริ่มเล่น (Start)</button>
+    </div>
+
+    <!-- Controls -->
+    <div id="controls">
+        <button id="btn-labels" onclick="toggleLabels()">แสดงโน้ต</button>
+        <button id="btn-record" onclick="toggleRecord()">🔴 อัดเสียง</button>
+        <span id="rec-status">REC</span>
+        <button id="btn-play-rec" onclick="playRecording()" disabled>▶️ เล่นที่อัด</button>
+        <button id="btn-download" onclick="downloadRecording()" disabled>💾 โหลด</button>
+    </div>
+
+    <!-- Instrument -->
+    <div id="instrument-container">
+        <div id="khong-frame">
+            <!-- Decorative wood structure visual (CSS generated via JS mostly for positions) -->
+            <!-- Gongs will be injected here by JS -->
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const totalGongs = 15;
+        // Thai scales are approx equidistant 7-tone, but we map to nearest Western frequencies for compatibility
+        // Starting from low pitch to high pitch. 
+        // Khong Mon Wong Yai usually starts around C3/D3.
+        // Frequencies (Hz) approximate for Thai feel:
+        const frequencies = [
+            196.00, // G3 (Low)
+            220.00, // A3
+            246.94, // B3
+            261.63, // C4
+            293.66, // D4
+            329.63, // E4
+            349.23, // F4
+            392.00, // G4
+            440.00, // A4
+            493.88, // B4
+            523.25, // C5
+            587.33, // D5
+            659.25, // E5
+            698.46, // F5
+            783.99  // G5 (High)
+        ];
+        
+        const noteNames = ["ซ", "ล", "ท", "ด", "ร", "ม", "ฟ", "ซ", "ล", "ท", "ด", "ร", "ม", "ฟ", "ซ"];
+        // 1 = Low (Do), 2=Re, etc. Using Thai phonetics:
+        // Do Re Mi Fa Sol La Ti -> D R M F S L T (ด ร ม ฟ ซ ล ท)
+
+        // --- Audio Context & Synthesis ---
+        let audioCtx;
+        let masterGain;
+        let destStream; // For recording
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob = null;
+        let recordedAudio = null;
+
+        function initAudio() {
+            if (audioCtx) return;
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            
+            // Master Gain
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.8;
+            
+            // Create destination for recording
+            destStream = audioCtx.createMediaStreamDestination();
+            
+            // Connect: Master -> Speaker AND Master -> Recorder
+            masterGain.connect(audioCtx.destination);
+            masterGain.connect(destStream);
+        }
+
+        // Realistic Gong Synthesis
+        function playTone(freq) {
+            if (!audioCtx) initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const t = audioCtx.currentTime;
+            
+            // 1. Fundamental Oscillator (Sine with slight shape)
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, t);
+
+            // 2. Overtones (to make it metallic)
+            // Khong Mon has a "wah" sound and distinct harmonics
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'triangle';
+            osc2.frequency.setValueAtTime(freq * 2.02, t); // Slightly detuned octave
+
+            const osc3 = audioCtx.createOscillator();
+            osc3.type = 'sine';
+            osc3.frequency.setValueAtTime(freq * 3.5, t); 
+
+            // Envelopes (ADSR)
+            const gain1 = audioCtx.createGain();
+            const gain2 = audioCtx.createGain();
+            const gain3 = audioCtx.createGain();
+
+            // Attack (Immediate impact) -> Decay (Long ring)
+            gain1.gain.setValueAtTime(0, t);
+            gain1.gain.linearRampToValueAtTime(1.0, t + 0.01);
+            gain1.gain.exponentialRampToValueAtTime(0.001, t + 2.5); // Long sustain for gong
+
+            gain2.gain.setValueAtTime(0, t);
+            gain2.gain.linearRampToValueAtTime(0.4, t + 0.01);
+            gain2.gain.exponentialRampToValueAtTime(0.001, t + 1.5); // Shorter metal ring
+
+            gain3.gain.setValueAtTime(0, t);
+            gain3.gain.linearRampToValueAtTime(0.2, t + 0.005);
+            gain3.gain.exponentialRampToValueAtTime(0.001, t + 0.8); // Initial clang
+
+            // Connections
+            osc.connect(gain1);
+            osc2.connect(gain2);
+            osc3.connect(gain3);
+
+            gain1.connect(masterGain);
+            gain2.connect(masterGain);
+            gain3.connect(masterGain);
+
+            osc.start(t);
+            osc2.start(t);
+            osc3.start(t);
+
+            // Stop oscs after decay to save CPU
+            osc.stop(t + 3.0);
+            osc2.stop(t + 3.0);
+            osc3.stop(t + 3.0);
+        }
+
+        // --- Visual Setup ---
+        const frame = document.getElementById('khong-frame');
+
+        function createGongs() {
+            // Calculate positions for a U-shape (Horseshoe)
+            // Parametric equation for a U-shape or truncated ellipse
+            
+            // Visual params
+            const centerX = 50; // percent
+            const centerY = 50; // percent
+            const radiusX = 40; // percent width
+            const radiusY = 45; // percent height
+            
+            for (let i = 0; i < totalGongs; i++) {
+                // Determine angle. 
+                // Khong Mon stands upright U-shape.
+                // Left bottom -> Top -> Right bottom
+                // Angle range: approx 160 degrees to 380 degrees (in standard trig)
+                // Let's map i (0 to 14) to Angle.
+                
+                // Let's create a "U" shape opening upwards (as seen from player usually, or player sits inside)
+                // Actually, Khong Mon (Mon Gong) player sits inside the U. 
+                // Left hand = Low pitch, Right hand = High pitch.
+                // Left end (near player) -> Curve around -> Right end (near player)
+                
+                // Angle: Start at bottom-left, go around to bottom-right.
+                // Math: 
+                // Start Angle: 140 deg (Top-leftish if 0 is right) -> No, let's use standard unit circle.
+                // 90 is Bottom. 
+                // We want to go from Left-Bottom around Top to Right-Bottom.
+                // Left Bottom approx: 150 degrees.
+                // Top: 270 degrees (-90)
+                // Right Bottom: 30 degrees (390).
+                
+                // Let's use Normalized position 0..1
+                const t = i / (totalGongs - 1);
+                
+                // Angle calculation (radians)
+                // Start from left side (PI approx) to right side (0 approx)
+                // But Khong Mon is vertical U. Let's map to screen coordinates.
+                // We want a nice arch.
+                
+                // Angle range: From ~170 deg to ~10 deg.
+                const startAngle = 170 * (Math.PI / 180);
+                const endAngle = 10 * (Math.PI / 180);
+                const angle = startAngle - (t * (startAngle - endAngle));
+
+                // Position
+                // x = 50 + r * cos(a)
+                // y = 50 - r * sin(a) (minus because CSS Y is down)
+                const x = 50 + radiusX * Math.cos(angle);
+                const y = 55 - radiusY * Math.sin(angle); // 55 pushes it down slightly
+                
+                // Size of gong varies slightly? Usually low gongs are bigger.
+                // Size range: 16% to 12% of container width
+                const sizeScale = 1 - (t * 0.3); // 1.0 down to 0.7
+                const baseSize = 14; // vmin units
+                const size = baseSize * sizeScale;
+
+                const btn = document.createElement('div');
+                btn.className = 'gong';
+                btn.style.left = `${x}%`;
+                btn.style.top = `${y}%`;
+                btn.style.width = `${size}vmin`;
+                btn.style.height = `${size}vmin`;
+                
+                // Visual properties
+                btn.innerHTML = `<span class="note-label">${noteNames[i]}</span>`;
+                
+                // Interaction
+                // Touch start is faster than click on mobile
+                btn.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); // Prevent ghost clicks
+                    hitGong(i, btn);
+                });
+                btn.addEventListener('mousedown', (e) => {
+                    hitGong(i, btn);
+                });
+
+                frame.appendChild(btn);
+            }
+            
+            // Add wood frame background explicitly based on curve logic if needed, 
+            // but the CSS border-radius approximation is lighter for performance.
+        }
+
+        function hitGong(index, element) {
+            playTone(frequencies[index]);
+            
+            // Visual Feedback
+            element.classList.remove('hit');
+            void element.offsetWidth; // Trigger reflow
+            element.classList.add('hit');
+            
+            // Remove class after animation
+            setTimeout(() => {
+                element.classList.remove('hit');
+            }, 100);
+        }
+
+        // --- Controls Logic ---
+        function toggleLabels() {
+            const frame = document.getElementById('khong-frame');
+            frame.classList.toggle('show-notes');
+            const btn = document.getElementById('btn-labels');
+            btn.classList.toggle('active');
+        }
+
+        // --- Recording Logic ---
+        let isRecording = false;
+
+        function toggleRecord() {
+            if (!audioCtx) initAudio();
+            
+            const recBtn = document.getElementById('btn-record');
+            const status = document.getElementById('rec-status');
+            const playBtn = document.getElementById('btn-play-rec');
+            const dlBtn = document.getElementById('btn-download');
+
+            if (!isRecording) {
+                // Start Recording
+                audioChunks = [];
+                // Check browser support
+                const mimeTypes = [
+                    'audio/webm;codecs=opus', 
+                    'audio/webm', 
+                    'audio/ogg'
+                ];
+                let options = {};
+                for(let type of mimeTypes) {
+                    if (MediaRecorder.isTypeSupported(type)) {
+                        options = { mimeType: type };
+                        break;
+                    }
+                }
+                
+                try {
+                    mediaRecorder = new MediaRecorder(destStream.stream, options);
+                } catch(e) {
+                    alert("Browser doesn't support MediaRecorder fully.");
+                    return;
+                }
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    playBtn.disabled = false;
+                    dlBtn.disabled = false;
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recBtn.classList.add('active');
+                recBtn.innerHTML = "⏹ หยุดอัด";
+                status.style.display = 'inline';
+                playBtn.disabled = true;
+                dlBtn.disabled = true;
+
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                recBtn.classList.remove('active');
+                recBtn.innerHTML = "🔴 อัดเสียง";
+                status.style.display = 'none';
+            }
+        }
+
+        function playRecording() {
+            if (!audioBlob) return;
+            
+            // Stop previous if playing
+            if (recordedAudio) {
+                recordedAudio.pause();
+                recordedAudio = null;
+            }
+
+            const url = URL.createObjectURL(audioBlob);
+            recordedAudio = new Audio(url);
+            
+            const btn = document.getElementById('btn-play-rec');
+            btn.classList.add('playing');
+            
+            recordedAudio.onended = () => {
+                btn.classList.remove('playing');
+            };
+            
+            recordedAudio.play();
+        }
+
+        function downloadRecording() {
+            if (!audioBlob) return;
+            const url = URL.createObjectURL(audioBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'khong_mon_recording.webm';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+        }
+
+        // --- Initialization ---
+        document.getElementById('start-btn').addEventListener('click', () => {
+            initAudio();
+            // Try to unlock audio on iOS
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            // Play a silent note to warm up engine
+            playTone(0);
+            
+            document.getElementById('start-overlay').style.display = 'none';
+        });
+
+        // Initialize Layout
+        createGongs();
+
+    </script>
+</body>
+</html>

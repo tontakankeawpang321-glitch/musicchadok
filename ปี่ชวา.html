@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ปี่ชวาจำลอง (Virtual Pi Java)</title>
+    <style>
+        /* --- การตั้งค่าพื้นฐาน --- */
+        :root {
+            --wood-dark: #3e2723;
+            --wood-light: #5d4037;
+            --gold: #ffc107;
+            --bg-color: #1a1a1a;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: white;
+            font-family: 'Sarabun', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden; /* ป้องกันการเลื่อนหน้าจอ */
+            touch-action: none; /* ป้องกัน default touch actions ของ browser */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* --- แผงควบคุม (ด้านบน) --- */
+        .control-panel {
+            width: 100%;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+        }
+
+        .btn-control {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-record { background-color: #e53935; color: white; }
+        .btn-stop { background-color: #757575; color: white; display: none; }
+        .btn-play { background-color: #43a047; color: white; }
+        .btn-download { background-color: #1e88e5; color: white; }
+        
+        .btn-control:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-control:active { transform: scale(0.95); }
+
+        .status-text {
+            position: absolute;
+            top: 60px;
+            font-size: 0.8rem;
+            color: var(--gold);
+            text-shadow: 1px 1px 2px black;
+        }
+
+        /* --- ตัวเครื่องดนตรี (ตรงกลาง) --- */
+        .instrument-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            width: 100%;
+            padding-top: 20px;
+            padding-bottom: 20px;
+            touch-action: none; 
+        }
+
+        /* ส่วนยอด (กำพวด/ลิ้น) */
+        .pi-top {
+            width: 20px;
+            height: 40px;
+            background: linear-gradient(90deg, #d4af37, #fff8e1, #d4af37);
+            border-radius: 5px 5px 0 0;
+            margin-bottom: -5px;
+            z-index: 2;
+        }
+
+        /* ส่วนตัวปี่ (เลาปี่) */
+        .pi-body {
+            width: 60px;
+            flex-grow: 1; /* ยืดตามความสูงจอ */
+            max-height: 70vh;
+            background: linear-gradient(90deg, var(--wood-dark), var(--wood-light), var(--wood-dark));
+            border-radius: 30px;
+            position: relative;
+            box-shadow: 5px 0 15px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-evenly; /* จัดระยะห่างรูนิ้ว */
+            align-items: center;
+            padding: 20px 0;
+            border: 2px solid #2d1b18;
+        }
+
+        /* ลวดลายข้อต่อ */
+        .pi-ring {
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, #b8860b, #ffd700, #b8860b);
+            position: absolute;
+        }
+        .ring-top { top: 10px; }
+        .ring-bottom { bottom: 10px; }
+
+        /* ส่วนลำโพง (บานออกด้านล่าง) */
+        .pi-bell {
+            width: 0;
+            height: 0;
+            border-left: 50px solid transparent;
+            border-right: 50px solid transparent;
+            border-top: 80px solid var(--wood-dark);
+            margin-top: -10px;
+            position: relative;
+            filter: drop-shadow(0 10px 10px rgba(0,0,0,0.5));
+        }
+        
+        .pi-bell::after {
+            content: '';
+            position: absolute;
+            top: -80px;
+            left: -40px;
+            width: 80px;
+            height: 20px;
+            background: linear-gradient(90deg, var(--wood-dark), var(--wood-light), var(--wood-dark));
+            opacity: 0.5;
+        }
+
+        /* --- ปุ่มกดโน้ต (รูนิ้ว) --- */
+        .note-hole {
+            width: 45px;
+            height: 45px;
+            background: radial-gradient(circle at 30% 30%, #5d4037, #261612);
+            border-radius: 50%;
+            border: 3px solid #8d6e63;
+            box-shadow: inset 2px 2px 5px black;
+            cursor: pointer;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.05s, background 0.05s; /* ทำให้ตอบสนองไวขึ้น */
+        }
+
+        /* สร้าง Hitbox ที่ใหญ่ขึ้นแบบมองไม่เห็น เพื่อให้กดง่ายและลากต่อนิ้วง่าย */
+        .note-hole::before {
+            content: '';
+            position: absolute;
+            top: -15px;
+            bottom: -15px;
+            left: -15px;
+            right: -15px;
+            border-radius: 50%;
+            z-index: 10;
+        }
+
+        .note-hole::after {
+            content: attr(data-note);
+            font-size: 12px;
+            color: rgba(255,255,255,0.7);
+            pointer-events: none;
+        }
+
+        /* เอฟเฟกต์ตอนกด (Active State) */
+        .note-hole.active {
+            background: radial-gradient(circle at 30% 30%, #ffd700, #b8860b);
+            border-color: #fff;
+            transform: scale(0.90); /* ยุบลงเล็กน้อย */
+            box-shadow: 0 0 15px var(--gold);
+        }
+        
+        .note-hole.active::after {
+            color: #000;
+            font-weight: bold;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- แผงควบคุม -->
+    <div class="control-panel">
+        <button id="btnRecord" class="btn-control btn-record">
+            <span>🔴</span> อัดเสียง
+        </button>
+        <button id="btnStop" class="btn-control btn-stop">
+            <span>⏹</span> หยุด
+        </button>
+        <button id="btnPlayRecord" class="btn-control btn-play" disabled>
+            <span>▶</span> ฟังที่อัด
+        </button>
+        <button id="btnDownload" class="btn-control btn-download" disabled>
+            <span>⬇</span> โหลด
+        </button>
+    </div>
+
+    <div id="status" class="status-text">พร้อมใช้งาน (กรุณาใส่ลิงก์เสียงในโค้ด)</div>
+
+    <!-- ตัวเครื่องดนตรี -->
+    <div class="instrument-container">
+        <div class="pi-top"></div>
+        
+        <div class="pi-body">
+            <div class="pi-ring ring-top"></div>
+            
+            <!-- รูนิ้ว เรียงจากบนลงล่าง -->
+            <div class="note-hole" data-note="High" data-index="7"></div>
+            <div class="note-hole" data-note="Ti" data-index="6"></div>
+            <div class="note-hole" data-note="La" data-index="5"></div>
+            <div class="note-hole" data-note="Sol" data-index="4"></div>
+            <div class="note-hole" data-note="Fa" data-index="3"></div>
+            <div class="note-hole" data-note="Mi" data-index="2"></div>
+            <div class="note-hole" data-note="Re" data-index="1"></div>
+            <div class="note-hole" data-note="Do" data-index="0"></div>
+
+            <div class="pi-ring ring-bottom"></div>
+        </div>
+
+        <div class="pi-bell"></div>
+    </div>
+
+    <script>
+        // ==========================================
+        // --- ส่วนใส่ลิงก์เสียง (USER CONFIG) ---
+        // ==========================================
+        const audioConfig = [
+            "", // เสียงที่ 1 (โด / Low)
+            "", // เสียงที่ 2 (เร)
+            "", // เสียงที่ 3 (มี)
+            "", // เสียงที่ 4 (ฟา)
+            "", // เสียงที่ 5 (ซอล)
+            "", // เสียงที่ 6 (ลา)
+            "", // เสียงที่ 7 (ที)
+            ""  // เสียงที่ 8 (โด สูง / High)
+        ];
+
+        // ==========================================
+        // --- ระบบ Audio Engine ---
+        // ==========================================
+        let audioContext;
+        let audioBuffers = [];
+        let mediaStreamDestination;
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordedBlob;
+        let isRecording = false;
+        const statusEl = document.getElementById('status');
+
+        async function initAudio() {
+            if (!audioContext) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioContext = new AudioContext();
+                mediaStreamDestination = audioContext.createMediaStreamDestination();
+                await loadSounds();
+            }
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
+        }
+
+        async function loadSounds() {
+            statusEl.innerText = "กำลังโหลดเสียง...";
+            const loadPromises = audioConfig.map(async (url, index) => {
+                if (!url) return null;
+                try {
+                    const response = await fetch(url);
+                    const arrayBuffer = await response.arrayBuffer();
+                    return await audioContext.decodeAudioData(arrayBuffer);
+                } catch (error) {
+                    console.error(`Error loading sound ${index}:`, error);
+                    return null;
+                }
+            });
+
+            audioBuffers = await Promise.all(loadPromises);
+            const loadedCount = audioBuffers.filter(b => b !== null).length;
+            if (loadedCount === 0) {
+                statusEl.innerText = "ยังไม่ได้ใส่ไฟล์เสียง (ใช้งานได้เฉพาะกราฟิก)";
+            } else {
+                statusEl.innerText = `โหลดเสียงเสร็จสิ้น (${loadedCount}/${audioConfig.length})`;
+            }
+        }
+
+        // ฟังก์ชันเล่นเสียง (อย่างเดียว ไม่เกี่ยวกับภาพ)
+        function playSound(index) {
+            initAudio(); 
+
+            if (audioContext && audioBuffers[index]) {
+                const source = audioContext.createBufferSource();
+                source.buffer = audioBuffers[index];
+                source.connect(audioContext.destination);
+                
+                if (mediaStreamDestination) {
+                    source.connect(mediaStreamDestination);
+                }
+                source.start(0);
+            }
+        }
+
+        // ==========================================
+        // --- ระบบจัดการสัมผัส (Robust Touch System) ---
+        // ==========================================
+        
+        // เก็บสถานะว่านิ้วไหน (Touch ID) กำลังกดโน้ตไหนอยู่ล่าสุด
+        // เพื่อใช้ป้องกันการเล่นเสียงซ้ำถ้านิ้วยังแช่อยู่ที่เดิม แต่ยอมให้เล่นใหม่ถ้าย้ายรู
+        const activeTouches = {}; 
+
+        function handleTouch(e) {
+            e.preventDefault(); // ป้องกันการซูมหรือเลื่อนจอ
+
+            // เซ็ตเก็บรายชื่อรูโน้ตที่ถูกกดในขณะนี้ (เพื่อแสดงผลกราฟิก)
+            const currentTouchedIndices = new Set();
+
+            // วนลูปตรวจสอบทุกนิ้วที่สัมผัสจอ
+            for (let i = 0; i < e.touches.length; i++) {
+                const touch = e.touches[i];
+                const element = document.elementFromPoint(touch.clientX, touch.clientY);
+
+                if (element && element.classList.contains('note-hole')) {
+                    const index = parseInt(element.getAttribute('data-index'));
+                    
+                    // เพิ่มโน้ตนี้เข้าไปในรายการ "กำลังถูกกด" เพื่อแสดงไฟ
+                    currentTouchedIndices.add(index);
+
+                    // ตรวจสอบ Logic การเล่นเสียง:
+                    // ถ้านิ้วนี้ (ID นี้) ยังไม่เคยบันทึกว่ากดปุ่มนี้มาก่อน (คือเพิ่งเลื่อนมาโดน หรือเพิ่งกดลงไป)
+                    if (activeTouches[touch.identifier] !== index) {
+                        playSound(index);
+                        activeTouches[touch.identifier] = index; // จำไว้ว่านิ้วนี้กดปุ่มนี้แล้ว
+                    }
+                } else {
+                    // ถ้านิ้วนี้ไม่ได้อยู่บนรูโน้ต (ลากออกไปพื้นที่ว่าง)
+                    // ให้ลบสถานะออก เพื่อให้เวลากลับมาโดนรูใหม่ จะได้เล่นเสียงได้อีก
+                    delete activeTouches[touch.identifier];
+                }
+            }
+
+            // อัปเดตการแสดงผล (Visual Update)
+            // เช็คปุ่มทั้งหมด ถ้าปุ่มไหนอยู่ในรายการที่ถูกกด ให้เปิดไฟ, ถ้าไม่อยู่ ให้ปิดไฟ
+            document.querySelectorAll('.note-hole').forEach(hole => {
+                const index = parseInt(hole.getAttribute('data-index'));
+                if (currentTouchedIndices.has(index)) {
+                    hole.classList.add('active');
+                } else {
+                    hole.classList.remove('active');
+                }
+            });
+        }
+
+        // เมื่อยกนิ้วขึ้นทั้งหมด
+        function handleTouchEnd(e) {
+            e.preventDefault();
+            
+            // ลบ Touch ID ที่ยกออกไปแล้วออกจากระบบจำ
+            // เพื่อไม่ให้ค้าง (Memory cleanup)
+            const currentTouchIds = new Set();
+            for (let i = 0; i < e.touches.length; i++) {
+                currentTouchIds.add(e.touches[i].identifier);
+            }
+
+            for (const id in activeTouches) {
+                if (!currentTouchIds.has(parseInt(id))) {
+                    delete activeTouches[id];
+                }
+            }
+
+            // เรียก handleTouch อีกรอบเพื่อเคลียร์ไฟปุ่มที่นิ้วยกออกไปแล้ว
+            handleTouch(e); 
+        }
+
+        const instrumentContainer = document.querySelector('.instrument-container');
+        
+        // ใช้ Touch Events แบบ Full-Screen Container เพื่อความลื่นไหล
+        instrumentContainer.addEventListener('touchstart', handleTouch, { passive: false });
+        instrumentContainer.addEventListener('touchmove', handleTouch, { passive: false }); // สำคัญมากสำหรับการลาก (Glissando)
+        instrumentContainer.addEventListener('touchend', handleTouchEnd);
+        instrumentContainer.addEventListener('touchcancel', handleTouchEnd);
+
+        // รองรับ Mouse สำหรับทดสอบบนคอม (คลิก+ลาก)
+        let isMouseDown = false;
+        instrumentContainer.addEventListener('mousedown', (e) => {
+            isMouseDown = true;
+            // สร้าง Mock Touch Object
+            const mockEvent = {
+                preventDefault: () => {},
+                touches: [{ identifier: 999, clientX: e.clientX, clientY: e.clientY }]
+            };
+            handleTouch(mockEvent);
+        });
+        
+        window.addEventListener('mousemove', (e) => {
+            if (!isMouseDown) return;
+            const mockEvent = {
+                preventDefault: () => {},
+                touches: [{ identifier: 999, clientX: e.clientX, clientY: e.clientY }]
+            };
+            handleTouch(mockEvent);
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            isMouseDown = false;
+             const mockEvent = {
+                preventDefault: () => {},
+                touches: []
+            };
+            handleTouchEnd(mockEvent);
+        });
+
+
+        // ==========================================
+        // --- ระบบอัดเสียง ---
+        // ==========================================
+        const btnRecord = document.getElementById('btnRecord');
+        const btnStop = document.getElementById('btnStop');
+        const btnPlayRecord = document.getElementById('btnPlayRecord');
+        const btnDownload = document.getElementById('btnDownload');
+
+        btnRecord.addEventListener('click', async () => {
+            await initAudio();
+            audioChunks = [];
+            
+            if (!mediaStreamDestination) {
+                statusEl.innerText = "Error: Audio Context not ready";
+                return;
+            }
+
+            try {
+                const options = MediaRecorder.isTypeSupported('audio/webm') ? { mimeType: 'audio/webm' } : undefined;
+                mediaRecorder = new MediaRecorder(mediaStreamDestination.stream, options);
+
+                mediaRecorder.ondataavailable = (event) => audioChunks.push(event.data);
+                mediaRecorder.onstop = () => {
+                    recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    btnPlayRecord.disabled = false;
+                    btnDownload.disabled = false;
+                    statusEl.innerText = "บันทึกเสร็จสิ้น";
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                btnRecord.style.display = 'none';
+                btnStop.style.display = 'flex';
+                statusEl.innerText = "กำลังบันทึก... 🔴";
+                btnPlayRecord.disabled = true;
+                btnDownload.disabled = true;
+
+            } catch (e) {
+                statusEl.innerText = "ไม่สามารถบันทึกได้";
+            }
+        });
+
+        btnStop.addEventListener('click', () => {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                btnRecord.style.display = 'flex';
+                btnStop.style.display = 'none';
+            }
+        });
+
+        btnPlayRecord.addEventListener('click', () => {
+            if (recordedBlob) {
+                const audioUrl = URL.createObjectURL(recordedBlob);
+                const playbackAudio = new Audio(audioUrl);
+                playbackAudio.play();
+                statusEl.innerText = "กำลังเล่นเสียงที่อัด... ▶";
+            }
+        });
+
+        btnDownload.addEventListener('click', () => {
+            if (recordedBlob) {
+                const url = URL.createObjectURL(recordedBlob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'my_pi_java_song.webm';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+            }
+        });
+
+    </script>
+</body>
+</html>

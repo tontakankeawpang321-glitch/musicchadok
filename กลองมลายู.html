@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>กลองมลายูเสมือนจริง (Malay Drum)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background: #1a1510; /* Dark wood feel */
+            background-image: radial-gradient(circle at center, #2c241b 0%, #0f0c09 100%);
+            overflow: hidden; /* Prevent scrolling */
+            touch-action: none; /* Prevent browser zoom/swipe */
+            user-select: none;
+            -webkit-user-select: none;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Drum Skin Texture */
+        .drum-skin {
+            background-color: #e3cbb1;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.15'/%3E%3C/svg%3E");
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.3), inset 0 0 10px rgba(0,0,0,0.2);
+            transition: transform 0.05s ease;
+        }
+
+        .drum-rim {
+            background: conic-gradient(#5c4033, #3e2b22, #5c4033, #3e2b22, #5c4033);
+            box-shadow: 
+                0 10px 25px rgba(0,0,0,0.6),
+                inset 0 2px 5px rgba(255,255,255,0.1),
+                inset 0 -5px 10px rgba(0,0,0,0.4);
+            border-radius: 50%;
+        }
+
+        /* Hit Animation */
+        .hit-anim {
+            animation: ripple 0.3s linear;
+        }
+
+        @keyframes ripple {
+            0% { transform: scale(0.98); filter: brightness(0.95); }
+            50% { transform: scale(1.01); filter: brightness(1.05); }
+            100% { transform: scale(1); filter: brightness(1); }
+        }
+
+        /* Visual indicator for notes */
+        .note-text {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.2s ease-out;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        .note-text.active {
+            opacity: 1;
+            transform: translateY(-20px);
+        }
+
+        /* Controls */
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.2s;
+        }
+        .control-btn:active {
+            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.2);
+        }
+        .recording-dot {
+            width: 12px;
+            height: 12px;
+            background-color: #ef4444;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .zone-highlight {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            background: radial-gradient(circle, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 70%);
+            transform: scale(0);
+            transition: transform 0.1s;
+        }
+        .zone-highlight.pop {
+            transform: scale(1);
+            opacity: 0;
+            transition: transform 0.2s, opacity 0.3s;
+        }
+
+    </style>
+</head>
+<body class="text-white">
+
+    <!-- Header / Info -->
+    <div class="absolute top-4 w-full text-center z-10 px-4">
+        <h1 class="text-2xl font-bold tracking-wider text-amber-100 drop-shadow-md">กลองมลายู</h1>
+        <p class="text-xs text-amber-200/60 mt-1">แตะตรงกลางเพื่อเสียง "ตุง" - แตะขอบเพื่อเสียง "ตั๊ก"</p>
+    </div>
+
+    <!-- Main Drum Container -->
+    <div class="relative w-full h-full flex items-center justify-center">
+        
+        <!-- Drum Body (Rim) -->
+        <div class="relative w-[85vw] h-[85vw] max-w-[500px] max-h-[500px] drum-rim p-3 sm:p-5 flex items-center justify-center">
+            
+            <!-- Drum Skin (Playable Area) -->
+            <div id="drumpad" class="relative w-full h-full rounded-full drum-skin cursor-pointer overflow-hidden touch-manipulation">
+                
+                <!-- Decorative Tension Pegs (Visual only) -->
+                <div class="absolute inset-0 border-4 border-dashed border-amber-900/20 rounded-full pointer-events-none"></div>
+
+                <!-- Center Hit Zone (Dung) -->
+                <div id="zone-dung" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[55%] h-[55%] rounded-full border border-amber-900/10 pointer-events-none flex items-center justify-center">
+                   <div class="zone-highlight w-full h-full"></div>
+                </div>
+
+                <!-- Visual Text Feedback -->
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span id="visual-note" class="text-4xl font-bold text-amber-900 note-text"></span>
+                </div>
+            </div>
+
+            <!-- Outer Ring Hit Zone (Tak) - Logic handled by coordinates -->
+        </div>
+    </div>
+
+    <!-- Control Panel -->
+    <div class="absolute bottom-6 w-full px-6 z-20">
+        <div class="bg-gray-900/80 backdrop-blur-md rounded-2xl p-3 flex justify-between items-center shadow-xl border border-gray-700">
+            
+            <!-- Record Button -->
+            <button id="btn-record" class="control-btn rounded-xl p-3 flex-1 mx-1 text-center flex flex-col items-center justify-center h-16 group">
+                <div id="rec-icon" class="w-6 h-6 rounded-full bg-red-500 mb-1 group-hover:bg-red-400 transition-colors"></div>
+                <span id="rec-text" class="text-xs font-semibold">อัดเสียง</span>
+            </button>
+
+            <!-- Stop Button -->
+            <button id="btn-stop" class="control-btn rounded-xl p-3 flex-1 mx-1 text-center flex flex-col items-center justify-center h-16 hidden">
+                <i class="fas fa-stop text-xl text-yellow-400 mb-1"></i>
+                <span class="text-xs font-semibold">หยุด</span>
+            </button>
+
+            <!-- Play Button -->
+            <button id="btn-play" class="control-btn rounded-xl p-3 flex-1 mx-1 text-center flex flex-col items-center justify-center h-16 disabled:opacity-30 disabled:cursor-not-allowed">
+                <i id="play-icon" class="fas fa-play text-xl text-green-400 mb-1"></i>
+                <span id="play-text" class="text-xs font-semibold">เล่น</span>
+            </button>
+
+            <!-- Download Button -->
+            <button id="btn-download" class="control-btn rounded-xl p-3 flex-1 mx-1 text-center flex flex-col items-center justify-center h-16 disabled:opacity-30 disabled:cursor-not-allowed">
+                <i class="fas fa-download text-xl text-blue-400 mb-1"></i>
+                <span class="text-xs font-semibold">โหลด</span>
+            </button>
+        </div>
+        
+        <!-- Status Bar -->
+        <div id="status-bar" class="text-center mt-2 h-6 text-sm text-amber-200 font-light opacity-0 transition-opacity">
+            กำลังบันทึก...
+        </div>
+    </div>
+
+    <script>
+        // --- Audio Context & Synthesis Engine ---
+        let audioCtx;
+        let masterGain;
+        let dest; // MediaStreamDestination for recording
+        let mediaRecorder;
+        let recordedChunks = [];
+        let audioBlob = null;
+        let isRecording = false;
+        let isPlaying = false;
+        
+        // Initialize Audio Context on first interaction
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // Create destination for recording
+                dest = audioCtx.createMediaStreamDestination();
+                
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.8;
+                
+                // Connect Master -> Recording Dest
+                masterGain.connect(dest);
+                // Connect Master -> Speakers
+                masterGain.connect(audioCtx.destination);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // --- Sound Synthesis Functions ---
+        
+        // Sound 1: "Dung" (Bass/Center)
+        function playDung() {
+            if(!audioCtx) initAudio();
+            const t = audioCtx.currentTime;
+
+            // Oscillator for deep resonance
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.frequency.setValueAtTime(150, t);
+            osc.frequency.exponentialRampToValueAtTime(40, t + 0.5); // Pitch drop
+            
+            gain.gain.setValueAtTime(1.0, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.6); // Long decay
+
+            osc.connect(gain);
+            gain.connect(masterGain);
+            
+            osc.start(t);
+            osc.stop(t + 0.6);
+
+            // Add slight thud (noise)
+            const bufferSize = audioCtx.sampleRate * 0.05; // 50ms
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            const noiseGain = audioCtx.createGain();
+            
+            // Lowpass filter for thud
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 200;
+
+            noiseGain.gain.setValueAtTime(0.5, t);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+
+            noise.connect(filter);
+            filter.connect(noiseGain);
+            noiseGain.connect(masterGain);
+            noise.start(t);
+
+            showVisual('ตุง', 'dung');
+        }
+
+        // Sound 2: "Tak" (Rim/Edge)
+        function playTak() {
+            if(!audioCtx) initAudio();
+            const t = audioCtx.currentTime;
+
+            // Oscillator for tone (higher pitch)
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(400, t);
+            osc.frequency.exponentialRampToValueAtTime(200, t + 0.1);
+            
+            gain.gain.setValueAtTime(0.6, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15); // Short decay
+
+            osc.connect(gain);
+            gain.connect(masterGain);
+            
+            osc.start(t);
+            osc.stop(t + 0.15);
+
+            // High frequency slap (noise)
+            const bufferSize = audioCtx.sampleRate * 0.05;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            const noiseGain = audioCtx.createGain();
+            
+            // Highpass filter for snap
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'highpass';
+            filter.frequency.value = 1000;
+
+            noiseGain.gain.setValueAtTime(0.8, t);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.08);
+
+            noise.connect(filter);
+            filter.connect(noiseGain);
+            noiseGain.connect(masterGain);
+            noise.start(t);
+
+            showVisual('ตั๊ก', 'tak');
+        }
+
+        // --- Visual Feedback ---
+        const drumPad = document.getElementById('drumpad');
+        const visualText = document.getElementById('visual-note');
+        const dungZone = document.getElementById('zone-dung');
+
+        function showVisual(text, type) {
+            // Text animation
+            visualText.innerText = text;
+            visualText.classList.remove('active');
+            void visualText.offsetWidth; // Trigger reflow
+            visualText.classList.add('active');
+
+            // Drum skin animation
+            drumPad.classList.remove('hit-anim');
+            void drumPad.offsetWidth;
+            drumPad.classList.add('hit-anim');
+
+            // Highlight
+            if(type === 'dung') {
+                const hl = dungZone.querySelector('.zone-highlight');
+                hl.classList.remove('pop');
+                void hl.offsetWidth;
+                hl.classList.add('pop');
+            }
+        }
+
+        // --- Interaction Logic ---
+        function handleHit(e) {
+            e.preventDefault(); // Prevent ghost clicks
+            initAudio();
+
+            // Get coordinates
+            let clientX, clientY;
+            if (e.changedTouches) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            // Calculate distance from center of drum
+            const rect = drumPad.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const distance = Math.sqrt(Math.pow(clientX - centerX, 2) + Math.pow(clientY - centerY, 2));
+            const maxRadius = rect.width / 2;
+
+            // Logic: Inner 60% is Dung, Outer 40% is Tak
+            if (distance < maxRadius * 0.6) {
+                playDung();
+            } else {
+                playTak();
+            }
+        }
+
+        // Events
+        drumPad.addEventListener('mousedown', handleHit);
+        drumPad.addEventListener('touchstart', handleHit, {passive: false});
+
+        // --- Recording & Playback Logic ---
+        const btnRecord = document.getElementById('btn-record');
+        const btnStop = document.getElementById('btn-stop');
+        const btnPlay = document.getElementById('btn-play');
+        const btnDownload = document.getElementById('btn-download');
+        const statusBar = document.getElementById('status-bar');
+        const recIcon = document.getElementById('rec-icon');
+        const recText = document.getElementById('rec-text');
+        const playIcon = document.getElementById('play-icon');
+        const playText = document.getElementById('play-text');
+
+        let audioURL = "";
+
+        // Record
+        btnRecord.addEventListener('click', () => {
+            initAudio();
+            recordedChunks = [];
+            
+            // Check browser support
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
+            
+            try {
+                mediaRecorder = new MediaRecorder(dest.stream, { mimeType: mimeType });
+            } catch (e) {
+                alert('Browser does not support MediaRecorder for web audio.');
+                return;
+            }
+
+            mediaRecorder.ondataavailable = (evt) => {
+                if (evt.data.size > 0) recordedChunks.push(evt.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(recordedChunks, { type: mimeType });
+                audioURL = URL.createObjectURL(audioBlob);
+                btnPlay.disabled = false;
+                btnDownload.disabled = false;
+                statusBar.innerText = "บันทึกเรียบร้อย";
+                setTimeout(() => statusBar.style.opacity = 0, 2000);
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            updateUIState();
+        });
+
+        // Stop
+        btnStop.addEventListener('click', () => {
+            if (isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+            } else if (isPlaying) {
+                // Stop audio playback (handled by audio element usually, but here we might just toggle UI since we create a temporary audio object)
+                if(currentAudioObj) {
+                    currentAudioObj.pause();
+                    currentAudioObj.currentTime = 0;
+                }
+                isPlaying = false;
+            }
+            updateUIState();
+        });
+
+        // Play
+        let currentAudioObj = null;
+        btnPlay.addEventListener('click', () => {
+            if (!audioBlob) return;
+            
+            if(isPlaying) {
+                 if(currentAudioObj) {
+                    currentAudioObj.pause();
+                    currentAudioObj.currentTime = 0;
+                }
+                isPlaying = false;
+                updateUIState();
+                return;
+            }
+
+            currentAudioObj = new Audio(audioURL);
+            currentAudioObj.onended = () => {
+                isPlaying = false;
+                updateUIState();
+            };
+            
+            currentAudioObj.play();
+            isPlaying = true;
+            statusBar.innerText = "กำลังเล่น...";
+            statusBar.style.opacity = 1;
+            updateUIState();
+        });
+
+        // Download
+        btnDownload.addEventListener('click', () => {
+            if (!audioBlob) return;
+            const link = document.createElement('a');
+            link.href = audioURL;
+            const ext = MediaRecorder.isTypeSupported('audio/webm') ? 'webm' : 'ogg';
+            link.download = `my-drum-recording.${ext}`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        function updateUIState() {
+            if (isRecording) {
+                btnRecord.classList.add('hidden');
+                btnStop.classList.remove('hidden');
+                btnPlay.disabled = true;
+                btnDownload.disabled = true;
+                statusBar.innerText = "กำลังบันทึกเสียง...";
+                statusBar.style.opacity = 1;
+                // Add blinking dot to stop button
+                btnStop.innerHTML = `<div class="recording-dot"></div><span class="text-xs font-semibold">หยุดอัด</span>`;
+            } else if (isPlaying) {
+                btnRecord.disabled = true;
+                btnStop.classList.remove('hidden');
+                btnPlay.classList.add('hidden');
+                btnStop.innerHTML = `<i class="fas fa-stop text-xl text-yellow-400 mb-1"></i><span class="text-xs font-semibold">หยุดเล่น</span>`;
+            } else {
+                // Default / Idle
+                btnRecord.classList.remove('hidden');
+                btnStop.classList.add('hidden');
+                btnPlay.classList.remove('hidden');
+                
+                btnRecord.disabled = false;
+                
+                if (audioBlob) {
+                    btnPlay.disabled = false;
+                    btnDownload.disabled = false;
+                    playIcon.className = "fas fa-play text-xl text-green-400 mb-1";
+                    playText.innerText = "เล่น";
+                } else {
+                    btnPlay.disabled = true;
+                    btnDownload.disabled = true;
+                }
+            }
+        }
+    </script>
+</body>
+</html>

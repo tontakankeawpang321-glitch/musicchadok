@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ระนาดเอกเหล็กจำลอง (Ranat Ek Lek Virtual)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #1a1510;
+            background-image: radial-gradient(circle, #2c241b 0%, #0f0c09 100%);
+            overflow: hidden; /* ป้องกันการเลื่อน */
+            touch-action: none; /* ป้องกัน default touch actions */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* เอฟเฟกต์ไม้สำหรับรางระนาด */
+        .wood-texture {
+            background: #5c4033;
+            background: linear-gradient(to bottom, #75513f, #3e2b22);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 10px 20px rgba(0,0,0,0.5);
+            border-radius: 10px;
+            border: 4px solid #2a1d15;
+        }
+
+        /* ดีไซน์ลูกระนาดเหล็ก */
+        .key {
+            position: relative;
+            background: linear-gradient(135deg, #bf953f, #fcf6ba 40%, #b38728 60%, #aa771c 100%); /* สีทองโลหะ */
+            border-radius: 4px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.5);
+            transition: transform 0.05s, filter 0.05s;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            border: 1px solid #7a5c2f;
+        }
+
+        /* ลูกระนาดสีดำ (สำหรับโน้ตบางตัวถ้าต้องการ หรือใช้สีเดียวกันหมดแบบระนาดเหล็ก) 
+           ระนาดเอกเหล็กปกติลูกเป็นโลหะสีทองหรือรมดำ เราใช้สีทองเงา */
+        
+        .key:active, .key.active {
+            transform: scale(0.95) translateY(2px);
+            filter: brightness(1.2);
+            background: linear-gradient(135deg, #e6b755, #fffdcf 40%, #d4a339 60%, #c9912b 100%);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.8);
+        }
+
+        /* เชือกร้อยระนาด */
+        .string-line {
+            position: absolute;
+            background: rgba(255,255,255,0.3);
+            height: 2px;
+            width: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* Overlay เริ่มต้น */
+        #start-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            flex-direction: column;
+            color: white;
+        }
+
+        /* ไฟแสดงสถานะอัดเสียง */
+        .recording-dot {
+            width: 12px;
+            height: 12px;
+            background-color: red;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 1s infinite;
+            margin-right: 5px;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); }
+            70% { opacity: 0.5; box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+            100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+        }
+
+        /* Scrollbar ซ่อน */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between p-2">
+
+    <!-- Overlay คลิกเพื่อเริ่ม (แก้ปัญหา Audio Context บนมือถือ) -->
+    <div id="start-overlay">
+        <div class="text-center p-6 border border-yellow-600 rounded-lg bg-gray-900 shadow-2xl">
+            <h1 class="text-3xl font-bold text-yellow-500 mb-4">ระนาดเอกเหล็ก</h1>
+            <p class="text-gray-300 mb-6">แตะเพื่อเริ่มใช้งาน / Tap to Start</p>
+            <div class="text-4xl animate-bounce">👆</div>
+        </div>
+    </div>
+
+    <!-- ส่วนควบคุม -->
+    <div class="flex justify-between items-center bg-gray-900 bg-opacity-80 p-2 rounded-lg border border-gray-700 h-[10vh] min-h-[60px] z-10">
+        <div class="flex items-center space-x-2">
+            <h1 class="text-yellow-500 font-bold text-lg hidden sm:block md:block pl-2">ระนาดเอกเหล็ก</h1>
+            <button id="toggle-notes" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm border border-gray-500">
+                แสดงโน้ต
+            </button>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <span id="timer" class="text-red-400 font-mono hidden">00:00</span>
+            
+            <button id="record-btn" class="bg-red-900 hover:bg-red-700 text-white px-3 py-1 rounded text-sm flex items-center border border-red-600">
+                <div class="w-3 h-3 bg-red-500 rounded-full mr-1"></div> อัดเสียง
+            </button>
+            
+            <button id="stop-btn" class="hidden bg-gray-600 text-white px-3 py-1 rounded text-sm border border-gray-400">
+                หยุด
+            </button>
+
+            <button id="play-btn" class="hidden bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded text-sm border border-green-500">
+                ▶ เล่น
+            </button>
+            
+            <a id="download-link" class="hidden bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm border border-blue-500">
+                ⬇ โหลด
+            </a>
+        </div>
+    </div>
+
+    <!-- พื้นที่ระนาด (Container) -->
+    <div class="relative flex-grow flex items-center justify-center p-1 sm:p-4 h-[88vh]">
+        <!-- รางระนาด -->
+        <div class="wood-texture w-full h-full relative flex flex-col justify-center items-center shadow-2xl p-2 sm:p-4">
+            
+            <!-- สายร้อย (ตกแต่ง) -->
+            <div class="string-line top-[20%]"></div>
+            <div class="string-line bottom-[20%]"></div>
+
+            <!-- แป้นคีย์ระนาด (Grid Container) -->
+            <div id="keys-container" class="relative w-full h-full grid grid-cols-[repeat(21,1fr)] gap-1 sm:gap-2 z-10">
+                <!-- Keys will be generated by JS -->
+            </div>
+            
+            <!-- ฐาน (ตกแต่ง) -->
+            <div class="absolute bottom-0 w-full h-4 bg-black opacity-30 rounded-b-lg"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. Audio Engine (Synthesis) ---
+        let audioCtx;
+        let masterGain;
+        let dest; // MediaStreamDestination for recording
+        let isSetup = false;
+
+        // Frequencies for Ranat Ek Lek (Approximation to C Major / Diatonic for playability)
+        // Starting from G3 to F6 (21 keys typical range)
+        // Note: Thai tuning is equidistant, but we map to Western frequencies for browser compatibility and pleasant sound.
+        const baseFrequencies = [
+            196.00, // G3
+            220.00, // A3
+            246.94, // B3
+            261.63, // C4
+            293.66, // D4
+            329.63, // E4
+            349.23, // F4
+            392.00, // G4
+            440.00, // A4
+            493.88, // B4
+            523.25, // C5
+            587.33, // D5
+            659.25, // E5
+            698.46, // F5
+            783.99, // G5
+            880.00, // A5
+            987.77, // B5
+            1046.50, // C6
+            1174.66, // D6
+            1318.51, // E6
+            1396.91  // F6
+        ];
+
+        const noteLabels = ["ซ", "ล", "ท", "ด", "ร", "ม", "ฟ", "ซ", "ล", "ท", "ด", "ร", "ม", "ฟ", "ซ", "ล", "ท", "ด", "ร", "ม", "ฟ"];
+        // Thai Labels: ซ=Sol, ล=La, ท=Ti, ด=Do, ร=Re, ม=Mi, ฟ=Fa
+
+        function initAudio() {
+            if (isSetup) return;
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            
+            // Master volume
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.8;
+            
+            // Destination setup
+            masterGain.connect(audioCtx.destination);
+            
+            // Recorder destination
+            dest = audioCtx.createMediaStreamDestination();
+            masterGain.connect(dest);
+
+            isSetup = true;
+        }
+
+        // Synthesize Ranat Ek Lek Sound (Metallic, bell-like)
+        function playSound(freq) {
+            if (!audioCtx) initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const t = audioCtx.currentTime;
+            
+            // 1. Fundamental Oscillator (Sine) - ตัวเสียงหลัก
+            const osc1 = audioCtx.createOscillator();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(freq, t);
+
+            // 2. Harmonic Oscillator (Triangle/Sine) - เสียง Overtone ของโลหะ
+            // Metal often has non-integer harmonics. 2.7 or 3.0 times freq gives a metallic ring.
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(freq * 2.8, t); 
+
+            // 3. Impact Noise (Attack) - เสียงกระทบ
+            const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.01, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < noiseBuffer.length; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = noiseBuffer;
+
+            // Envelopes (ADSR)
+            const gain1 = audioCtx.createGain();
+            const gain2 = audioCtx.createGain();
+            const gainNoise = audioCtx.createGain();
+
+            // Setup Connections
+            osc1.connect(gain1);
+            osc2.connect(gain2);
+            noise.connect(gainNoise);
+
+            gain1.connect(masterGain);
+            gain2.connect(masterGain);
+            gainNoise.connect(masterGain);
+
+            // Envelope Logic
+            // Fundamental: Sharp attack, long decay (Sustain like a bell)
+            gain1.gain.setValueAtTime(0, t);
+            gain1.gain.linearRampToValueAtTime(1.0, t + 0.005);
+            gain1.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
+
+            // Overtone: Sharp attack, medium decay (The "ring")
+            gain2.gain.setValueAtTime(0, t);
+            gain2.gain.linearRampToValueAtTime(0.3, t + 0.005);
+            gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+
+            // Noise: Very short click
+            gainNoise.gain.setValueAtTime(0.5, t);
+            gainNoise.gain.exponentialRampToValueAtTime(0.001, t + 0.02);
+
+            // Start & Stop
+            osc1.start(t);
+            osc2.start(t);
+            noise.start(t);
+
+            osc1.stop(t + 1.5);
+            osc2.stop(t + 1.5);
+            noise.stop(t + 0.05);
+        }
+
+        // --- 2. UI & Interaction ---
+        const keysContainer = document.getElementById('keys-container');
+        const toggleNotesBtn = document.getElementById('toggle-notes');
+        let showNotes = false;
+
+        function createKeys() {
+            baseFrequencies.forEach((freq, index) => {
+                const key = document.createElement('div');
+                key.className = 'key group';
+                key.dataset.freq = freq;
+                key.id = `key-${index}`;
+                
+                // Visual variation: Higher notes are slightly shorter (optional realism)
+                // Using flex-grow or height adjustment in CSS?
+                // Let's use margin-top to simulate the curve if needed, but for "Fit Screen" keeping them uniform is safer.
+                // However, making higher notes slightly narrower visually helps? 
+                // Let's keep them uniform width (grid) but adjust height padding slightly.
+                
+                // Content (Note Label)
+                const label = document.createElement('span');
+                label.innerText = noteLabels[index];
+                label.className = `font-bold text-black opacity-0 text-xs sm:text-base md:text-xl transition-opacity ${showNotes ? 'opacity-70' : ''}`;
+                key.appendChild(label);
+
+                // Interaction Events
+                const triggerPlay = (e) => {
+                    e.preventDefault(); // Stop scroll/zoom
+                    playSound(freq);
+                    
+                    // Visual Feedback
+                    key.classList.add('active');
+                    setTimeout(() => key.classList.remove('active'), 100);
+                };
+
+                key.addEventListener('mousedown', triggerPlay);
+                key.addEventListener('touchstart', triggerPlay, {passive: false});
+
+                keysContainer.appendChild(key);
+            });
+        }
+
+        // Toggle Notes
+        toggleNotesBtn.addEventListener('click', () => {
+            showNotes = !showNotes;
+            const labels = document.querySelectorAll('.key span');
+            labels.forEach(l => {
+                l.classList.toggle('opacity-0', !showNotes);
+                l.classList.toggle('opacity-70', showNotes);
+            });
+            toggleNotesBtn.innerText = showNotes ? "ซ่อนโน้ต" : "แสดงโน้ต";
+        });
+
+        // Initialize
+        createKeys();
+
+        // Start Overlay Logic
+        const overlay = document.getElementById('start-overlay');
+        overlay.addEventListener('click', () => {
+            initAudio();
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 500);
+        });
+
+        // --- 3. Recording System ---
+        let mediaRecorder;
+        let chunks = [];
+        let blobUrl;
+        let isRecording = false;
+        let timerInterval;
+        let startTime;
+
+        const recordBtn = document.getElementById('record-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const playBtn = document.getElementById('play-btn');
+        const downloadLink = document.getElementById('download-link');
+        const timerDisplay = document.getElementById('timer');
+
+        recordBtn.addEventListener('click', () => {
+            if (!audioCtx) initAudio();
+            
+            chunks = [];
+            // Use MediaStreamDestination from Web Audio
+            const stream = dest.stream; 
+            
+            // Check support
+            let options = { mimeType: 'audio/webm' };
+            if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                options = { mimeType: 'audio/ogg' }; // Safari fallback sometimes needed, or default
+                if (!MediaRecorder.isTypeSupported('audio/ogg')) options = {};
+            }
+
+            mediaRecorder = new MediaRecorder(stream, options);
+
+            mediaRecorder.ondataavailable = (e) => {
+                chunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(chunks, { 'type' : 'audio/webm; codecs=opus' });
+                blobUrl = URL.createObjectURL(blob);
+                
+                // Setup download
+                downloadLink.href = blobUrl;
+                downloadLink.download = `ranat-ek-lek-${new Date().getTime()}.webm`;
+                
+                // Show Play/Download
+                playBtn.classList.remove('hidden');
+                downloadLink.classList.remove('hidden');
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+
+            // UI Update
+            recordBtn.classList.add('hidden');
+            stopBtn.classList.remove('hidden');
+            playBtn.classList.add('hidden');
+            downloadLink.classList.add('hidden');
+            timerDisplay.classList.remove('hidden');
+
+            // Timer
+            startTime = Date.now();
+            timerInterval = setInterval(() => {
+                const diff = Date.now() - startTime;
+                const sec = Math.floor(diff / 1000) % 60;
+                const min = Math.floor(diff / 60000);
+                timerDisplay.innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+            }, 1000);
+        });
+
+        stopBtn.addEventListener('click', () => {
+            if (isRecording && mediaRecorder) {
+                mediaRecorder.stop();
+                isRecording = false;
+                
+                clearInterval(timerInterval);
+                
+                stopBtn.classList.add('hidden');
+                recordBtn.classList.remove('hidden');
+                recordBtn.innerHTML = `<div class="w-3 h-3 bg-red-500 rounded-full mr-1"></div> อัดใหม่`;
+            }
+        });
+
+        playBtn.addEventListener('click', () => {
+            if (blobUrl) {
+                const audio = new Audio(blobUrl);
+                audio.play();
+            }
+        });
+
+    </script>
+</body>
+</html>

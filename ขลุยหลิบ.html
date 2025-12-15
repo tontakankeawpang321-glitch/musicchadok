@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ขลุ่ยหลิบเสมือนจริง (Virtual Khlui Lib)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            touch-action: none; /* Prevent scroll on mobile while playing */
+            background-color: #1a1a1a;
+            color: white;
+            overflow: hidden;
+        }
+
+        /* Wood Texture Effect */
+        .wood-texture {
+            background: rgb(139,69,19);
+            background: linear-gradient(90deg, rgba(101,51,14,1) 0%, rgba(160,82,45,1) 35%, rgba(205,133,63,1) 50%, rgba(160,82,45,1) 65%, rgba(101,51,14,1) 100%);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 5px 5px 15px rgba(0,0,0,0.5);
+            border-radius: 50px;
+            position: relative;
+        }
+
+        .wood-texture::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.5' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
+            border-radius: 50px;
+            pointer-events: none;
+        }
+
+        /* Gold Ring Decoration */
+        .gold-ring {
+            background: linear-gradient(90deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
+            height: 8px;
+            width: 100%;
+            margin: 10px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        /* Finger Holes */
+        .hole-container {
+            position: relative;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .hole {
+            width: 60px;
+            height: 60px;
+            background: radial-gradient(circle at 30% 30%, #3e2723, #000000);
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.1);
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: all 0.1s ease;
+            position: relative;
+            z-index: 10;
+        }
+
+        .hole.active {
+            background: radial-gradient(circle at 30% 30%, #5d4037, #1a1a1a);
+            transform: scale(0.95);
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.6), inset 0 0 10px rgba(0,0,0,1);
+            border-color: #ffd700;
+        }
+
+        .hole-label {
+            position: absolute;
+            left: -40px;
+            color: #ffd700;
+            font-weight: bold;
+            font-size: 1.2rem;
+            text-shadow: 1px 1px 2px black;
+            pointer-events: none;
+        }
+
+        /* UI Controls */
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.2s;
+        }
+        .control-btn:active {
+            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.2);
+        }
+        .recording-pulse {
+            animation: pulse-red 1.5s infinite;
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        /* Download Link hidden initially */
+        #downloadLink { display: none; }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-between p-4 bg-gray-900">
+
+    <!-- Header & Controls -->
+    <div class="w-full max-w-md flex flex-col gap-4 z-20">
+        <div class="flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-yellow-500 drop-shadow-md">
+                <i class="fas fa-wind mr-2"></i>ขลุ่ยหลิบ
+            </h1>
+            <div id="statusText" class="text-xs text-gray-400">แตะเพื่อเริ่มเล่น</div>
+        </div>
+
+        <!-- Recorder Controls -->
+        <div class="grid grid-cols-4 gap-2">
+            <button id="btnRecord" class="control-btn rounded-lg p-3 text-red-400 flex flex-col items-center justify-center">
+                <i class="fas fa-circle mb-1"></i>
+                <span class="text-xs">อัดเสียง</span>
+            </button>
+            <button id="btnStop" class="control-btn rounded-lg p-3 text-gray-300 flex flex-col items-center justify-center hidden">
+                <i class="fas fa-stop mb-1"></i>
+                <span class="text-xs">หยุด</span>
+            </button>
+            <button id="btnPlay" class="control-btn rounded-lg p-3 text-green-400 flex flex-col items-center justify-center disabled:opacity-30">
+                <i class="fas fa-play mb-1"></i>
+                <span class="text-xs">ฟังเสียง</span>
+            </button>
+            <button id="btnDownload" class="control-btn rounded-lg p-3 text-blue-400 flex flex-col items-center justify-center disabled:opacity-30">
+                <i class="fas fa-download mb-1"></i>
+                <span class="text-xs">โหลด</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- The Instrument -->
+    <div class="flex-grow flex items-center justify-center w-full max-w-md relative py-4">
+        <!-- Flute Body -->
+        <div class="wood-texture w-24 h-full flex flex-col items-center py-6 relative shadow-2xl">
+            <!-- Mouthpiece area -->
+            <div class="w-full h-12 bg-black opacity-20 absolute top-4 rounded-full blur-sm"></div>
+            
+            <div class="gold-ring"></div>
+
+            <!-- Notes Container -->
+            <div class="flex flex-col justify-evenly h-full w-full px-2" id="fluteHoles">
+                <!-- Generated by JS -->
+            </div>
+
+            <div class="gold-ring"></div>
+            <div class="text-yellow-800 font-bold opacity-50 mt-2 text-sm select-none">Thai Khlui</div>
+        </div>
+    </div>
+
+    <!-- Hidden Audio Element for Playback -->
+    <audio id="audioPlayback" class="hidden"></audio>
+
+    <script>
+        // --- Audio Engine Configuration ---
+        // ขลุ่ยหลิบมีเสียงสูง (High Pitch)
+        // Scale: Thai 7-tone (approx to Western C Major/Bb Major for this simulation)
+        // Using C5 Major scale for Khlui Lib (High)
+        const notes = [
+            { label: 'ดํ', note: 'C6', freq: 1046.50 }, // Do High
+            { label: 'ท', note: 'B5', freq: 987.77 },   // Ti
+            { label: 'ล', note: 'A5', freq: 880.00 },   // La
+            { label: 'ซ', note: 'G5', freq: 783.99 },   // Sol
+            { label: 'ฟ', note: 'F5', freq: 698.46 },   // Fa
+            { label: 'ม', note: 'E5', freq: 659.25 },   // Mi
+            { label: 'ร', note: 'D5', freq: 587.33 },   // Re
+            { label: 'ด', note: 'C5', freq: 523.25 }    // Do Low
+        ];
+
+        // --- Web Audio Context & Recorder ---
+        let audioCtx;
+        let masterGain;
+        let compressor;
+        let destinationNode; // For recording
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordedBlob;
+        let activeOscillators = {}; // Map to track active notes
+
+        // Noise Buffer for Breath Sound
+        let noiseBuffer;
+
+        function initAudio() {
+            if (audioCtx) return;
+            
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+
+            // Create Master Gain
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.8;
+
+            // Compressor to prevent clipping
+            compressor = audioCtx.createDynamicsCompressor();
+            compressor.threshold.value = -10;
+            compressor.knee.value = 40;
+            compressor.ratio.value = 12;
+            compressor.attack.value = 0;
+            compressor.release.value = 0.25;
+
+            // Media Stream Destination for Recording
+            destinationNode = audioCtx.createMediaStreamDestination();
+
+            // Connect graph: Master -> Compressor -> [Speakers, Recorder]
+            masterGain.connect(compressor);
+            compressor.connect(audioCtx.destination);
+            compressor.connect(destinationNode);
+
+            // Generate White Noise Buffer (for breath effect)
+            const bufferSize = audioCtx.sampleRate * 2; // 2 seconds
+            noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+
+            document.getElementById('statusText').innerText = "พร้อมเล่น (Ready)";
+        }
+
+        // --- Sound Synthesis (Physical Modeling Approximation) ---
+        function playNote(freq, id) {
+            if (!audioCtx) initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            if (activeOscillators[id]) return; // Prevent double trigger
+
+            const t = audioCtx.currentTime;
+            
+            // 1. Fundamental Oscillator (Sine/Triangle mix)
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine'; // Sine is base for flute
+            osc.frequency.setValueAtTime(freq, t);
+
+            // 2. Harmonics (Add timber)
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'triangle';
+            osc2.frequency.setValueAtTime(freq, t); // Same freq but triangle adds odd harmonics
+
+            // 3. Breath Noise (White noise filtered)
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = noiseBuffer;
+            noise.loop = true;
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'bandpass';
+            noiseFilter.frequency.value = freq * 1.5; // Breath centers around the note
+            noiseFilter.Q.value = 1;
+
+            // --- Envelopes & Gains ---
+            
+            // Main Tone Envelope
+            const toneGain = audioCtx.createGain();
+            toneGain.gain.setValueAtTime(0, t);
+            toneGain.gain.linearRampToValueAtTime(0.5, t + 0.05); // Attack
+            toneGain.gain.exponentialRampToValueAtTime(0.3, t + 0.2); // Decay to Sustain
+
+            // Harmonic Envelope (Subtle)
+            const harmGain = audioCtx.createGain();
+            harmGain.gain.setValueAtTime(0, t);
+            harmGain.gain.linearRampToValueAtTime(0.1, t + 0.05);
+
+            // Breath Envelope (Attack emphasis)
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0, t);
+            noiseGain.gain.linearRampToValueAtTime(0.05, t + 0.02); // Chiff sound
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.3); // Sustain breath
+
+            // Vibrato (LFO)
+            const lfo = audioCtx.createOscillator();
+            lfo.frequency.value = 5; // 5Hz vibrato
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = 3; // Depth
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+
+            // Wiring
+            osc.connect(toneGain);
+            osc2.connect(harmGain);
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+
+            toneGain.connect(masterGain);
+            harmGain.connect(masterGain);
+            noiseGain.connect(masterGain);
+
+            // Start sources
+            osc.start(t);
+            osc2.start(t);
+            noise.start(t);
+            lfo.start(t);
+
+            // Store references to stop later
+            activeOscillators[id] = {
+                sources: [osc, osc2, noise, lfo],
+                gains: [toneGain, harmGain, noiseGain]
+            };
+        }
+
+        function stopNote(id) {
+            if (!activeOscillators[id]) return;
+
+            const t = audioCtx.currentTime;
+            const nodes = activeOscillators[id];
+
+            // Release Envelope
+            nodes.gains.forEach(g => {
+                g.gain.cancelScheduledValues(t);
+                g.gain.setValueAtTime(g.gain.value, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.1); // Short release
+            });
+
+            // Stop oscillators after release
+            nodes.sources.forEach(src => {
+                src.stop(t + 0.15);
+            });
+
+            delete activeOscillators[id];
+        }
+
+        // --- UI Rendering ---
+        const fluteContainer = document.getElementById('fluteHoles');
+        
+        notes.forEach((n, index) => {
+            const holeContainer = document.createElement('div');
+            holeContainer.className = 'hole-container';
+
+            const label = document.createElement('span');
+            label.className = 'hole-label';
+            label.innerText = n.label;
+
+            const hole = document.createElement('div');
+            hole.className = 'hole';
+            hole.id = `note-${index}`;
+            hole.dataset.freq = n.freq;
+            hole.dataset.id = index;
+
+            // Events
+            const startHandler = (e) => {
+                e.preventDefault();
+                hole.classList.add('active');
+                playNote(n.freq, index);
+            };
+            
+            const endHandler = (e) => {
+                e.preventDefault();
+                hole.classList.remove('active');
+                stopNote(index);
+            };
+
+            // Touch events
+            hole.addEventListener('touchstart', startHandler, {passive: false});
+            hole.addEventListener('touchend', endHandler);
+            hole.addEventListener('touchcancel', endHandler);
+            
+            // Mouse events (for desktop testing)
+            hole.addEventListener('mousedown', startHandler);
+            hole.addEventListener('mouseup', endHandler);
+            hole.addEventListener('mouseleave', endHandler);
+
+            holeContainer.appendChild(label);
+            holeContainer.appendChild(hole);
+            fluteContainer.appendChild(holeContainer);
+        });
+
+        // --- Recorder Logic ---
+        const btnRecord = document.getElementById('btnRecord');
+        const btnStop = document.getElementById('btnStop');
+        const btnPlay = document.getElementById('btnPlay');
+        const btnDownload = document.getElementById('btnDownload');
+        const audioPlayback = document.getElementById('audioPlayback');
+
+        // Initial Button States
+        btnPlay.disabled = true;
+        btnDownload.disabled = true;
+
+        btnRecord.addEventListener('click', () => {
+            if (!audioCtx) initAudio();
+            
+            audioChunks = [];
+            
+            // Setup MediaRecorder
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+            mediaRecorder = new MediaRecorder(destinationNode.stream, { mimeType: mimeType });
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                recordedBlob = new Blob(audioChunks, { type: 'audio/webm' }); // Standardize to webm for internal
+                const audioURL = URL.createObjectURL(recordedBlob);
+                audioPlayback.src = audioURL;
+                
+                btnPlay.disabled = false;
+                btnDownload.disabled = false;
+                
+                // Reset UI
+                btnRecord.classList.remove('hidden');
+                btnStop.classList.add('hidden');
+                btnRecord.classList.remove('recording-pulse');
+                btnRecord.innerHTML = `<i class="fas fa-circle mb-1"></i><span class="text-xs">อัดเสียงใหม่</span>`;
+            };
+
+            mediaRecorder.start();
+
+            // UI Update
+            btnRecord.classList.add('hidden');
+            btnStop.classList.remove('hidden');
+            btnStop.classList.add('recording-pulse');
+        });
+
+        btnStop.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+        });
+
+        btnPlay.addEventListener('click', () => {
+            audioPlayback.play();
+        });
+
+        btnDownload.addEventListener('click', () => {
+            if (!recordedBlob) return;
+            const url = URL.createObjectURL(recordedBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `khlui-recording-${new Date().getTime()}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+        });
+
+        // Global touch unlock for iOS audio
+        document.body.addEventListener('touchstart', function() {
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }, {once:true});
+
+    </script>
+</body>
+</html>

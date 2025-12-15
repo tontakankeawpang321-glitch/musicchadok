@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>กลองชาตรีเสมือนจริง (Virtual Klong Chatri)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;800&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #1a1a1a;
+            background-image: radial-gradient(#2d2d2d 1px, transparent 1px);
+            background-size: 20px 20px;
+            touch-action: manipulation; /* ป้องกันการซูม */
+            overflow: hidden; /* ป้องกันการเลื่อน */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* เอฟเฟกต์ไม้ (Wood Texture) */
+        .wood-texture {
+            background: repeating-linear-gradient(
+                45deg,
+                #603813,
+                #603813 10px,
+                #4a2c0f 10px,
+                #4a2c0f 20px
+            );
+            box-shadow: inset 0 0 20px #000;
+        }
+
+        /* หนังกลอง (Drum Skin) */
+        .drum-skin {
+            background: radial-gradient(circle at 30% 30%, #f3e5ab, #d4c48a);
+            position: relative;
+            box-shadow: 
+                inset 0 0 15px rgba(0,0,0,0.2),
+                inset 0 0 50px rgba(0,0,0,0.1),
+                0 10px 20px rgba(0,0,0,0.5);
+            transition: transform 0.05s ease;
+        }
+
+        .drum-skin:active, .drum-skin.active {
+            transform: scale(0.96);
+            background: radial-gradient(circle at 30% 30%, #e6d89b, #c4b47a);
+        }
+
+        /* จุดกึ่งกลาง (Center Marker) */
+        .center-mark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            background: rgba(0,0,0,0.1);
+            border-radius: 50%;
+            filter: blur(2px);
+        }
+
+        /* ปุ่มควบคุม */
+        .control-btn {
+            transition: all 0.2s;
+        }
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        .control-btn.recording {
+            animation: pulse-red 1.5s infinite;
+            background-color: #ef4444;
+            color: white;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        /* Visual Feedback Note */
+        .note-bubble {
+            position: absolute;
+            pointer-events: none;
+            animation: floatUp 0.8s ease-out forwards;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            z-index: 50;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(0.8); }
+            50% { opacity: 1; transform: translateY(-30px) scale(1.2); }
+            100% { opacity: 0; transform: translateY(-60px) scale(1); }
+        }
+
+        /* เชือกขึงกลอง */
+        .rope {
+            border: 2px dashed #d1d5db;
+            opacity: 0.3;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between items-center text-white">
+
+    <!-- Header / Control Panel -->
+    <div class="w-full bg-black/80 backdrop-blur-md p-4 border-b border-gray-700 z-20">
+        <div class="max-w-md mx-auto flex flex-col items-center gap-3">
+            <h1 class="text-xl font-bold text-amber-500 flex items-center gap-2">
+                <i class="fas fa-drum"></i> กลองชาตรี (Virtual)
+            </h1>
+            
+            <div class="flex gap-4 w-full justify-center">
+                <button id="btn-record" onclick="toggleRecording()" class="control-btn flex-1 bg-gray-800 hover:bg-gray-700 py-3 rounded-lg flex flex-col items-center justify-center gap-1 border border-gray-600">
+                    <i class="fas fa-microphone text-xl"></i>
+                    <span class="text-xs">อัดเสียง</span>
+                </button>
+                
+                <button id="btn-play" onclick="playRecording()" disabled class="control-btn flex-1 bg-gray-800 hover:bg-gray-700 py-3 rounded-lg flex flex-col items-center justify-center gap-1 border border-gray-600 disabled:opacity-30 disabled:cursor-not-allowed">
+                    <i class="fas fa-play text-xl"></i>
+                    <span class="text-xs">ฟังเสียง</span>
+                </button>
+                
+                <button id="btn-download" onclick="downloadRecording()" disabled class="control-btn flex-1 bg-gray-800 hover:bg-gray-700 py-3 rounded-lg flex flex-col items-center justify-center gap-1 border border-gray-600 disabled:opacity-30 disabled:cursor-not-allowed">
+                    <i class="fas fa-download text-xl"></i>
+                    <span class="text-xs">โหลดไฟล์</span>
+                </button>
+            </div>
+            
+            <div id="status-text" class="text-xs text-gray-400 h-4">พร้อมใช้งาน</div>
+        </div>
+    </div>
+
+    <!-- Main Drum Area -->
+    <div class="flex-1 w-full flex items-center justify-center relative overflow-hidden">
+        
+        <!-- พื้นหลังไม้รองกลอง -->
+        <div class="absolute w-[90%] h-[300px] wood-texture rounded-xl rotate-1 opacity-80 z-0 border-4 border-[#3d230a]"></div>
+
+        <div class="relative z-10 flex gap-4 md:gap-12 items-center justify-center w-full px-4">
+            
+            <!-- กลองตัวผู้ (เสียงต่ำ) -->
+            <div class="flex flex-col items-center gap-2">
+                <div class="relative">
+                    <!-- ขอบกลอง -->
+                    <div class="absolute inset-[-10px] rounded-full bg-[#4a2c0f] shadow-xl"></div>
+                    <!-- หน้ากลอง -->
+                    <div id="drum-low" 
+                         class="drum-skin w-36 h-36 md:w-48 md:h-48 rounded-full cursor-pointer flex items-center justify-center border-4 border-[#8B4513]"
+                         onpointerdown="hitDrum('low', event)">
+                        <div class="center-mark"></div>
+                        <span class="text-black/30 font-bold text-2xl select-none">ตูม</span>
+                    </div>
+                </div>
+                <span class="text-amber-200 text-sm font-semibold bg-black/50 px-2 rounded">ตัวผู้ (เสียงทุ้ม)</span>
+                <span class="text-gray-500 text-xs">Keyboard: Z / Arrow Left</span>
+            </div>
+
+            <!-- กลองตัวเมีย (เสียงสูง) -->
+            <div class="flex flex-col items-center gap-2">
+                <div class="relative">
+                    <!-- ขอบกลอง -->
+                    <div class="absolute inset-[-10px] rounded-full bg-[#4a2c0f] shadow-xl"></div>
+                    <!-- หน้ากลอง -->
+                    <div id="drum-high" 
+                         class="drum-skin w-32 h-32 md:w-44 md:h-44 rounded-full cursor-pointer flex items-center justify-center border-4 border-[#8B4513]"
+                         onpointerdown="hitDrum('high', event)">
+                        <div class="center-mark"></div>
+                        <span class="text-black/30 font-bold text-2xl select-none">ติง</span>
+                    </div>
+                </div>
+                <span class="text-amber-200 text-sm font-semibold bg-black/50 px-2 rounded">ตัวเมีย (เสียงแหลม)</span>
+                <span class="text-gray-500 text-xs">Keyboard: X / Arrow Right</span>
+            </div>
+        </div>
+
+        <!-- Note Container Area -->
+        <div id="visual-container" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="w-full bg-black/80 p-2 text-center text-gray-500 text-xs z-20">
+        แตะที่หน้ากลองเพื่อเล่น | ใช้หูฟังเพื่อเสียงที่สมจริงที่สุด
+    </div>
+
+    <script>
+        // --- AUDIO ENGINE (Web Audio API) ---
+        let audioCtx;
+        let masterGain;
+        let mediaDest;
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob = null;
+        let isRecording = false;
+
+        // เริ่มต้น AudioContext เมื่อมีการโต้ตอบครั้งแรก (ตามนโยบาย Browser)
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // Master Volume
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.8;
+                masterGain.connect(audioCtx.destination);
+
+                // Setup Recording Destination
+                mediaDest = audioCtx.createMediaStreamDestination();
+                masterGain.connect(mediaDest);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // ฟังก์ชันสร้างเสียงกลองชาตรี (Physical Modeling Synthesis)
+        function synthesizeDrum(type) {
+            initAudio();
+            const t = audioCtx.currentTime;
+
+            // Parameters ตามชนิดกลอง
+            // ตัวผู้ (Low): ตูม~ 200Hz, Decay ยาวกว่า
+            // ตัวเมีย (High): ติง! 350Hz, Decay สั้น, Attack คม
+            const params = type === 'low' 
+                ? { freq: 180, decay: 0.35, punch: 150 } 
+                : { freq: 380, decay: 0.25, punch: 200 };
+
+            // 1. Oscillator หลัก (เสียงหนังกลอง)
+            const osc = audioCtx.createOscillator();
+            const oscGain = audioCtx.createGain();
+            
+            osc.type = 'sine';
+            // Pitch Envelope (เสียง "ปุ๊ง" ตอนเริ่ม)
+            osc.frequency.setValueAtTime(params.freq + params.punch, t);
+            osc.frequency.exponentialRampToValueAtTime(params.freq, t + 0.05);
+            
+            // Amplitude Envelope
+            oscGain.gain.setValueAtTime(0, t);
+            oscGain.gain.linearRampToValueAtTime(1, t + 0.01); // Attack
+            oscGain.gain.exponentialRampToValueAtTime(0.01, t + params.decay); // Decay
+
+            osc.connect(oscGain);
+            oscGain.connect(masterGain);
+            osc.start(t);
+            osc.stop(t + params.decay + 0.1);
+
+            // 2. Noise (เสียงไม้กระทบ + เสียงแกรกของหนัง)
+            const noiseBufferSize = audioCtx.sampleRate * params.decay;
+            const buffer = audioCtx.createBuffer(1, noiseBufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < noiseBufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'highpass';
+            noiseFilter.frequency.value = 800;
+            
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.8, t);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05); // สั้นมากๆ แค่เสียงกระทบ
+
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(masterGain);
+            noise.start(t);
+        }
+
+        // --- UI & INTERACTION ---
+
+        function hitDrum(type, event) {
+            // เล่นเสียง
+            synthesizeDrum(type);
+            
+            // เอฟเฟกต์ภาพ (Visuals)
+            const drumId = type === 'low' ? 'drum-low' : 'drum-high';
+            const drumEl = document.getElementById(drumId);
+            const label = type === 'low' ? 'ตูม' : 'ติง';
+            const color = type === 'low' ? 'text-amber-200' : 'text-yellow-100';
+
+            // Animation class reset
+            drumEl.classList.remove('active');
+            void drumEl.offsetWidth; // Trigger reflow
+            drumEl.classList.add('active');
+
+            // แสดงโน้ตลอยขึ้น
+            showFloatingNote(label, color, event);
+        }
+
+        function showFloatingNote(text, colorClass, event) {
+            const container = document.getElementById('visual-container');
+            const el = document.createElement('div');
+            el.className = `note-bubble text-3xl ${colorClass}`;
+            el.innerText = text;
+
+            // คำนวณตำแหน่ง
+            let x, y;
+            if (event && event.type.includes('touch')) {
+                // สำหรับ Touch
+                const touch = event.touches[0] || event.changedTouches[0];
+                x = touch.clientX;
+                y = touch.clientY;
+            } else if (event && event.clientX) {
+                // สำหรับ Mouse
+                x = event.clientX;
+                y = event.clientY;
+            } else {
+                // สำหรับ Keyboard (หาตำแหน่งกลางกลอง)
+                const drumId = text === 'ตูม' ? 'drum-low' : 'drum-high';
+                const rect = document.getElementById(drumId).getBoundingClientRect();
+                x = rect.left + rect.width / 2;
+                y = rect.top + rect.height / 2;
+            }
+
+            el.style.left = `${x}px`;
+            el.style.top = `${y}px`;
+            el.style.transform = 'translate(-50%, -50%)';
+
+            container.appendChild(el);
+
+            // ลบ Element เมื่อ Animation จบ
+            setTimeout(() => {
+                el.remove();
+            }, 800);
+        }
+
+        // Keyboard Support
+        document.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            const key = e.key.toLowerCase();
+            if (key === 'z' || key === 'arrowleft') {
+                hitDrum('low', {});
+                document.getElementById('drum-low').classList.add('active');
+                setTimeout(() => document.getElementById('drum-low').classList.remove('active'), 100);
+            }
+            if (key === 'x' || key === 'arrowright') {
+                hitDrum('high', {});
+                document.getElementById('drum-high').classList.add('active');
+                setTimeout(() => document.getElementById('drum-high').classList.remove('active'), 100);
+            }
+        });
+
+        // --- RECORDER LOGIC ---
+
+        function toggleRecording() {
+            initAudio();
+            const btn = document.getElementById('btn-record');
+            const status = document.getElementById('status-text');
+
+            if (!isRecording) {
+                // Start Recording
+                audioChunks = [];
+                // ใช้ mimeType ที่รองรับตาม Browser
+                const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+                
+                try {
+                    mediaRecorder = new MediaRecorder(mediaDest.stream, { mimeType: mimeType });
+                } catch (err) {
+                    alert('Browser นี้ไม่รองรับการอัดเสียง');
+                    return;
+                }
+
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    audioBlob = new Blob(audioChunks, { type: mimeType });
+                    document.getElementById('btn-play').disabled = false;
+                    document.getElementById('btn-download').disabled = false;
+                    status.innerText = "บันทึกเสร็จสิ้น พร้อมเล่นหรือดาวน์โหลด";
+                    status.classList.remove('text-red-500');
+                    status.classList.add('text-green-500');
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                btn.innerHTML = '<i class="fas fa-stop text-xl"></i><span class="text-xs">หยุด</span>';
+                btn.classList.add('recording');
+                status.innerText = "กำลังอัดเสียง... (กดปุ่มหยุดเมื่อเสร็จ)";
+                status.classList.add('text-red-500');
+                
+                // ปิดปุ่มอื่นๆ
+                document.getElementById('btn-play').disabled = true;
+                document.getElementById('btn-download').disabled = true;
+
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                btn.innerHTML = '<i class="fas fa-microphone text-xl"></i><span class="text-xs">อัดใหม่</span>';
+                btn.classList.remove('recording');
+            }
+        }
+
+        function playRecording() {
+            if (!audioBlob) return;
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            document.getElementById('status-text').innerText = "กำลังเล่นเสียงที่อัดไว้...";
+            audio.play();
+            audio.onended = () => {
+                document.getElementById('status-text').innerText = "พร้อมใช้งาน";
+            };
+        }
+
+        function downloadRecording() {
+            if (!audioBlob) return;
+            const url = URL.createObjectURL(audioBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            
+            // ตั้งชื่อไฟล์ตามเวลา
+            const date = new Date();
+            const timestamp = `${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`;
+            a.download = `klong-chatri-${timestamp}.webm`;
+            
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+            
+            document.getElementById('status-text').innerText = "ดาวน์โหลดเรียบร้อย";
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ซอสามสายจำลอง (Virtual Saw Sam Sai)</title>
+    <style>
+        /* Reset & Layout */
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none; /* Prevent scrolling */
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: #1a0f0a; /* Dark wood background */
+            background: radial-gradient(circle, #2e1e15 0%, #0d0603 100%);
+            font-family: 'Sarabun', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* UI Controls (Top Bar) */
+        #controls {
+            width: 100%;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 100;
+            height: 60px;
+            border-bottom: 2px solid #c5a059;
+        }
+
+        .btn {
+            background: linear-gradient(180deg, #d4af37 0%, #aa8c2c 100%);
+            border: 1px solid #ffe680;
+            color: #2e1e15;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: transform 0.1s;
+            min-width: 70px;
+            text-align: center;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn.recording {
+            background: linear-gradient(180deg, #ff4444 0%, #cc0000 100%);
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
+        }
+
+        /* Instrument Body */
+        #instrument-container {
+            flex-grow: 1;
+            width: 100%;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* Neck / Fingerboard */
+        #neck {
+            width: 90%;
+            max-width: 400px;
+            height: 100%;
+            background: linear-gradient(90deg, #3e2723 0%, #5d4037 50%, #3e2723 100%);
+            border-left: 5px solid #1a1008;
+            border-right: 5px solid #1a1008;
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 5%; /* Spacing for strings */
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        /* Decorative Elements (Thai Pattern Hint) */
+        #neck::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: repeating-linear-gradient(0deg, transparent, transparent 98%, rgba(255,255,255,0.03) 99%, rgba(255,255,255,0.03) 100%);
+            pointer-events: none;
+        }
+
+        /* Strings */
+        .string-lane {
+            flex: 1;
+            height: 100%;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .string {
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(90deg, #e0e0e0, #fff, #9e9e9e); /* Silk string look */
+            box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+            position: absolute;
+            pointer-events: none; /* Let clicks pass to lane */
+        }
+
+        .string.vibrating {
+            animation: vibrate 0.1s infinite;
+        }
+
+        @keyframes vibrate {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(1px); }
+            75% { transform: translateX(-1px); }
+            100% { transform: translateX(0); }
+        }
+
+        /* Note Markers */
+        .fret-marker {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 215, 0, 0.7); /* Gold text */
+            font-size: 16px;
+            font-weight: bold;
+            pointer-events: none;
+            text-shadow: 0 2px 4px black;
+            opacity: 0; /* Hidden by default */
+            transition: opacity 0.3s;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05); /* Invisible fret line guide */
+            padding-top: 5px;
+        }
+
+        .fret-marker.show {
+            opacity: 1;
+        }
+
+        /* Active Finger Highlight */
+        .finger-glow {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: radial-gradient(circle, rgba(255, 215, 0, 0.6) 0%, transparent 70%);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            display: none;
+            z-index: 20;
+        }
+
+        /* Bottom Decoration (The Resonator hint) */
+        #resonator-hint {
+            position: absolute;
+            bottom: -50px;
+            width: 100%;
+            height: 100px;
+            background: radial-gradient(circle at 50% 100%, #2b1b12, #000);
+            border-top: 4px solid #c5a059;
+            z-index: 5;
+            pointer-events: none;
+        }
+        
+        #status-msg {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="controls">
+        <button id="notes-btn" class="btn" onclick="toggleNotes()">แสดงโน้ต</button>
+        <button id="rec-btn" class="btn" onclick="toggleRecord()">อัดเสียง</button>
+        <button id="play-btn" class="btn" onclick="playRecording()" disabled>เล่นเสียง</button>
+        <button id="dl-btn" class="btn" onclick="downloadRecording()" disabled>ดาวน์โหลด</button>
+    </div>
+
+    <div id="status-msg">บันทึกเสียงแล้ว</div>
+
+    <div id="instrument-container">
+        <div id="neck">
+            <!-- Left String (Sai Thum - Low) -->
+            <div class="string-lane" id="lane-0" data-string="0">
+                <div class="string"></div>
+                <!-- Frets will be generated here -->
+            </div>
+
+            <!-- Middle String (Sai Klang - Mid) -->
+            <div class="string-lane" id="lane-1" data-string="1">
+                <div class="string"></div>
+            </div>
+
+            <!-- Right String (Sai Ek - High) -->
+            <div class="string-lane" id="lane-2" data-string="2">
+                <div class="string"></div>
+            </div>
+            
+            <!-- Visual glow for touch -->
+            <div id="glow-pool"></div>
+        </div>
+        <div id="resonator-hint"></div>
+    </div>
+
+    <script>
+        // --- Audio Engine Setup ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        let masterGain;
+        let recorder;
+        let recordingChunks = [];
+        let audioBlob = null;
+        let destNode; // Destination for recording
+        let isRecording = false;
+
+        // Thai 7-tone Equal Temperament Tuning System
+        // Base Frequency (approximate):
+        // Sai Thum (Low) = Sol (approx 196Hz - G3) but slightly shifted for Thai tuning
+        // Sai Klang (Mid) = Do (approx 261Hz - C4)
+        // Sai Ek (High) = Sol (approx 392Hz - G4)
+        
+        // Thai scale doesn't match Western exactly. We calculate using 7-TET formula:
+        // Freq = Base * 2^(n/7)
+        
+        const baseFreqs = [196.00, 261.63, 392.00]; // G3, C4, G4 (Western approx bases)
+        const noteLabels = ["ซ", "ล", "ท", "ด", "ร", "ม", "ฟ"]; // Sol, La, Ti, Do, Re, Mi, Fa
+        
+        // Map string index to scale offset
+        // String 0 (Sol) starts at index 0 of noteLabels
+        // String 1 (Do) starts at index 3 of noteLabels
+        // String 2 (Sol High) starts at index 0 (octave up)
+        const stringStartNoteIndex = [0, 3, 0]; 
+
+        let activeVoices = {}; // Store active oscillators by touch ID
+        let showNotes = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+                
+                // Master Volume
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.5;
+                
+                // Setup Recording Stream
+                destNode = audioCtx.createMediaStreamDestination();
+                masterGain.connect(audioCtx.destination);
+                masterGain.connect(destNode);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // --- Sound Synthesis ---
+        // Create a voice that sounds like a bowed instrument
+        function startNote(freq, touchId) {
+            initAudio();
+
+            const osc = audioCtx.createOscillator();
+            const subOsc = audioCtx.createOscillator(); // Adds body/warmth
+            const gainNode = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+
+            // Sawtooth for the "buzz" of the bow/string
+            osc.type = 'sawtooth';
+            osc.frequency.value = freq;
+
+            // Sine for the fundamental warmth
+            subOsc.type = 'sine';
+            subOsc.frequency.value = freq;
+
+            // Filter to remove harsh high frequencies (simulate wood body)
+            filter.type = 'lowpass';
+            filter.frequency.value = 2000;
+            filter.Q.value = 1;
+
+            // Envelope (Attack)
+            gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime + 0.1); // Bowing attack
+
+            // Connections
+            osc.connect(filter);
+            subOsc.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(masterGain);
+
+            osc.start();
+            subOsc.start();
+
+            activeVoices[touchId] = {
+                oscillators: [osc, subOsc],
+                gain: gainNode,
+                startTime: audioCtx.currentTime
+            };
+        }
+
+        function stopNote(touchId) {
+            if (activeVoices[touchId]) {
+                const voice = activeVoices[touchId];
+                const releaseTime = 0.2; // Bow release decay
+                
+                voice.gain.gain.cancelScheduledValues(audioCtx.currentTime);
+                voice.gain.gain.setValueAtTime(voice.gain.gain.value, audioCtx.currentTime);
+                voice.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + releaseTime);
+
+                voice.oscillators.forEach(osc => {
+                    osc.stop(audioCtx.currentTime + releaseTime);
+                });
+
+                delete activeVoices[touchId];
+            }
+        }
+
+        function updateNotePitch(touchId, freq) {
+            if (activeVoices[touchId]) {
+                activeVoices[touchId].oscillators.forEach(osc => {
+                    osc.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.05); // Slide effect
+                });
+            }
+        }
+
+        // --- UI & Interaction Logic ---
+
+        const lanes = [
+            document.getElementById('lane-0'),
+            document.getElementById('lane-1'),
+            document.getElementById('lane-2')
+        ];
+
+        // Generate Fret Markers (Visual Only - Thai System is fretless but we need guides)
+        function generateFrets() {
+            // Create roughly 1 octave of positions per string
+            const numNotes = 8; 
+            
+            lanes.forEach((lane, stringIdx) => {
+                const startNote = stringStartNoteIndex[stringIdx];
+                
+                for (let i = 0; i < numNotes; i++) {
+                    const noteIndex = (startNote + i) % 7;
+                    const label = noteLabels[noteIndex];
+                    
+                    // Position roughly distributed down the neck
+                    // In reality, distance gets smaller, but for mobile playability, linear-ish is easier
+                    const topPos = 10 + (i * 11); // Percent
+                    
+                    const marker = document.createElement('div');
+                    marker.className = 'fret-marker';
+                    marker.style.top = topPos + '%';
+                    marker.innerText = label;
+                    lane.appendChild(marker);
+                }
+            });
+        }
+
+        // Calculate frequency based on vertical position (0 to 1)
+        function getFrequencyFromPos(stringIdx, yRatio) {
+            // Invert Y (Bottom is higher pitch on a real fiddle closer to body? 
+            // Actually on Saw Sam Sai, pressing down (closer to body) = higher pitch.
+            // Screen Top = Nut (Open String), Screen Bottom = Bridge.
+            // So Y:0 is open string, Y:1 is high pitch.
+            
+            // Map 0-1 to Thai Scale steps (approx 0 to 14 steps ~ 2 octaves)
+            // Let's constrain to 1 octave for playability on screen
+            const maxSteps = 7; // 1 Octave range on screen
+            
+            // Snap logic vs Slide logic
+            // To make it sound "Thai", we allow slight sliding, but bias towards the note
+            // But strict snapping is easier to play. Let's use continuous pitch for realism.
+            
+            const steps = yRatio * 10; // Scale factor
+            
+            // Thai 7-tone formula: Freq = Base * 2^(steps/7)
+            const freq = baseFreqs[stringIdx] * Math.pow(2, steps / 7);
+            return freq;
+        }
+
+        // --- Input Handling (Touch/Mouse) ---
+
+        function handleStart(e) {
+            e.preventDefault();
+            initAudio(); // Ensure context is running
+
+            const touches = e.changedTouches || [e];
+            const rect = e.currentTarget.getBoundingClientRect();
+            const stringIdx = parseInt(e.currentTarget.dataset.string);
+
+            for (let i = 0; i < touches.length; i++) {
+                const t = touches[i];
+                const touchId = t.identifier !== undefined ? t.identifier : 'mouse';
+                
+                // Calculate Y ratio (0 top, 1 bottom)
+                // Add a small buffer at top for "Open String" (0.0 - 0.05)
+                let y = (t.clientY - rect.top) / rect.height;
+                if (y < 0.05) y = 0; // Open string
+                
+                const freq = getFrequencyFromPos(stringIdx, y);
+                
+                startNote(freq, touchId);
+                visualizeTouch(stringIdx, t.clientY, t.clientX, true);
+                
+                // Add Visual Vibration
+                e.currentTarget.querySelector('.string').classList.add('vibrating');
+            }
+        }
+
+        function handleMove(e) {
+            e.preventDefault();
+            const touches = e.changedTouches || [e];
+            const rect = e.currentTarget.getBoundingClientRect();
+            const stringIdx = parseInt(e.currentTarget.dataset.string);
+
+            for (let i = 0; i < touches.length; i++) {
+                const t = touches[i];
+                const touchId = t.identifier !== undefined ? t.identifier : 'mouse';
+                
+                let y = (t.clientY - rect.top) / rect.height;
+                if (y < 0.05) y = 0;
+
+                const freq = getFrequencyFromPos(stringIdx, y);
+                updateNotePitch(touchId, freq);
+                
+                visualizeTouch(stringIdx, t.clientY, t.clientX, false);
+            }
+        }
+
+        function handleEnd(e) {
+            e.preventDefault();
+            const touches = e.changedTouches || [e];
+            const stringIdx = parseInt(e.currentTarget.dataset.string);
+
+            for (let i = 0; i < touches.length; i++) {
+                const t = touches[i];
+                const touchId = t.identifier !== undefined ? t.identifier : 'mouse';
+                stopNote(touchId);
+            }
+            
+            // Stop vibration if no active touches on this lane (simplified)
+            // Ideally check activeVoices for this string
+            e.currentTarget.querySelector('.string').classList.remove('vibrating');
+            hideTouchVisual();
+        }
+
+        // Attach events
+        lanes.forEach(lane => {
+            lane.addEventListener('touchstart', handleStart, {passive: false});
+            lane.addEventListener('touchmove', handleMove, {passive: false});
+            lane.addEventListener('touchend', handleEnd, {passive: false});
+            lane.addEventListener('touchcancel', handleEnd, {passive: false});
+
+            // Mouse fallback
+            lane.addEventListener('mousedown', handleStart);
+        });
+        
+        // Global mouse up for safety
+        window.addEventListener('mouseup', (e) => {
+            stopNote('mouse');
+            document.querySelectorAll('.string').forEach(s => s.classList.remove('vibrating'));
+            hideTouchVisual();
+        });
+        window.addEventListener('mousemove', (e) => {
+             if(activeVoices['mouse']) {
+                 // Complex to map global mouse move back to specific lane logic without complexity
+                 // Keep mouse interaction simple (click and drag within lane)
+             }
+        });
+
+
+        // --- Visual Feedback ---
+        const glow = document.createElement('div');
+        glow.className = 'finger-glow';
+        document.body.appendChild(glow);
+
+        function visualizeTouch(stringIdx, y, x, isStart) {
+            // Simplified: only track last touch for visual to avoid DOM chaos in single file
+            glow.style.display = 'block';
+            glow.style.top = y + 'px';
+            glow.style.left = x + 'px';
+        }
+
+        function hideTouchVisual() {
+            glow.style.display = 'none';
+        }
+
+        // --- Controls Logic ---
+
+        function toggleNotes() {
+            showNotes = !showNotes;
+            const markers = document.querySelectorAll('.fret-marker');
+            markers.forEach(m => {
+                if(showNotes) m.classList.add('show');
+                else m.classList.remove('show');
+            });
+            
+            const btn = document.getElementById('notes-btn');
+            btn.style.background = showNotes ? '#ffe680' : '';
+        }
+
+        // --- Recording Logic ---
+        function toggleRecord() {
+            const btn = document.getElementById('rec-btn');
+            
+            if (!isRecording) {
+                // Start Recording
+                initAudio(); // Ensure context ready
+                recordingChunks = [];
+                recorder = new MediaRecorder(destNode.stream); // Use the destination node
+                
+                recorder.ondataavailable = (e) => recordingChunks.push(e.data);
+                recorder.onstop = (e) => {
+                    audioBlob = new Blob(recordingChunks, { type: 'audio/webm' });
+                    document.getElementById('play-btn').disabled = false;
+                    document.getElementById('dl-btn').disabled = false;
+                    showStatus("บันทึกเสียงเรียบร้อย");
+                };
+                
+                recorder.start();
+                isRecording = true;
+                btn.textContent = "หยุดอัด";
+                btn.classList.add('recording');
+                showStatus("กำลังบันทึก...");
+            } else {
+                // Stop Recording
+                recorder.stop();
+                isRecording = false;
+                btn.textContent = "อัดเสียง";
+                btn.classList.remove('recording');
+            }
+        }
+
+        function playRecording() {
+            if (!audioBlob) return;
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            audio.play();
+            showStatus("กำลังเล่นเสียงที่อัดไว้...");
+        }
+
+        function downloadRecording() {
+            if (!audioBlob) return;
+            const url = URL.createObjectURL(audioBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'saw_sam_sai_recording.webm';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            showStatus("กำลังดาวน์โหลด...");
+        }
+        
+        function showStatus(msg) {
+            const el = document.getElementById('status-msg');
+            el.innerText = msg;
+            el.style.opacity = 1;
+            setTimeout(() => { el.style.opacity = 0; }, 2000);
+        }
+
+        // Init
+        generateFrets();
+
+    </script>
+</body>
+</html>

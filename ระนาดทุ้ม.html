@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ระนาดทุ้มจำลอง (Virtual Ranat Thum)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Sarabun -->
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #1a1a1a;
+            background-image: radial-gradient(circle at center, #2a2a2a 0%, #111 100%);
+            overflow: hidden; /* ป้องกันการเลื่อน */
+            touch-action: none; /* ป้องกัน gesture ของ browser */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Effect ลายไม้ */
+        .wood-texture {
+            background-color: #5d4037;
+            background-image: linear-gradient(90deg, rgba(255,255,255,0.05) 50%, transparent 50%),
+            linear-gradient(90deg, rgba(255,255,255,0.1) 50%, transparent 50%);
+            background-size: 20px 100%, 60px 100%;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        .key-wood {
+            background: linear-gradient(to bottom, #8d6e63 0%, #5d4037 50%, #3e2723 100%);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.2);
+            transition: transform 0.05s ease, background 0.1s;
+            position: relative;
+        }
+
+        .key-wood::after {
+            content: '';
+            position: absolute;
+            top: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            height: 2px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 50%;
+        }
+
+        .key-wood:active, .key-wood.active {
+            transform: translateY(4px) scale(0.98);
+            background: linear-gradient(to bottom, #795548 0%, #4e342e 100%);
+        }
+
+        .rope {
+            background: #d7ccc8;
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+
+        /* Animation Pulse for Recording */
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .recording-pulse {
+            animation: pulse-red 1.5s infinite;
+        }
+
+        /* Modal Overlay */
+        #start-overlay {
+            z-index: 50;
+            backdrop-filter: blur(5px);
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-between text-white">
+
+    <!-- Start Overlay (To unlock AudioContext on Mobile) -->
+    <div id="start-overlay" class="absolute inset-0 bg-black/80 flex flex-col items-center justify-center p-6 text-center">
+        <div class="bg-stone-800 p-8 rounded-2xl border-2 border-amber-600 shadow-2xl max-w-sm w-full">
+            <h1 class="text-3xl font-bold text-amber-400 mb-2">ระนาดทุ้ม</h1>
+            <p class="text-gray-300 mb-6">Thai Ranat Thum Simulator</p>
+            <div class="text-sm text-gray-400 mb-6">
+                <i class="fa-solid fa-headphones"></i> แนะนำให้ใส่หูฟังเพื่อเสียงที่สมจริง
+            </div>
+            <button id="start-btn" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-6 rounded-full transition-all transform active:scale-95 shadow-lg border border-amber-400">
+                <i class="fa-solid fa-play mr-2"></i> เริ่มเล่น (Start)
+            </button>
+        </div>
+    </div>
+
+    <!-- Top Control Bar -->
+    <div class="w-full bg-stone-900/90 backdrop-blur-md p-3 flex justify-between items-center z-10 border-b border-stone-700 h-16 shrink-0">
+        <div class="flex items-center gap-2">
+            <div class="text-amber-500 text-xl font-bold mr-2 hidden sm:block">ระนาดทุ้ม</div>
+            <button id="toggle-notes" class="bg-stone-700 hover:bg-stone-600 text-white px-3 py-1.5 rounded-lg text-sm transition border border-stone-600">
+                <i class="fa-solid fa-music"></i> <span class="hidden xs:inline">โน้ต</span>
+            </button>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <div id="timer" class="text-red-400 font-mono hidden">00:00</div>
+            
+            <button id="record-btn" class="bg-stone-800 hover:bg-stone-700 text-red-500 w-10 h-10 rounded-full flex items-center justify-center border border-red-900/50 transition">
+                <i class="fa-solid fa-circle"></i>
+            </button>
+            
+            <button id="stop-btn" class="hidden bg-stone-800 hover:bg-stone-700 text-gray-200 w-10 h-10 rounded-full items-center justify-center border border-stone-600">
+                <i class="fa-solid fa-stop"></i>
+            </button>
+            
+            <button id="play-btn" class="hidden bg-green-700 hover:bg-green-600 text-white w-10 h-10 rounded-full items-center justify-center shadow-lg">
+                <i class="fa-solid fa-play"></i>
+            </button>
+
+            <a id="download-link" class="hidden bg-blue-600 hover:bg-blue-500 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg" download="ranat-thum-recording.webm">
+                <i class="fa-solid fa-download"></i>
+            </a>
+        </div>
+    </div>
+
+    <!-- Ranat Instrument Area -->
+    <div class="flex-grow w-full flex flex-col items-center justify-center p-2 relative">
+        
+        <!-- The "Rang" (Boat shape visual background) -->
+        <div class="absolute w-[98%] h-[85%] bg-[#3e2723] rounded-[50px] wood-texture border-b-8 border-[#2d1b15] shadow-2xl z-0 transform scale-y-90 translate-y-4"></div>
+        
+        <!-- Rope Left -->
+        <div class="absolute left-4 top-1/2 w-2 h-[70%] bg-[#d7ccc8] z-10 rope rounded-full transform -translate-y-1/2"></div>
+        <!-- Rope Right -->
+        <div class="absolute right-4 top-1/2 w-2 h-[70%] bg-[#d7ccc8] z-10 rope rounded-full transform -translate-y-1/2"></div>
+
+        <!-- Keys Container -->
+        <div id="keys-container" class="relative z-20 flex justify-center items-center gap-[2px] w-full max-w-6xl h-[65%] px-6">
+            <!-- Keys will be generated by JS -->
+        </div>
+
+    </div>
+
+    <!-- Footer / Credit -->
+    <div class="text-[10px] text-stone-500 pb-1 w-full text-center shrink-0">
+        Virtual Thai Instrument Simulator
+    </div>
+
+    <script>
+        // --- 1. CONFIGURATION & STATE ---
+        const NOTE_NAMES = ['ซ', 'ล', 'ท', 'ด', 'ร', 'ม', 'ฟ', 'ซ', 'ล', 'ท', 'ด', 'ร', 'ม', 'ฟ', 'ซ', 'ล', 'ท'];
+        const WESTERN_NOTES = ['G2', 'A2', 'B2', 'C3', 'D3', 'E3', 'F3', 'G3', 'A3', 'B3', 'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4'];
+        
+        // Frequencies for Ranat Thum (Approximate tuning for pleasant simulation)
+        // Ranat Thum is lower than Ranat Ek. Starting around G2.
+        const FREQUENCIES = [
+            98.00,  // G2 (Sol)
+            110.00, // A2 (La)
+            123.47, // B2 (Ti)
+            130.81, // C3 (Do)
+            146.83, // D3 (Re)
+            164.81, // E3 (Mi)
+            174.61, // F3 (Fa)
+            196.00, // G3 (Sol)
+            220.00, // A3 (La)
+            246.94, // B3 (Ti)
+            261.63, // C4 (Do)
+            293.66, // D4 (Re)
+            329.63, // E4 (Mi)
+            349.23, // F4 (Fa)
+            392.00, // G4 (Sol)
+            440.00, // A4 (La)
+            493.88  // B4 (Ti)
+        ];
+
+        let audioCtx;
+        let masterGain;
+        let dest; // For recording
+        let mediaRecorder;
+        let recordedChunks = [];
+        let audioBlob;
+        let audioUrl;
+        let isRecording = false;
+        let startTime;
+        let timerInterval;
+        let showNotes = true;
+
+        // --- 2. AUDIO ENGINE (SYNTHESIS) ---
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // Master Gain (Volume Control)
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.8;
+                masterGain.connect(audioCtx.destination);
+
+                // Setup Recording Destination
+                dest = audioCtx.createMediaStreamDestination();
+                masterGain.connect(dest);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSound(freq) {
+            if (!audioCtx) return;
+
+            const t = audioCtx.currentTime;
+
+            // 1. Fundamental Oscillator (The main tone) - Triangle for body, Sine for depth
+            const osc1 = audioCtx.createOscillator();
+            osc1.type = 'triangle'; 
+            osc1.frequency.setValueAtTime(freq, t);
+
+            // 2. Harmonic Oscillator (For the "wood" resonance)
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(freq * 2.02, t); // Slightly detuned harmonic
+
+            // 3. Filter (Lowpass to simulate the mellow "Thum" sound)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(800, t); // Cutoff high frequencies
+            filter.Q.value = 5;
+
+            // 4. Envelopes (Attack and Decay)
+            const gain1 = audioCtx.createGain();
+            const gain2 = audioCtx.createGain();
+
+            // Envelope 1 (Main body): Fast attack, medium decay
+            gain1.gain.setValueAtTime(0, t);
+            gain1.gain.linearRampToValueAtTime(0.8, t + 0.01); // Attack
+            gain1.gain.exponentialRampToValueAtTime(0.01, t + 0.6); // Decay
+
+            // Envelope 2 (Harmonic/Click): Very fast attack, fast decay
+            gain2.gain.setValueAtTime(0, t);
+            gain2.gain.linearRampToValueAtTime(0.4, t + 0.005);
+            gain2.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+
+            // Connect graph
+            osc1.connect(filter);
+            filter.connect(gain1);
+            gain1.connect(masterGain);
+
+            osc2.connect(gain2);
+            gain2.connect(masterGain);
+
+            // Start and Stop
+            osc1.start(t);
+            osc2.start(t);
+            osc1.stop(t + 0.7);
+            osc2.stop(t + 0.7);
+        }
+
+        // --- 3. UI GENERATION ---
+        function createKeys() {
+            const container = document.getElementById('keys-container');
+            const totalKeys = FREQUENCIES.length;
+
+            FREQUENCIES.forEach((freq, index) => {
+                const key = document.createElement('div');
+                key.className = 'key-wood flex items-end justify-center pb-2 cursor-pointer select-none';
+                
+                // Style adjustment for realistic look (Middle keys are wider/longer)
+                // Actually in Ranat Thum, low keys are bigger. 
+                // Let's make them scale slightly in height.
+                const heightPercent = 100 - (index * 1.5); // Tapering height
+                const widthPercent = 100 / totalKeys;
+                
+                key.style.height = `${heightPercent}%`;
+                key.style.flexGrow = 1;
+                key.dataset.freq = freq;
+                key.id = `key-${index}`;
+
+                // Note Label
+                const label = document.createElement('span');
+                label.className = 'note-label text-stone-200 text-xs sm:text-sm font-bold opacity-90 drop-shadow-md';
+                label.innerText = NOTE_NAMES[index];
+                if (!showNotes) label.style.display = 'none';
+                
+                key.appendChild(label);
+
+                // Interactions
+                const triggerSound = (e) => {
+                    e.preventDefault(); // Prevent scroll/zoom
+                    initAudio(); // Ensure audio context is ready
+                    playSound(freq);
+                    
+                    // Visual feedback
+                    key.classList.add('active');
+                    setTimeout(() => key.classList.remove('active'), 100);
+                };
+
+                // Mouse
+                key.addEventListener('mousedown', triggerSound);
+                // Touch (use start to prevent delay)
+                key.addEventListener('touchstart', triggerSound, {passive: false});
+
+                container.appendChild(key);
+            });
+        }
+
+        // --- 4. RECORDING LOGIC ---
+        const recordBtn = document.getElementById('record-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const playBtn = document.getElementById('play-btn');
+        const downloadLink = document.getElementById('download-link');
+        const timerDisplay = document.getElementById('timer');
+
+        function updateTimer() {
+            const now = Date.now();
+            const diff = Math.floor((now - startTime) / 1000);
+            const m = Math.floor(diff / 60).toString().padStart(2, '0');
+            const s = (diff % 60).toString().padStart(2, '0');
+            timerDisplay.innerText = `${m}:${s}`;
+        }
+
+        recordBtn.addEventListener('click', () => {
+            initAudio();
+            recordedChunks = [];
+            
+            // Check browser support
+            const mimeTypes = ['audio/webm', 'audio/ogg', 'audio/mp4'];
+            let selectedType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || '';
+
+            try {
+                mediaRecorder = new MediaRecorder(dest.stream, { mimeType: selectedType });
+            } catch (e) {
+                alert('Browser not supporting MediaRecorder properly. Trying default.');
+                mediaRecorder = new MediaRecorder(dest.stream);
+            }
+
+            mediaRecorder.ondataavailable = (evt) => {
+                if (evt.data.size > 0) recordedChunks.push(evt.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+                audioUrl = URL.createObjectURL(audioBlob);
+                
+                // Setup Play Button
+                playBtn.onclick = () => {
+                    const audio = new Audio(audioUrl);
+                    audio.play();
+                };
+                playBtn.classList.remove('hidden');
+                playBtn.style.display = 'flex';
+
+                // Setup Download Link
+                downloadLink.href = audioUrl;
+                downloadLink.classList.remove('hidden');
+                downloadLink.style.display = 'flex';
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            
+            // UI Updates
+            recordBtn.classList.add('recording-pulse');
+            recordBtn.innerHTML = '<i class="fa-solid fa-microphone-lines"></i>';
+            stopBtn.classList.remove('hidden');
+            stopBtn.style.display = 'flex';
+            playBtn.classList.add('hidden');
+            downloadLink.classList.add('hidden');
+            timerDisplay.classList.remove('hidden');
+            
+            startTime = Date.now();
+            timerInterval = setInterval(updateTimer, 1000);
+        });
+
+        stopBtn.addEventListener('click', () => {
+            if (isRecording && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                isRecording = false;
+                
+                recordBtn.classList.remove('recording-pulse');
+                recordBtn.innerHTML = '<i class="fa-solid fa-circle"></i>';
+                stopBtn.classList.add('hidden');
+                clearInterval(timerInterval);
+                timerDisplay.innerText = "00:00";
+            }
+        });
+
+        // --- 5. GENERAL UI LOGIC ---
+        document.getElementById('start-btn').addEventListener('click', () => {
+            initAudio();
+            document.getElementById('start-overlay').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('start-overlay').style.display = 'none';
+            }, 500);
+        });
+
+        document.getElementById('toggle-notes').addEventListener('click', () => {
+            showNotes = !showNotes;
+            const labels = document.querySelectorAll('.note-label');
+            labels.forEach(lbl => lbl.style.display = showNotes ? 'block' : 'none');
+            
+            const btn = document.getElementById('toggle-notes');
+            if(showNotes) {
+                btn.classList.add('bg-stone-700', 'text-white');
+                btn.classList.remove('bg-stone-500', 'text-gray-300');
+            } else {
+                btn.classList.remove('bg-stone-700', 'text-white');
+                btn.classList.add('bg-stone-500', 'text-gray-300');
+            }
+        });
+
+        // Initialize Keys on Load
+        createKeys();
+
+    </script>
+</body>
+</html>

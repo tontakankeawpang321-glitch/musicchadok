@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ฆ้องราวจำลอง (Virtual Khong Rao)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <style>
+        /* ป้องกันการเลือกข้อความและการเลื่อนหน้าจอ */
+        body {
+            overscroll-behavior: none;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            font-family: 'Sarabun', sans-serif;
+            background-color: #2D1B0E; /* สีไม้เข้ม */
+            overflow: hidden;
+        }
+
+        /* พื้นหลังลายไม้จำลอง */
+        .wood-texture {
+            background: repeating-linear-gradient(
+                45deg,
+                #3e2723,
+                #3e2723 10px,
+                #4e342e 10px,
+                #4e342e 20px
+            );
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        /* ดีไซน์ลูกฆ้อง (Gong Style) */
+        .gong {
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #ffd700, #b8860b, #5c4033);
+            box-shadow: 
+                0 4px 6px rgba(0,0,0,0.5),
+                inset 0 0 20px rgba(0,0,0,0.5);
+            position: relative;
+            transition: transform 0.1s, filter 0.1s;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .gong:active, .gong.hit {
+            transform: scale(0.95);
+            filter: brightness(1.2);
+        }
+
+        /* ปุ่มนูนกลางฆ้อง (The Boss/Nipple) */
+        .gong::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 35%;
+            height: 35%;
+            background: radial-gradient(circle at 40% 40%, #ffec8b, #daa520);
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+        }
+
+        /* เชือกแขวน */
+        .rope {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 25px;
+            background-color: #d2b48c;
+            z-index: 0;
+        }
+
+        /* แสงวิบวับ */
+        @keyframes ripple {
+            0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(255, 215, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
+        }
+        .gong.hit {
+            animation: ripple 0.4s ease-out;
+        }
+
+        /* Custom Scrollbar for Controls if needed */
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col wood-texture text-white">
+
+    <!-- Header / Controls -->
+    <div class="p-3 bg-black/40 backdrop-blur-sm flex items-center justify-between shrink-0 z-50 shadow-lg border-b border-[#8B4513]">
+        <div class="flex items-center gap-2">
+            <h1 class="text-lg font-bold text-yellow-500 hidden sm:block">ฆ้องราว</h1>
+            <div id="statusText" class="text-xs text-gray-300">พร้อมเล่น</div>
+        </div>
+
+        <div class="flex gap-2">
+            <!-- Toggle Note Button -->
+            <button id="btnToggleNote" class="p-2 rounded-full bg-gray-700 hover:bg-gray-600 border border-gray-500 active:scale-95 transition">
+                <i class="ph ph-music-notes text-xl"></i>
+            </button>
+            
+            <!-- Record Button -->
+            <button id="btnRecord" class="p-2 rounded-full bg-red-900/80 hover:bg-red-700 border border-red-500 active:scale-95 transition">
+                <i class="ph ph-microphone text-xl text-red-200"></i>
+            </button>
+
+            <!-- Play/Download Container (Hidden by default) -->
+            <div id="playbackControls" class="hidden flex gap-2">
+                <button id="btnPlay" class="p-2 rounded-full bg-green-800 hover:bg-green-700 border border-green-500 active:scale-95 transition">
+                    <i class="ph ph-play text-xl"></i>
+                </button>
+                <a id="btnDownload" class="p-2 rounded-full bg-blue-800 hover:bg-blue-700 border border-blue-500 active:scale-95 transition flex items-center justify-center">
+                    <i class="ph ph-download-simple text-xl"></i>
+                </a>
+                <button id="btnClear" class="p-2 rounded-full bg-gray-700 border border-gray-500 active:scale-95 transition">
+                    <i class="ph ph-trash text-xl"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Instrument Area -->
+    <div class="flex-1 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        
+        <!-- Frame Styling (Left/Right Pillars) -->
+        <div class="absolute left-2 top-4 bottom-4 w-4 bg-[#3E2723] border-r border-[#1a100e] rounded shadow-xl z-0"></div>
+        <div class="absolute right-2 top-4 bottom-4 w-4 bg-[#3E2723] border-l border-[#1a100e] rounded shadow-xl z-0"></div>
+        
+        <!-- Gong Container: Responsive Grid -->
+        <div class="w-full h-full max-w-4xl z-10 flex flex-col justify-center gap-2">
+            
+            <!-- Top Row (Higher Pitch) -->
+            <div class="flex justify-center items-center gap-3 sm:gap-6 flex-1">
+                 <!-- Generated by JS -->
+                 <div class="gong-wrapper relative group" data-note="4"></div>
+                 <div class="gong-wrapper relative group" data-note="5"></div>
+                 <div class="gong-wrapper relative group" data-note="6"></div>
+                 <div class="gong-wrapper relative group" data-note="7"></div>
+            </div>
+
+            <!-- Bottom Row (Lower Pitch/Main) -->
+            <div class="flex justify-center items-center gap-3 sm:gap-6 flex-1">
+                <!-- Generated by JS -->
+                <div class="gong-wrapper relative group" data-note="0"></div>
+                <div class="gong-wrapper relative group" data-note="1"></div>
+                <div class="gong-wrapper relative group" data-note="2"></div>
+                <div class="gong-wrapper relative group" data-note="3"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Alert / Toast -->
+    <div id="toast" class="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded-full text-sm opacity-0 pointer-events-none transition-opacity duration-300 z-50">
+        ข้อความแจ้งเตือน
+    </div>
+
+    <script>
+        /* --- Audio Engine: Synthesizer --- */
+        let audioCtx;
+        let masterGain;
+        let dest; // For recording
+        let recorder;
+        let chunks = [];
+        let audioBlob;
+        let audioUrl;
+        
+        // Scale Frequencies (Roughly Thai/Pentatonic spacing)
+        // Using C Major scale for familiarity but tuned slightly for ring
+        // Low: C4, D4, E4, G4 | High: A4, C5, D5, E5
+        const NOTES = [
+            { freq: 261.63, label: "ด", sub: "C4" },
+            { freq: 293.66, label: "ร", sub: "D4" },
+            { freq: 329.63, label: "ม", sub: "E4" },
+            { freq: 392.00, label: "ซ", sub: "G4" }, // Skip F for pentatonic feel
+            { freq: 440.00, label: "ล", sub: "A4" },
+            { freq: 523.25, label: "ดํ", sub: "C5" },
+            { freq: 587.33, label: "รํ", sub: "D5" },
+            { freq: 659.25, label: "มํ", sub: "E5" }
+        ];
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // Destination for recording
+                dest = audioCtx.createMediaStreamDestination();
+                
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.8;
+                masterGain.connect(audioCtx.destination);
+                masterGain.connect(dest); // Connect to recorder destination too
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playGongSound(freq) {
+            initAudio();
+            const now = audioCtx.currentTime;
+
+            // 1. Fundamental Tone (Sine) - The body
+            const osc1 = audioCtx.createOscillator();
+            const gain1 = audioCtx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(freq, now);
+            gain1.gain.setValueAtTime(0, now);
+            gain1.gain.linearRampToValueAtTime(0.6, now + 0.01); // Attack
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 2.5); // Long Sustain
+
+            // 2. Overtone (Triangle) - Metallic ring
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.type = 'triangle';
+            osc2.frequency.setValueAtTime(freq * 2.5, now); // Non-integer harmonic
+            gain2.gain.setValueAtTime(0, now);
+            gain2.gain.linearRampToValueAtTime(0.15, now + 0.01);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5); // Short decay
+
+            // 3. Impact Noise (Bandpass) - The "Clang"
+            const osc3 = audioCtx.createOscillator();
+            const gain3 = audioCtx.createGain();
+            osc3.type = 'square';
+            osc3.frequency.setValueAtTime(freq * 0.5, now);
+            gain3.gain.setValueAtTime(0, now);
+            gain3.gain.linearRampToValueAtTime(0.1, now + 0.005);
+            gain3.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+            // Connect graph
+            osc1.connect(gain1).connect(masterGain);
+            osc2.connect(gain2).connect(masterGain);
+            osc3.connect(gain3).connect(masterGain);
+
+            osc1.start(now);
+            osc2.start(now);
+            osc3.start(now);
+
+            // Cleanup
+            osc1.stop(now + 3);
+            osc2.stop(now + 3);
+            osc3.stop(now + 3);
+            
+            // Clean nodes after playing
+            setTimeout(() => {
+                gain1.disconnect();
+                gain2.disconnect();
+                gain3.disconnect();
+            }, 3000);
+        }
+
+        /* --- UI Logic --- */
+        let showNotes = false;
+        const gongs = document.querySelectorAll('.gong-wrapper');
+
+        // Initial rendering of Gongs
+        gongs.forEach((wrapper) => {
+            const index = parseInt(wrapper.dataset.note);
+            const noteData = NOTES[index];
+            
+            // Create the Gong Element
+            const gongDiv = document.createElement('div');
+            gongDiv.className = `gong w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 flex items-center justify-center select-none text-shadow-sm`;
+            
+            // Create Rope
+            const rope = document.createElement('div');
+            rope.className = 'rope';
+            
+            // Note Label
+            const label = document.createElement('span');
+            label.className = 'note-label text-black font-bold text-xl sm:text-2xl opacity-0 transition-opacity duration-300 pointer-events-none drop-shadow-md z-10';
+            label.innerText = noteData.label;
+
+            wrapper.appendChild(rope);
+            wrapper.appendChild(gongDiv);
+            gongDiv.appendChild(label);
+
+            // Interaction Handlers (Touch & Mouse)
+            const trigger = (e) => {
+                e.preventDefault(); // Prevent ghost clicks
+                playGongSound(noteData.freq);
+                
+                // Visual feedback
+                gongDiv.classList.remove('hit');
+                void gongDiv.offsetWidth; // Trigger reflow
+                gongDiv.classList.add('hit');
+            };
+
+            gongDiv.addEventListener('touchstart', trigger, { passive: false });
+            gongDiv.addEventListener('mousedown', trigger);
+        });
+
+        // Toggle Notes
+        document.getElementById('btnToggleNote').addEventListener('click', () => {
+            showNotes = !showNotes;
+            const labels = document.querySelectorAll('.note-label');
+            const btn = document.getElementById('btnToggleNote');
+            
+            labels.forEach(l => l.style.opacity = showNotes ? '1' : '0');
+            
+            if(showNotes) {
+                btn.classList.add('bg-yellow-600', 'text-white');
+                btn.classList.remove('bg-gray-700');
+                showToast("แสดงโน้ต");
+            } else {
+                btn.classList.add('bg-gray-700');
+                btn.classList.remove('bg-yellow-600');
+                showToast("ซ่อนโน้ต");
+            }
+        });
+
+        /* --- Recording Logic --- */
+        const btnRecord = document.getElementById('btnRecord');
+        const playbackControls = document.getElementById('playbackControls');
+        const statusText = document.getElementById('statusText');
+        let isRecording = false;
+
+        btnRecord.addEventListener('click', () => {
+            initAudio(); // Ensure context is ready
+            
+            if (!isRecording) {
+                // Start Recording
+                startRecording();
+            } else {
+                // Stop Recording
+                stopRecording();
+            }
+        });
+
+        function startRecording() {
+            chunks = [];
+            // Use MediaRecorder on the destination node
+            try {
+                // Check if supported types exist, fallback if needed
+                let options = { mimeType: 'audio/webm' };
+                if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                    options = { mimeType: 'audio/mp4' }; // Safari fallback
+                }
+                
+                recorder = new MediaRecorder(dest.stream, options);
+                
+                recorder.ondataavailable = (e) => chunks.push(e.data);
+                recorder.onstop = exportAudio;
+                
+                recorder.start();
+                isRecording = true;
+                
+                // UI Update
+                btnRecord.innerHTML = '<i class="ph ph-stop text-xl text-white"></i>';
+                btnRecord.classList.add('animate-pulse', 'bg-red-600');
+                statusText.innerText = "กำลังบันทึก...";
+                playbackControls.classList.add('hidden');
+                
+            } catch (err) {
+                console.error(err);
+                showToast("เบราว์เซอร์ไม่รองรับการอัดเสียง");
+            }
+        }
+
+        function stopRecording() {
+            if(recorder && recorder.state !== 'inactive') {
+                recorder.stop();
+                isRecording = false;
+                
+                // UI Update
+                btnRecord.innerHTML = '<i class="ph ph-microphone text-xl text-red-200"></i>';
+                btnRecord.classList.remove('animate-pulse', 'bg-red-600');
+                statusText.innerText = "บันทึกเสร็จสิ้น";
+            }
+        }
+
+        function exportAudio() {
+            audioBlob = new Blob(chunks, { type: 'audio/webm' }); // or audio/wav via library, keeping simple
+            audioUrl = URL.createObjectURL(audioBlob);
+            
+            // Setup Download
+            const btnDownload = document.getElementById('btnDownload');
+            btnDownload.href = audioUrl;
+            btnDownload.download = `khong_rao_${new Date().getTime()}.webm`;
+            
+            playbackControls.classList.remove('hidden');
+            playbackControls.classList.add('flex');
+        }
+
+        /* --- Playback Logic --- */
+        const btnPlay = document.getElementById('btnPlay');
+        let playbackAudio = null;
+
+        btnPlay.addEventListener('click', () => {
+            if (audioUrl) {
+                if (playbackAudio) {
+                    playbackAudio.pause();
+                    playbackAudio = null;
+                    btnPlay.innerHTML = '<i class="ph ph-play text-xl"></i>';
+                } else {
+                    playbackAudio = new Audio(audioUrl);
+                    playbackAudio.play();
+                    btnPlay.innerHTML = '<i class="ph ph-pause text-xl"></i>';
+                    statusText.innerText = "กำลังเล่นเสียงที่อัด...";
+                    
+                    playbackAudio.onended = () => {
+                        btnPlay.innerHTML = '<i class="ph ph-play text-xl"></i>';
+                        playbackAudio = null;
+                        statusText.innerText = "พร้อมเล่น";
+                    };
+                }
+            }
+        });
+
+        document.getElementById('btnClear').addEventListener('click', () => {
+            playbackControls.classList.add('hidden');
+            playbackControls.classList.remove('flex');
+            audioBlob = null;
+            audioUrl = null;
+            statusText.innerText = "ล้างข้อมูลแล้ว";
+        });
+
+        /* --- Utilities --- */
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.style.opacity = '1';
+            setTimeout(() => t.style.opacity = '0', 2000);
+        }
+
+        // Initialize Audio on first interaction globally to be safe
+        window.addEventListener('click', initAudio, { once: true });
+        window.addEventListener('touchstart', initAudio, { once: true });
+
+    </script>
+</body>
+</html>

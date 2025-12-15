@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ฆ้องวงใหญ่จำลอง (Virtual Khong Wong Yai)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        :root {
+            --wood-color: #5d4037;
+            --wood-light: #8d6e63;
+            --gold-dark: #b8860b;
+            --gold-light: #ffd700;
+            --bg-color: #1a1a1a;
+        }
+
+        * {
+            box-sizing: border-box;
+            touch-action: none; /* ป้องกันการเลื่อน/ซูมบนมือถือ */
+            user-select: none; /* ป้องกันการเลือกข้อความ */
+            -webkit-user-select: none;
+            font-family: 'Sarabun', sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: var(--bg-color);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* ส่วนควบคุมด้านบน */
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: linear-gradient(145deg, #f0f0f0, #cacaca);
+            border: none;
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        button:active {
+            transform: scale(0.95);
+            background: #d4d4d4;
+        }
+
+        button.recording {
+            background: #ff4444;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
+        }
+
+        /* พื้นที่วางฆ้อง (วง) */
+        .instrument-container {
+            position: relative;
+            width: 95vw;
+            height: 80vh; /* ปรับให้พอดีกับแนวนอน */
+            max-width: 800px;
+            max-height: 500px;
+            margin-top: 40px;
+        }
+
+        /* รางไม้โค้ง (ใช้ SVG หรือ CSS shape ซ้อนกัน) */
+        .wood-frame {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            height: 100%;
+            border-radius: 50% / 40%; /* ทรงรี */
+            border: 40px solid var(--wood-color);
+            border-bottom: 0; /* เปิดด้านล่างให้นั่งได้ (จำลอง) */
+            box-shadow: 
+                inset 0 0 20px rgba(0,0,0,0.8),
+                0 10px 20px rgba(0,0,0,0.5);
+            background: radial-gradient(circle at center, transparent 60%, rgba(93, 64, 55, 0.3) 100%);
+            pointer-events: none; /* ให้คลิกทะลุไปโดนฆ้องได้ถ้าซ้อน */
+        }
+        
+        /* ตกแต่งลายไม้ */
+        .wood-frame::after {
+            content: '';
+            position: absolute;
+            top: -40px; left: -40px; right: -40px; bottom: 0;
+            border-radius: 50% / 40%;
+            border: 2px solid var(--wood-light);
+            border-bottom: 0;
+            pointer-events: none;
+            opacity: 0.5;
+        }
+
+        /* ลูกฆ้อง */
+        .gong {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, var(--gold-light), var(--gold-dark) 60%, #5e4304 90%);
+            box-shadow: 
+                0 4px 8px rgba(0,0,0,0.6),
+                inset 0 -2px 5px rgba(0,0,0,0.5);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform-origin: center;
+            transition: transform 0.05s;
+            z-index: 10;
+        }
+
+        /* ปุ่มนูนตรงกลางฆ้อง (ปุ่มตี) */
+        .gong::before {
+            content: '';
+            position: absolute;
+            width: 40%;
+            height: 40%;
+            background: radial-gradient(circle at 30% 30%, #ffecb3, #b8860b);
+            border-radius: 50%;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+        }
+
+        .gong:active, .gong.active {
+            transform: scale(0.92);
+            filter: brightness(1.2);
+        }
+
+        /* ตัวเลขโน้ต */
+        .note-label {
+            position: absolute;
+            color: #3e2723;
+            font-weight: bold;
+            font-size: 16px;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+            pointer-events: none;
+            opacity: 0; /* ซ่อนโดย default */
+            transition: opacity 0.3s;
+            z-index: 11;
+        }
+
+        .show-notes .note-label {
+            opacity: 1;
+        }
+
+        /* แอนิเมชั่นตอนตี */
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.6);
+            width: 100%;
+            height: 100%;
+            transform: scale(0);
+            pointer-events: none;
+        }
+        
+        .ripple.animate {
+            animation: ripple-effect 0.4s linear;
+        }
+
+        @keyframes ripple-effect {
+            to {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        /* Media Queries สำหรับมือถือ */
+        @media (max-width: 600px) {
+            .gong {
+                width: 45px;
+                height: 45px;
+            }
+            .wood-frame {
+                border-width: 30px;
+            }
+            .note-label {
+                font-size: 12px;
+            }
+            .controls button {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+        }
+
+        #audio-player {
+            display: none;
+            margin-top: 10px;
+            width: 90%;
+            max-width: 300px;
+            height: 30px;
+        }
+
+        .status-text {
+            color: #fff;
+            font-size: 12px;
+            margin-top: 5px;
+            opacity: 0.8;
+            position: absolute;
+            bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <button id="btn-toggle-notes" onclick="toggleNotes()">👁️ แสดงโน้ต</button>
+        <button id="btn-record" onclick="toggleRecording()">🔴 อัดเสียง</button>
+        <button id="btn-play-record" onclick="playRecording()" disabled>▶️ เล่นที่อัด</button>
+        <button id="btn-download" onclick="downloadRecording()" disabled>💾 ดาวน์โหลด</button>
+    </div>
+
+    <!-- เครื่องเล่นเสียงที่ซ่อนอยู่ -->
+    <audio id="audio-playback" controls style="display:none; position:absolute; bottom: 40px; z-index:200;"></audio>
+
+    <div class="instrument-container" id="instrument">
+        <div class="wood-frame"></div>
+        <!-- ลูกฆ้องจะถูกสร้างด้วย JavaScript -->
+    </div>
+    
+    <div class="status-text" id="status-display">พร้อมใช้งาน (แตะเพื่อเล่น)</div>
+
+    <script>
+        // --- การตั้งค่าเสียง (Sound Synthesis) ---
+        let audioCtx;
+        let masterGain;
+        let recorder;
+        let recordedChunks = [];
+        let audioBlob = null;
+        let destNode; // สำหรับอัดเสียง
+
+        // ความถี่โดยประมาณของฆ้องวงใหญ่ (Thai Tuning System - 7 tone equidistant)
+        // เริ่มจากเสียงต่ำ (ซ้ายหลัง) วนไปขวา
+        // หมายเหตุ: ความถี่นี้เป็นการประมาณเพื่อให้เสียงไพเราะบน Digital
+        const frequencies = [
+            293.66, // D4 (Re) - ลูกที่ 1
+            329.63, // E4 (Mi)
+            369.99, // F#4 (Fah) - Thai Scale approx
+            410.00, // G4 (Sol)
+            460.00, // A4 (La)
+            510.00, // B4 (Ti)
+            550.00, // C5 (Do)
+            587.33, // D5 (Re)
+            659.25, // E5 (Mi)
+            739.99, // F#5 (Fah)
+            783.99, // G5 (Sol)
+            880.00, // A5 (La)
+            987.77, // B5 (Ti)
+            1046.50, // C6 (Do)
+            1174.66, // D6 (Re)
+            1318.51  // E6 (Mi) - ลูกที่ 16
+        ];
+
+        const thaiNotes = ["๑", "๒", "๓", "๔", "๕", "๖", "๗", "๑̇", "๒̇", "๓̇", "๔̇", "๕̇", "๖̇", "๗̇", "๑̇̇", "๒̇̇"];
+        const westernNotes = ["Re", "Mi", "Fa", "Sol", "La", "Ti", "Do", "Re", "Mi", "Fa", "Sol", "La", "Ti", "Do", "Re", "Mi"];
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // สร้าง Node สำหรับส่งเสียงออกลำโพง
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.5; // ลดความดังรวม
+                masterGain.connect(audioCtx.destination);
+
+                // สร้าง Node สำหรับอัดเสียง
+                destNode = audioCtx.createMediaStreamDestination();
+                masterGain.connect(destNode);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playGongSound(freq) {
+            initAudio();
+
+            const t = audioCtx.currentTime;
+            
+            // Oscillator 1: Fundamental (Sine wave for depth)
+            const osc1 = audioCtx.createOscillator();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(freq, t);
+
+            // Oscillator 2: Overtone (Triangle for metallic character)
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'triangle';
+            osc2.frequency.setValueAtTime(freq * 2.02, t); // Detune slightly for gong realism
+
+            // Oscillator 3: High frequency transient (The "ting" sound)
+            const osc3 = audioCtx.createOscillator();
+            osc3.type = 'sine';
+            osc3.frequency.setValueAtTime(freq * 5.5, t);
+
+            // Envelope 1 & 2 (Main body)
+            const gain1 = audioCtx.createGain();
+            gain1.gain.setValueAtTime(0, t);
+            gain1.gain.linearRampToValueAtTime(0.5, t + 0.01); // Attack
+            gain1.gain.exponentialRampToValueAtTime(0.001, t + 1.5); // Long Decay
+
+            // Envelope 3 (Transient)
+            const gain3 = audioCtx.createGain();
+            gain3.gain.setValueAtTime(0, t);
+            gain3.gain.linearRampToValueAtTime(0.3, t + 0.005);
+            gain3.gain.exponentialRampToValueAtTime(0.001, t + 0.1); // Short Decay
+
+            // Connections
+            osc1.connect(gain1);
+            osc2.connect(gain1);
+            osc3.connect(gain3);
+
+            gain1.connect(masterGain);
+            gain3.connect(masterGain);
+
+            osc1.start(t);
+            osc2.start(t);
+            osc3.start(t);
+
+            const duration = 1.5;
+            osc1.stop(t + duration);
+            osc2.stop(t + duration);
+            osc3.stop(t + duration);
+
+            // Clean up nodes after playing
+            setTimeout(() => {
+                gain1.disconnect();
+                gain3.disconnect();
+            }, duration * 1000);
+        }
+
+        // --- การสร้าง UI และตำแหน่ง ---
+        function createGongs() {
+            const container = document.getElementById('instrument');
+            const totalGongs = 16;
+            const containerW = container.clientWidth;
+            const containerH = container.clientHeight;
+            
+            // คำนวณรัศมีวงรี
+            const radiusX = containerW * 0.42; 
+            const radiusY = containerH * 0.40;
+            const centerX = containerW / 2;
+            const centerY = containerH * 0.55; // จุดศูนย์กลางวงรี (ขยับลงมาหน่อย)
+
+            // มุมเริ่มต้น (ซ้ายล่าง) ไปจนถึง (ขวาล่าง)
+            // ใน CSS/JS 0 rad คือ 3 นาฬิกา, -PI/2 คือ 12 นาฬิกา, PI คือ 9 นาฬิกา
+            // เราต้องการเรียงจากซ้ายไปขวา (ตามเข็มนาฬิกาหรือทวนเข็มแล้วแต่ setup แต่ฆ้องวงใหญ่เสียงต่ำอยู่ซ้าย)
+            // ให้เริ่มแถวๆ 8-9 นาฬิกา วนขึ้นไป 12 แล้วจบที่ 3-4 นาฬิกา
+            const startAngle = Math.PI - 0.2; // ประมาณ 9 นาฬิกา (ซ้าย)
+            const endAngle = 0.2;     // ประมาณ 3 นาฬิกา (ขวา)
+            // หมายเหตุ: Math.cos(PI) = -1 (ซ้าย), Math.cos(0) = 1 (ขวา)
+            // เราต้องวนจาก ซ้าย -> บน -> ขวา 
+            
+            for (let i = 0; i < totalGongs; i++) {
+                // คำนวณมุมสำหรับแต่ละลูก
+                // ใช้ interpolation เชิงเส้น
+                const t = i / (totalGongs - 1); 
+                // เนื่องจากเราต้องการโค้งวงกลมด้านบน เราต้องไล่มุมจาก PI ไป 0 (ทวนเข็มของ Unit circle ปกติคือ 0->PI แต่เราต้องการซ้ายไปขวาคือ PI -> 0)
+                const angle = startAngle - (t * (startAngle - endAngle));
+
+                // คำนวณตำแหน่ง X, Y
+                // X: cos(angle), Y: -sin(angle) (เพราะแกน Y browser ลงคือบวก แต่เราต้องการให้โค้งขึ้น)
+                const x = centerX + radiusX * Math.cos(angle);
+                const y = centerY - radiusY * Math.sin(angle);
+
+                const gong = document.createElement('div');
+                gong.className = 'gong';
+                gong.style.left = `${x - 25}px`; // ลบครึ่งหนึ่งของขนาดลูกฆ้อง (ประมาณ)
+                gong.style.top = `${y - 25}px`;
+                gong.dataset.note = i; // เก็บ index
+                
+                // สร้างตัวเลขโน้ต
+                const label = document.createElement('span');
+                label.className = 'note-label';
+                label.innerText = thaiNotes[i];
+                gong.appendChild(label);
+
+                // สร้าง Ripple effect element
+                const ripple = document.createElement('div');
+                ripple.className = 'ripple';
+                gong.appendChild(ripple);
+
+                // Event Listeners
+                const hit = (e) => {
+                    e.preventDefault(); // ป้องกัน double tap zoom
+                    playGongSound(frequencies[i]);
+                    
+                    // Visual feedback
+                    gong.classList.add('active');
+                    ripple.classList.remove('animate');
+                    void ripple.offsetWidth; // Trigger reflow
+                    ripple.classList.add('animate');
+
+                    setTimeout(() => gong.classList.remove('active'), 100);
+                };
+
+                gong.addEventListener('mousedown', hit);
+                gong.addEventListener('touchstart', hit);
+
+                container.appendChild(gong);
+            }
+        }
+
+        // --- ระบบอัดเสียง ---
+        function toggleRecording() {
+            const btn = document.getElementById('btn-record');
+            const status = document.getElementById('status-display');
+            initAudio();
+
+            if (btn.classList.contains('recording')) {
+                // Stop Recording
+                recorder.stop();
+                btn.classList.remove('recording');
+                btn.innerHTML = '🔴 อัดเสียง';
+                status.innerText = 'หยุดอัดแล้ว';
+            } else {
+                // Start Recording
+                recordedChunks = [];
+                // ตรวจสอบ browser support
+                const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
+                
+                try {
+                    recorder = new MediaRecorder(destNode.stream, { mimeType: mimeType });
+                } catch (e) {
+                    alert('เบราว์เซอร์นี้ไม่รองรับการอัดเสียง');
+                    return;
+                }
+
+                recorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
+                };
+
+                recorder.onstop = () => {
+                    audioBlob = new Blob(recordedChunks, { type: mimeType });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    const audioEl = document.getElementById('audio-playback');
+                    audioEl.src = audioUrl;
+                    
+                    document.getElementById('btn-play-record').disabled = false;
+                    document.getElementById('btn-download').disabled = false;
+                    status.innerText = 'อัดเสียงเสร็จสิ้น พร้อมเล่น';
+                };
+
+                recorder.start();
+                btn.classList.add('recording');
+                btn.innerHTML = '⏹ หยุด';
+                status.innerText = 'กำลังอัดเสียง...';
+            }
+        }
+
+        function playRecording() {
+            const audioEl = document.getElementById('audio-playback');
+            if(audioBlob) {
+                audioEl.style.display = 'block'; // แสดง player ชั่วคราว
+                audioEl.play();
+                document.getElementById('status-display').innerText = 'กำลังเล่นเสียงที่อัด...';
+                audioEl.onended = () => {
+                     audioEl.style.display = 'none';
+                     document.getElementById('status-display').innerText = 'เล่นจบแล้ว';
+                };
+            }
+        }
+
+        function downloadRecording() {
+            if (!audioBlob) return;
+            const url = URL.createObjectURL(audioBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'khong_wong_sound.webm';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+            document.getElementById('status-display').innerText = 'ดาวน์โหลดเรียบร้อย';
+        }
+
+        function toggleNotes() {
+            const container = document.getElementById('instrument');
+            const btn = document.getElementById('btn-toggle-notes');
+            container.classList.toggle('show-notes');
+            if (container.classList.contains('show-notes')) {
+                btn.innerHTML = '👁️ ซ่อนโน้ต';
+                btn.style.background = '#ffd700';
+            } else {
+                btn.innerHTML = '👁️ แสดงโน้ต';
+                btn.style.background = '';
+            }
+        }
+
+        // ปรับตำแหน่งเมื่อหมุนหน้าจอหรือเปลี่ยนขนาด
+        window.addEventListener('resize', () => {
+            const container = document.getElementById('instrument');
+            // ลบลูกฆ้องเก่า
+            const gongs = document.querySelectorAll('.gong');
+            gongs.forEach(g => g.remove());
+            // สร้างใหม่ให้ตรงตำแหน่ง
+            createGongs();
+        });
+
+        // เริ่มต้น
+        window.onload = createGongs;
+
+    </script>
+</body>
+</html>

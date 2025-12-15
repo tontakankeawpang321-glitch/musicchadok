@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ปี่จุม - รอใส่ไฟล์เสียง (Custom Sound)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #2d3748;
+            touch-action: none;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Bamboo Texture Effect */
+        .bamboo-bg {
+            background: repeating-linear-gradient(
+                90deg,
+                #d2b48c,
+                #d2b48c 10px,
+                #c19a6b 20px,
+                #d2b48c 30px
+            );
+            border-radius: 50px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5), 5px 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .bamboo-node {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: rgba(101, 67, 33, 0.4);
+            box-shadow: 0 1px 2px rgba(255,255,255,0.3);
+        }
+
+        /* Hole (Key) Styling */
+        .pi-hole {
+            width: 60px;
+            height: 60px;
+            background: radial-gradient(circle at 30% 30%, #4a3c31, #1a120b);
+            border-radius: 50%;
+            border: 2px solid #8b5a2b;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.8), 0 2px 4px rgba(255,255,255,0.2);
+            transition: transform 0.1s, background 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #d2b48c;
+            font-weight: bold;
+            font-size: 1.2rem;
+            position: relative;
+            cursor: pointer;
+            z-index: 2;
+        }
+
+        .pi-hole.active {
+            transform: scale(0.95);
+            background: radial-gradient(circle at 30% 30%, #2a1f18, #000000);
+            box-shadow: inset 4px 4px 8px rgba(0,0,0,0.9);
+            border-color: #ffd700;
+            color: #ffd700;
+        }
+
+        .pi-hole::after {
+            content: '';
+            position: absolute;
+            top: -5px; left: -5px; right: -5px; bottom: -5px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            transition: border-color 0.2s;
+        }
+        .pi-hole.active::after {
+            border-color: rgba(255, 215, 0, 0.5);
+        }
+
+        /* Control Panel */
+        .control-btn {
+            transition: all 0.2s;
+        }
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .pulse-record {
+            animation: pulse-red 1.5s infinite;
+        }
+        
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        /* Loading Spinner */
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: #ffd700;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-between py-4 text-white">
+
+    <!-- Top Bar -->
+    <div class="w-full max-w-md px-4 flex justify-between items-center z-10">
+        <div>
+            <h1 class="text-2xl font-bold text-yellow-500 drop-shadow-md">ปี่จุม</h1>
+            <p class="text-xs text-gray-400">Custom Sound Sampler</p>
+        </div>
+        <div id="status-indicator" class="flex items-center gap-2 text-xs text-gray-400">
+            <span id="status-text">รอการตั้งค่าเสียง</span>
+            <div id="status-light" class="w-3 h-3 rounded-full bg-gray-500"></div>
+        </div>
+    </div>
+
+    <!-- Recorder Controls -->
+    <div class="bg-gray-800 rounded-xl p-3 flex gap-4 mt-2 shadow-lg border border-gray-700 z-10">
+        <button id="btn-record" class="control-btn flex flex-col items-center justify-center w-14 h-14 bg-gray-700 rounded-full text-red-500 hover:bg-gray-600 border-2 border-transparent" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 fill-current" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16z"/></svg>
+            <span class="text-[10px] mt-1">อัดเสียง</span>
+        </button>
+        
+        <button id="btn-stop" class="control-btn flex flex-col items-center justify-center w-14 h-14 bg-gray-700 rounded-full text-gray-300 hover:bg-gray-600" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 fill-current" viewBox="0 0 20 20"><path d="M5 4h10v12H5z"/></svg>
+            <span class="text-[10px] mt-1">หยุด</span>
+        </button>
+
+        <button id="btn-play" class="control-btn flex flex-col items-center justify-center w-14 h-14 bg-gray-700 rounded-full text-green-500 hover:bg-gray-600" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 fill-current" viewBox="0 0 20 20"><path d="M4 4l12 6-12 6z"/></svg>
+            <span class="text-[10px] mt-1">เล่น</span>
+        </button>
+
+        <button id="btn-download" class="control-btn flex flex-col items-center justify-center w-14 h-14 bg-gray-700 rounded-full text-blue-400 hover:bg-gray-600" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 fill-current" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            <span class="text-[10px] mt-1">โหลด</span>
+        </button>
+    </div>
+
+    <!-- The Instrument -->
+    <div class="flex-1 flex items-center justify-center w-full relative my-4">
+        <!-- Bamboo Body -->
+        <div class="bamboo-bg w-24 h-full max-h-[600px] flex flex-col items-center justify-evenly py-6 relative">
+            <div class="bamboo-node" style="top: 20%"></div>
+            <div class="bamboo-node" style="top: 50%"></div>
+            <div class="bamboo-node" style="top: 80%"></div>
+
+            <!-- Holes mapped to config keys -->
+            <div class="pi-hole" data-note="C5" data-label="ดํ">ดํ</div>
+            <div class="pi-hole" data-note="B4" data-label="ท">ท</div>
+            <div class="pi-hole" data-note="A4" data-label="ล">ล</div>
+            <div class="pi-hole" data-note="G4" data-label="ซ">ซ</div>
+            <div class="pi-hole" data-note="F4" data-label="ฟ">ฟ</div>
+            <div class="pi-hole" data-note="E4" data-label="ม">ม</div>
+            <div class="pi-hole" data-note="D4" data-label="ร">ร</div>
+            <div class="pi-hole" data-note="C4" data-label="ด">ด</div>
+        </div>
+    </div>
+
+    <!-- Loading / Start Overlay -->
+    <div id="start-overlay" class="fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-50 px-6 text-center">
+        <div class="bg-gray-800 p-8 rounded-2xl border border-yellow-600 shadow-2xl max-w-sm w-full">
+            <h2 class="text-3xl font-bold text-yellow-500 mb-2">🎵 ปี่จุม</h2>
+            <p class="text-gray-400 mb-6 text-sm">กรุณาใส่ลิงก์เสียงในโค้ดก่อนใช้งาน</p>
+            
+            <div id="loading-container" class="mb-4 hidden">
+                <div class="flex items-center justify-center gap-3 mb-2">
+                    <div class="loader"></div>
+                    <span class="text-yellow-200">กำลังโหลดไฟล์เสียง...</span>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-2">
+                    <div id="progress-bar" class="bg-yellow-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <button id="btn-init" class="w-full bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-6 rounded-full text-lg shadow-lg transform transition hover:scale-105">
+                โหลดและเริ่มเล่น
+            </button>
+            <p id="error-msg" class="text-xs text-red-400 mt-4 hidden">ยังไม่พบการตั้งค่าไฟล์เสียงในโค้ด</p>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // ส่วนตั้งค่าไฟล์เสียง (SOUND CONFIGURATION)
+        // ==========================================
+        
+        // 1. ใส่ URL หลักของโฟลเดอร์เสียง (ถ้ามี) หรือปล่อยว่างไว้ ""
+        const BASE_URL = ""; 
+
+        // 2. นำลิงก์ไฟล์เสียง (.mp3 / .wav) มาใส่ในช่องว่าง '' ด้านล่างนี้
+        const NOTE_MAP = {
+            'C5': '', // เสียง ดํ (สูง)
+            'B4': '', // เสียง ท
+            'A4': '', // เสียง ล
+            'G4': '', // เสียง ซ
+            'F4': '', // เสียง ฟ
+            'E4': '', // เสียง ม
+            'D4': '', // เสียง ร
+            'C4': ''  // เสียง ด (ต่ำ)
+        };
+
+        // ==========================================
+
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        let masterGain;
+        let dest;
+        let audioBuffers = {};
+        let activeSources = {}; 
+
+        // UI Elements
+        const btnInit = document.getElementById('btn-init');
+        const loadingContainer = document.getElementById('loading-container');
+        const progressBar = document.getElementById('progress-bar');
+        const statusText = document.getElementById('status-text');
+        const statusLight = document.getElementById('status-light');
+        const startOverlay = document.getElementById('start-overlay');
+        const btnRecord = document.getElementById('btn-record');
+        const errorMsg = document.getElementById('error-msg');
+
+        // Check if user has configured sounds
+        function hasSoundConfig() {
+            return Object.values(NOTE_MAP).some(val => val !== '');
+        }
+
+        btnInit.addEventListener('click', async () => {
+            if (!hasSoundConfig()) {
+                errorMsg.classList.remove('hidden');
+                errorMsg.innerText = "⚠ กรุณาเปิดไฟล์ HTML และใส่ลิงก์เสียงในตัวแปร NOTE_MAP ก่อนครับ";
+                return;
+            }
+
+            btnInit.classList.add('hidden');
+            errorMsg.classList.add('hidden');
+            loadingContainer.classList.remove('hidden');
+            loadingContainer.classList.add('block');
+            
+            try {
+                audioCtx = new AudioContext();
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.8;
+                
+                dest = audioCtx.createMediaStreamDestination();
+                masterGain.connect(audioCtx.destination);
+                masterGain.connect(dest);
+
+                await loadAllSamples();
+                
+                // Ready
+                startOverlay.classList.add('opacity-0', 'pointer-events-none');
+                statusText.innerText = "พร้อมใช้งาน";
+                statusLight.classList.replace('bg-gray-500', 'bg-green-500');
+                btnRecord.disabled = false;
+                
+                setTimeout(() => startOverlay.style.display = 'none', 500);
+
+            } catch (e) {
+                console.error(e);
+                alert("เกิดข้อผิดพลาด: " + e.message);
+                btnInit.classList.remove('hidden');
+                loadingContainer.classList.add('hidden');
+            }
+        });
+
+        async function loadAllSamples() {
+            const notes = Object.keys(NOTE_MAP);
+            let loaded = 0;
+            let total = notes.filter(n => NOTE_MAP[n] !== '').length; // Count only configured notes
+
+            if (total === 0) return;
+
+            const promises = notes.map(async (note) => {
+                const filename = NOTE_MAP[note];
+                if (!filename) return; // Skip empty config
+
+                const url = BASE_URL + filename;
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const arrayBuffer = await response.arrayBuffer();
+                    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                    audioBuffers[note] = audioBuffer;
+                    
+                    loaded++;
+                    const percent = (loaded / total) * 100;
+                    progressBar.style.width = percent + '%';
+                } catch (err) {
+                    console.error(`โหลดเสียง ${note} ไม่สำเร็จ:`, err);
+                }
+            });
+
+            await Promise.all(promises);
+        }
+
+        // --- Playback Logic ---
+
+        function playSample(note) {
+            if (!audioCtx) return;
+            if (!audioBuffers[note]) {
+                // Sound not loaded or not configured
+                if (NOTE_MAP[note] === '') console.log(`Note ${note} is not configured.`);
+                return;
+            }
+            
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const source = audioCtx.createBufferSource();
+            source.buffer = audioBuffers[note];
+            
+            const gainNode = audioCtx.createGain();
+            source.connect(gainNode);
+            gainNode.connect(masterGain);
+
+            gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(1, audioCtx.currentTime + 0.05);
+            
+            source.start(0);
+            activeSources[note] = { source, gainNode };
+        }
+
+        function stopSample(note) {
+            if (!activeSources[note]) return;
+            
+            const { source, gainNode } = activeSources[note];
+            const t = audioCtx.currentTime;
+
+            gainNode.gain.cancelScheduledValues(t);
+            gainNode.gain.setValueAtTime(gainNode.gain.value, t);
+            gainNode.gain.linearRampToValueAtTime(0, t + 0.1); 
+
+            source.stop(t + 0.1);
+            delete activeSources[note];
+        }
+
+        // --- UI Interactions ---
+        const holes = document.querySelectorAll('.pi-hole');
+        const activeTouches = new Map();
+
+        function triggerNoteStart(target) {
+            if (target && target.classList.contains('pi-hole')) {
+                const note = target.dataset.note;
+                target.classList.add('active');
+                playSample(note);
+                return note;
+            }
+            return null;
+        }
+
+        function triggerNoteEnd(target, note) {
+            if (target) {
+                target.classList.remove('active');
+                stopSample(note);
+            }
+        }
+
+        const container = document.querySelector('.bamboo-bg');
+        
+        container.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                const note = triggerNoteStart(target);
+                if (note) activeTouches.set(touch.identifier, { note, element: target });
+            }
+        }, { passive: false });
+
+        container.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                const data = activeTouches.get(touch.identifier);
+                if (data) {
+                    triggerNoteEnd(data.element, data.note);
+                    activeTouches.delete(touch.identifier);
+                }
+            }
+        }, { passive: false });
+        
+        container.addEventListener('touchcancel', (e) => {
+             e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                const data = activeTouches.get(touch.identifier);
+                if (data) {
+                    triggerNoteEnd(data.element, data.note);
+                    activeTouches.delete(touch.identifier);
+                }
+            }
+        });
+
+        holes.forEach(hole => {
+            hole.addEventListener('mousedown', () => triggerNoteStart(hole));
+            hole.addEventListener('mouseup', () => triggerNoteEnd(hole, hole.dataset.note));
+            hole.addEventListener('mouseleave', () => triggerNoteEnd(hole, hole.dataset.note));
+        });
+
+        // --- Recorder Logic ---
+        let mediaRecorder;
+        let recordedChunks = [];
+        let audioUrl = null;
+        let audioPlayer = new Audio();
+        
+        const btnStop = document.getElementById('btn-stop');
+        const btnPlay = document.getElementById('btn-play');
+        const btnDownload = document.getElementById('btn-download');
+
+        btnRecord.addEventListener('click', () => {
+            recordedChunks = [];
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+            
+            try {
+                mediaRecorder = new MediaRecorder(dest.stream, { mimeType });
+            } catch (err) {
+                alert("ไม่สามารถเริ่มอัดเสียงได้: " + err.message);
+                return;
+            }
+
+            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                audioUrl = URL.createObjectURL(blob);
+                btnPlay.disabled = false;
+                btnDownload.disabled = false;
+                statusText.innerText = "บันทึกเสร็จสิ้น";
+                statusLight.classList.replace('bg-green-500', 'bg-blue-500');
+            };
+
+            mediaRecorder.start();
+            btnRecord.classList.add('pulse-record', 'border-red-500');
+            btnRecord.disabled = true;
+            btnStop.disabled = false;
+            btnPlay.disabled = true;
+            btnDownload.disabled = true;
+            statusText.innerText = "กำลังอัดเสียง...";
+            statusLight.classList.replace('bg-green-500', 'bg-red-500');
+        });
+
+        btnStop.addEventListener('click', () => {
+            if (mediaRecorder?.state === 'recording') {
+                mediaRecorder.stop();
+                btnRecord.classList.remove('pulse-record', 'border-red-500');
+                btnRecord.disabled = false;
+                btnStop.disabled = true;
+            }
+        });
+
+        btnPlay.addEventListener('click', () => {
+            if (audioUrl) {
+                audioPlayer.src = audioUrl;
+                audioPlayer.play();
+            }
+        });
+
+        btnDownload.addEventListener('click', () => {
+            if (audioUrl) {
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = audioUrl;
+                a.download = 'my-pi-jum-song.webm';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => document.body.removeChild(a), 100);
+            }
+        });
+
+    </script>
+</body>
+</html>

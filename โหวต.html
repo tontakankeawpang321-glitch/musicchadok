@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>โหวดจำลอง (Virtual Isan Wot)</title>
+    <!-- Tailwind CSS for layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f3e5ab; /* สีพื้นหลังโทนเหลืองนวล */
+            background-image: radial-gradient(#e0cda7 10%, transparent 10%),
+            radial-gradient(#e0cda7 10%, transparent 10%);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+            overscroll-behavior: none;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none; /* ป้องกันการเลื่อนหน้าจอ */
+        }
+
+        /* Wot Pipe Styling - Bamboo Effect */
+        .wot-pipe {
+            position: absolute;
+            background: linear-gradient(90deg, #5c3a21 0%, #d4a76a 20%, #e6cc96 50%, #d4a76a 80%, #5c3a21 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 2px 4px 8px rgba(0,0,0,0.4), inset 0px 2px 4px rgba(255,255,255,0.3);
+            cursor: pointer;
+            transition: transform 0.1s, filter 0.1s;
+            border: 2px solid #3e2723;
+            overflow: hidden;
+            /* touch-action handled by container */
+        }
+
+        .wot-pipe::after {
+            /* รูตรงกลางท่อ */
+            content: '';
+            width: 60%;
+            height: 60%;
+            background: radial-gradient(circle at 30% 30%, #2a1b12, #000);
+            border-radius: 50%;
+            box-shadow: inset 1px 1px 3px rgba(255,255,255,0.1);
+        }
+
+        .wot-pipe.active {
+            transform: scale(0.92);
+            filter: brightness(1.2);
+            box-shadow: 0 0 20px #ffcc00;
+            border-color: #ffb300;
+        }
+
+        .pipe-label {
+            position: absolute;
+            bottom: -25px;
+            color: #3e2723;
+            font-weight: bold;
+            font-size: 14px;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+            pointer-events: none;
+            background: rgba(255,255,255,0.7);
+            padding: 2px 6px;
+            border-radius: 10px;
+            transition: opacity 0.3s;
+        }
+
+        .hide-labels .pipe-label {
+            opacity: 0;
+        }
+
+        /* ตัวโหวด (แกนกลาง) */
+        .wot-body {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: radial-gradient(circle, #4a3020, #2a1b12);
+            border-radius: 50%;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            z-index: 0;
+            /* ลายมัดเชือก */
+            border: 4px solid #8d6e63;
+        }
+        
+        .rope-binding {
+            position: absolute;
+            border: 2px dashed #d7ccc8;
+            border-radius: 50%;
+            opacity: 0.6;
+            width: 90%;
+            height: 90%;
+            top: 5%;
+            left: 5%;
+        }
+
+        #visualizer {
+            width: 100%;
+            height: 60px;
+            background: rgba(0,0,0,0.1);
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .control-btn {
+            transition: all 0.2s;
+        }
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        
+        #pipes-container {
+            touch-action: none;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-between overflow-hidden">
+
+    <!-- Header / Info -->
+    <header class="w-full p-4 flex justify-between items-center bg-yellow-900/10 backdrop-blur-sm z-20">
+        <div>
+            <h1 class="text-2xl font-bold text-yellow-900 drop-shadow-sm">โหวดอีสาน (Wot)</h1>
+            <p class="text-xs text-yellow-800">กดพร้อมกันได้ • รูดเพื่อเล่นต่อเนื่อง</p>
+        </div>
+        <div class="flex gap-2">
+            <button id="toggle-notes-btn" class="bg-white/80 text-yellow-900 p-2 rounded-full shadow-md hover:bg-white transition flex items-center justify-center w-10 h-10 border border-yellow-200" title="แสดง/ซ่อนโน้ต">
+                <i class="ph-fill ph-text-t"></i>
+            </button>
+            <button id="start-audio-btn" class="bg-yellow-700 text-white px-4 py-2 rounded-full shadow-lg text-sm hover:bg-yellow-800 transition animate-pulse">
+                🔊 เปิดเสียง
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Instrument Area -->
+    <main class="flex-grow w-full relative flex items-center justify-center" id="instrument-container">
+        <!-- Visualizer Canvas -->
+        <div class="absolute top-4 left-0 w-full px-4 z-0 opacity-50">
+            <canvas id="visualizer"></canvas>
+        </div>
+
+        <!-- The Wot Instrument -->
+        <div class="relative w-[320px] h-[320px] md:w-[400px] md:h-[400px]" id="wot-wrapper">
+            <!-- Center Body (แกนกลาง) -->
+            <div class="wot-body w-32 h-32 md:w-40 md:h-40">
+                <div class="rope-binding"></div>
+                <div class="absolute inset-0 flex items-center justify-center text-yellow-100/50 text-4xl">
+                    <i class="ph-fill ph-music-note"></i>
+                </div>
+            </div>
+            
+            <!-- Pipes will be injected here by JS -->
+            <div id="pipes-container" class="absolute inset-0 z-10"></div>
+        </div>
+    </main>
+
+    <!-- Control Panel -->
+    <footer class="w-full bg-white/90 backdrop-blur-md border-t border-yellow-200 p-4 pb-8 rounded-t-3xl shadow-[0_-5px_20px_rgba(0,0,0,0.1)] z-20">
+        
+        <div class="flex justify-around items-center max-w-lg mx-auto">
+            <!-- Record Button -->
+            <div class="flex flex-col items-center gap-1">
+                <button id="btn-record" class="control-btn w-14 h-14 rounded-full bg-red-100 text-red-600 border-2 border-red-200 flex items-center justify-center text-2xl shadow-sm hover:bg-red-200">
+                    <i class="ph-fill ph-microphone"></i>
+                </button>
+                <span class="text-xs font-semibold text-gray-600">บันทึก</span>
+            </div>
+
+            <!-- Stop Button -->
+            <div class="flex flex-col items-center gap-1">
+                <button id="btn-stop" class="control-btn w-14 h-14 rounded-full bg-gray-100 text-gray-600 border-2 border-gray-300 flex items-center justify-center text-2xl shadow-sm hover:bg-gray-200" disabled>
+                    <i class="ph-fill ph-stop"></i>
+                </button>
+                <span class="text-xs font-semibold text-gray-600">หยุด</span>
+            </div>
+
+            <!-- Play Button -->
+            <div class="flex flex-col items-center gap-1">
+                <button id="btn-play" class="control-btn w-14 h-14 rounded-full bg-green-100 text-green-600 border-2 border-green-200 flex items-center justify-center text-2xl shadow-sm hover:bg-green-200" disabled>
+                    <i class="ph-fill ph-play"></i>
+                </button>
+                <span class="text-xs font-semibold text-gray-600">เล่น</span>
+            </div>
+
+            <!-- Download Button -->
+            <div class="flex flex-col items-center gap-1">
+                <button id="btn-download" class="control-btn w-14 h-14 rounded-full bg-blue-100 text-blue-600 border-2 border-blue-200 flex items-center justify-center text-2xl shadow-sm hover:bg-blue-200" disabled>
+                    <i class="ph-fill ph-download-simple"></i>
+                </button>
+                <span class="text-xs font-semibold text-gray-600">โหลด</span>
+            </div>
+        </div>
+        
+        <div id="status-text" class="text-center text-xs text-gray-400 mt-2 h-4">พร้อมใช้งาน</div>
+    </footer>
+
+    <script>
+        // --- Configuration ---
+        const notes = [
+            { note: "G4", label: "ซ", freq: 392.00, size: 70 }, // Sol
+            { note: "A4", label: "ล", freq: 440.00, size: 68 }, // La
+            { note: "C5", label: "ด", freq: 523.25, size: 64 }, // Do
+            { note: "D5", label: "ร", freq: 587.33, size: 60 }, // Re
+            { note: "E5", label: "ม", freq: 659.25, size: 56 }, // Mi
+            { note: "G5", label: "ซํ", freq: 783.99, size: 52 }, // Sol High
+            { note: "A5", label: "ลํ", freq: 880.00, size: 48 }  // La High
+        ];
+
+        // --- Audio Context & Variables ---
+        let audioCtx;
+        let masterGain;
+        let compressor;
+        let analyser;
+        let mediaRecorder;
+        let recordedChunks = [];
+        let audioURL = null;
+        let destNode; 
+        
+        // Track active notes for sustain capability
+        // key: pipeIndex, value: { stop: function, oscs: [] }
+        const activeNotes = {};
+
+        // Track active touches for multi-touch/glissando
+        // key: touchIdentifier, value: pipeIndex
+        const activeTouches = new Map();
+
+        const statusText = document.getElementById('status-text');
+
+        // --- Initialization ---
+        async function initAudio() {
+            if (audioCtx) return;
+            
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // Compressor to handle multiple notes (Polyphony) without clipping
+                compressor = audioCtx.createDynamicsCompressor();
+                compressor.threshold.setValueAtTime(-20, audioCtx.currentTime);
+                compressor.knee.setValueAtTime(30, audioCtx.currentTime);
+                compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+                compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+                compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.8; 
+                
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 256;
+                
+                destNode = audioCtx.createMediaStreamDestination();
+
+                // Chain: Notes -> Master -> Compressor -> Analyser -> Dest & Speakers
+                masterGain.connect(compressor);
+                compressor.connect(analyser);
+                analyser.connect(destNode);
+                analyser.connect(audioCtx.destination);
+
+                document.getElementById('start-audio-btn').classList.add('hidden');
+                statusText.innerText = "ระบบเสียงทำงานแล้ว";
+                drawVisualizer();
+            } catch (e) {
+                alert("Browser นี้ไม่รองรับ Web Audio API");
+            }
+        }
+
+        document.getElementById('start-audio-btn').addEventListener('click', () => {
+            initAudio();
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        });
+
+        // --- Toggle Notes Button Logic ---
+        const toggleBtn = document.getElementById('toggle-notes-btn');
+        const pipesContainer = document.getElementById('pipes-container');
+        let areNotesVisible = true;
+
+        toggleBtn.addEventListener('click', () => {
+            areNotesVisible = !areNotesVisible;
+            if (areNotesVisible) {
+                pipesContainer.classList.remove('hide-labels');
+                toggleBtn.classList.add('bg-white/80');
+                toggleBtn.classList.remove('bg-gray-300');
+            } else {
+                pipesContainer.classList.add('hide-labels');
+                toggleBtn.classList.remove('bg-white/80');
+                toggleBtn.classList.add('bg-gray-300');
+            }
+        });
+
+        // --- Synthesis Logic (Sustain Capable) ---
+        function startNote(freq, index) {
+            if (!audioCtx) initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            // If already playing this note, return
+            if (activeNotes[index]) return;
+
+            const t = audioCtx.currentTime;
+
+            // 1. Oscillators
+            const osc = audioCtx.createOscillator();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, t);
+
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(freq, t);
+
+            // 2. Breath Noise
+            const bufferSize = audioCtx.sampleRate * 0.5;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            noise.loop = true;
+            
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'lowpass';
+            noiseFilter.frequency.value = 1000;
+
+            // 3. Gain Envelopes
+            const envMain = audioCtx.createGain();
+            const env2 = audioCtx.createGain();
+            const envNoise = audioCtx.createGain();
+
+            // Connections
+            osc.connect(envMain);
+            osc2.connect(env2);
+            noise.connect(noiseFilter);
+            noiseFilter.connect(envNoise);
+
+            envMain.connect(masterGain);
+            env2.connect(masterGain);
+            envNoise.connect(masterGain);
+
+            // ADSR - Attack Phase
+            const attack = 0.05;
+            const sustainVol = 0.5;
+
+            // Main Tone Attack
+            envMain.gain.setValueAtTime(0, t);
+            envMain.gain.linearRampToValueAtTime(sustainVol, t + attack);
+
+            // Sine Tone Attack
+            env2.gain.setValueAtTime(0, t);
+            env2.gain.linearRampToValueAtTime(0.4, t + attack);
+
+            // Noise Attack
+            envNoise.gain.setValueAtTime(0, t);
+            envNoise.gain.linearRampToValueAtTime(0.15, t + 0.02);
+            envNoise.gain.exponentialRampToValueAtTime(0.02, t + 0.1); 
+
+            osc.start(t);
+            osc2.start(t);
+            noise.start(t);
+
+            // Store stop function
+            activeNotes[index] = {
+                stop: () => {
+                    if (!audioCtx) return;
+                    const now = audioCtx.currentTime;
+                    const release = 0.15; // Release time
+
+                    // Cancel sustain loop
+                    try {
+                        envMain.gain.cancelScheduledValues(now);
+                        env2.gain.cancelScheduledValues(now);
+                        envNoise.gain.cancelScheduledValues(now);
+
+                        // Release Ramp
+                        envMain.gain.setValueAtTime(envMain.gain.value, now);
+                        envMain.gain.exponentialRampToValueAtTime(0.001, now + release);
+
+                        env2.gain.setValueAtTime(env2.gain.value, now);
+                        env2.gain.exponentialRampToValueAtTime(0.001, now + release);
+
+                        envNoise.gain.setValueAtTime(envNoise.gain.value, now);
+                        envNoise.gain.exponentialRampToValueAtTime(0.001, now + release);
+
+                        // Stop Oscillators after release
+                        osc.stop(now + release + 0.1);
+                        osc2.stop(now + release + 0.1);
+                        noise.stop(now + release + 0.1);
+
+                        // Disconnect cleanup
+                        setTimeout(() => {
+                            osc.disconnect();
+                            osc2.disconnect();
+                            noise.disconnect();
+                            envMain.disconnect();
+                            env2.disconnect();
+                            envNoise.disconnect();
+                        }, (release + 0.2) * 1000);
+                    } catch(e) { console.log(e); }
+                }
+            };
+        }
+
+        function stopNote(index) {
+            if (activeNotes[index]) {
+                activeNotes[index].stop();
+                delete activeNotes[index];
+            }
+        }
+
+        // --- UI Construction ---
+        const container = document.getElementById('pipes-container');
+        const radius = 130; 
+        const totalPipes = notes.length;
+        const angleStep = (2 * Math.PI) / totalPipes;
+        const startAngle = -Math.PI / 2 - (angleStep * (totalPipes-1)) / 2; 
+
+        notes.forEach((n, index) => {
+            const angle = startAngle + (index * angleStep);
+            const x = Math.cos(angle) * radius;
+            const y = Math.sin(angle) * radius;
+
+            const pipe = document.createElement('div');
+            pipe.className = 'wot-pipe select-none';
+            pipe.setAttribute('data-index', index); // Add index for hit testing
+            pipe.style.width = `${n.size}px`;
+            pipe.style.height = `${n.size}px`;
+            pipe.style.left = `calc(50% + ${x}px - ${n.size/2}px)`;
+            pipe.style.top = `calc(50% + ${y}px - ${n.size/2}px)`;
+
+            pipe.innerHTML = `<span class="pipe-label">${n.label}</span>`;
+            
+            // Mouse Interaction (Desktop Fallback)
+            const handleMouseStart = (e) => {
+                // Ignore if touch is active (prevent double firing)
+                if (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return;
+                pipe.classList.add('active');
+                startNote(n.freq, index);
+            };
+            const handleMouseEnd = (e) => {
+                if (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return;
+                pipe.classList.remove('active');
+                stopNote(index);
+            };
+
+            pipe.addEventListener('mousedown', handleMouseStart);
+            pipe.addEventListener('mouseup', handleMouseEnd);
+            pipe.addEventListener('mouseleave', handleMouseEnd);
+
+            container.appendChild(pipe);
+        });
+
+        // --- Robust Multi-Touch & Glissando Handler ---
+        // This handles "Playing Together" and "Sliding" (Glissando)
+        
+        function handleTouch(e) {
+            e.preventDefault(); // Prevent scroll/zoom
+            
+            const touches = e.changedTouches;
+            
+            for (let i = 0; i < touches.length; i++) {
+                const touch = touches[i];
+                const touchId = touch.identifier;
+                
+                // Find element under this specific finger
+                const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                const pipe = element?.closest('.wot-pipe');
+                
+                if (pipe) {
+                    const newIndex = parseInt(pipe.dataset.index);
+                    
+                    // Logic:
+                    // 1. Is this finger already tracking a note?
+                    // 2. If yes, is it the SAME note? -> Do nothing.
+                    // 3. If yes, is it a DIFFERENT note? -> Stop old note, Start new note (Glissando).
+                    // 4. If no, Start new note.
+
+                    const oldIndex = activeTouches.get(touchId);
+
+                    if (oldIndex !== undefined && oldIndex !== newIndex) {
+                        // Glissando: Finger moved from one pipe to another
+                        stopNote(oldIndex);
+                        const oldPipe = document.querySelector(`.wot-pipe[data-index="${oldIndex}"]`);
+                        if(oldPipe) oldPipe.classList.remove('active');
+                    }
+
+                    if (oldIndex !== newIndex) {
+                        // New note attack
+                        activeTouches.set(touchId, newIndex);
+                        pipe.classList.add('active');
+                        startNote(notes[newIndex].freq, newIndex);
+                    }
+                } else {
+                    // Finger moved off any pipe
+                    const oldIndex = activeTouches.get(touchId);
+                    if (oldIndex !== undefined) {
+                        stopNote(oldIndex);
+                        const oldPipe = document.querySelector(`.wot-pipe[data-index="${oldIndex}"]`);
+                        if(oldPipe) oldPipe.classList.remove('active');
+                        activeTouches.delete(touchId);
+                    }
+                }
+            }
+        }
+
+        function handleTouchEnd(e) {
+            e.preventDefault();
+            const touches = e.changedTouches;
+            for (let i = 0; i < touches.length; i++) {
+                const touchId = touches[i].identifier;
+                const index = activeTouches.get(touchId);
+                
+                if (index !== undefined) {
+                    stopNote(index);
+                    const pipe = document.querySelector(`.wot-pipe[data-index="${index}"]`);
+                    if(pipe) pipe.classList.remove('active');
+                    activeTouches.delete(touchId);
+                }
+            }
+        }
+
+        // Attach listeners to container to catch all moves
+        container.addEventListener('touchstart', handleTouch, {passive: false});
+        container.addEventListener('touchmove', handleTouch, {passive: false});
+        container.addEventListener('touchend', handleTouchEnd, {passive: false});
+        container.addEventListener('touchcancel', handleTouchEnd, {passive: false});
+
+
+        // --- Visualizer ---
+        const canvas = document.getElementById('visualizer');
+        const canvasCtx = canvas.getContext('2d');
+        
+        function drawVisualizer() {
+            requestAnimationFrame(drawVisualizer);
+            if(!analyser) return;
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteFrequencyData(dataArray);
+
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+
+            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const barWidth = (canvas.width / bufferLength) * 2.5;
+            let barHeight;
+            let x = 0;
+
+            for(let i = 0; i < bufferLength; i++) {
+                barHeight = dataArray[i] / 2;
+                canvasCtx.fillStyle = `rgba(139, 69, 19, ${barHeight/100})`; // Brown tint
+                canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                x += barWidth + 1;
+            }
+        }
+
+        // --- Recording Logic ---
+        const btnRecord = document.getElementById('btn-record');
+        const btnStop = document.getElementById('btn-stop');
+        const btnPlay = document.getElementById('btn-play');
+        const btnDownload = document.getElementById('btn-download');
+        let audioPlayer = new Audio();
+
+        btnRecord.addEventListener('click', () => {
+            if (!audioCtx) initAudio();
+            
+            recordedChunks = [];
+            const options = { mimeType: 'audio/webm' };
+            
+            try {
+                mediaRecorder = new MediaRecorder(destNode.stream, options);
+            } catch (e) {
+                mediaRecorder = new MediaRecorder(destNode.stream); 
+            }
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    recordedChunks.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                audioURL = URL.createObjectURL(blob);
+                audioPlayer.src = audioURL;
+                
+                btnPlay.disabled = false;
+                btnDownload.disabled = false;
+                statusText.innerText = "บันทึกเสร็จสิ้น พร้อมฟัง";
+            };
+
+            mediaRecorder.start();
+            btnRecord.disabled = true;
+            btnStop.disabled = false;
+            btnPlay.disabled = true;
+            btnDownload.disabled = true;
+            btnRecord.classList.add('animate-pulse');
+            statusText.innerText = "กำลังบันทึก...";
+        });
+
+        btnStop.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                btnRecord.disabled = false;
+                btnStop.disabled = true;
+                btnRecord.classList.remove('animate-pulse');
+            } else if (!audioPlayer.paused) {
+                audioPlayer.pause();
+                audioPlayer.currentTime = 0;
+                btnPlay.innerHTML = '<i class="ph-fill ph-play"></i>';
+                btnStop.disabled = true;
+            }
+        });
+
+        btnPlay.addEventListener('click', () => {
+            if (audioURL) {
+                audioPlayer.play();
+                btnPlay.innerHTML = '<i class="ph-fill ph-pause"></i>';
+                statusText.innerText = "กำลังเล่น...";
+                btnStop.disabled = false;
+                
+                audioPlayer.onended = () => {
+                    btnPlay.innerHTML = '<i class="ph-fill ph-play"></i>';
+                    statusText.innerText = "เล่นจบแล้ว";
+                    btnStop.disabled = true;
+                };
+            }
+        });
+
+        btnDownload.addEventListener('click', () => {
+            if (audioURL) {
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = audioURL;
+                a.download = `wot-recording-${Date.now()}.webm`;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                }, 100);
+            }
+        });
+
+    </script>
+</body>
+</html>

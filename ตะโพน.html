@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ตะโพนไทยเสมือนจริง (Virtual Taphon)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            touch-action: none; /* ป้องกันการเลื่อน/ซูมบนมือถือ */
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #1a1a1a;
+            overflow: hidden; /* ป้องกันล้นขอบ */
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* เอฟเฟกต์แสงเงาและพื้นผิวไม้ */
+        .wood-texture {
+            background: repeating-linear-gradient(
+                45deg,
+                #603813,
+                #603813 10px,
+                #4a2c0f 10px,
+                #4a2c0f 20px
+            );
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+        }
+        
+        .leather-texture {
+            background-color: #e3cbb1;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.4'/%3E%3C/svg%3E");
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        .strap {
+            background: linear-gradient(90deg, #2a1a0a, #5c4021, #2a1a0a);
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        /* การทำภาพเคลื่อนไหวเมื่อตี */
+        .hit-anim {
+            animation: hitScale 0.1s ease-in-out;
+        }
+
+        @keyframes hitScale {
+            0% { transform: scale(1); filter: brightness(1); }
+            50% { transform: scale(0.95); filter: brightness(1.2); }
+            100% { transform: scale(1); filter: brightness(1); }
+        }
+
+        /* ปุ่มควบคุม */
+        .control-btn {
+            transition: all 0.2s;
+        }
+        .control-btn:active {
+            transform: scale(0.9);
+        }
+        
+        .active-record {
+            animation: pulse-red 1.5s infinite;
+            background-color: #ef4444 !important;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        /* พื้นที่กลอง */
+        .drum-container {
+            position: relative;
+            width: 95%;
+            max-width: 600px;
+            aspect-ratio: 16/9;
+            margin: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .taphon-body {
+            position: relative;
+            width: 80%;
+            height: 70%;
+            border-radius: 40px; /* ทรงกระบอกมนๆ */
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .taphon-head {
+            position: absolute;
+            height: 110%;
+            border-radius: 50%;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: 8px solid #3e2723;
+        }
+
+        .head-left {
+            width: 35%;
+            left: -10%;
+            background: radial-gradient(circle at 30% 30%, #f5deb3, #8d6e63);
+        }
+
+        .head-right {
+            width: 28%;
+            right: -8%;
+            background: radial-gradient(circle at 30% 30%, #f5deb3, #8d6e63);
+        }
+        
+        /* ข้าวสุก (ตัวถ่วงเสียงตรงกลางหน้าใหญ่) */
+        .khao-suk {
+            width: 40%;
+            height: 40%;
+            background: #212121;
+            border-radius: 50%;
+            opacity: 0.8;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .note-label {
+            position: absolute;
+            color: rgba(255,255,255,0.8);
+            font-weight: bold;
+            text-shadow: 1px 1px 2px black;
+            pointer-events: none;
+            display: none; /* ซ่อนโดย default */
+        }
+        
+        .show-notes .note-label {
+            display: block;
+        }
+
+    </style>
+</head>
+<body class="text-white">
+
+    <!-- Header -->
+    <header class="p-2 flex justify-between items-center bg-neutral-900 border-b border-neutral-700 h-14 shrink-0">
+        <h1 class="text-lg font-bold text-amber-500">🥁 ตะโพนไทย (Taphon)</h1>
+        <div class="text-xs text-gray-400" id="status-text">พร้อมเล่น</div>
+    </header>
+
+    <!-- Main Instrument Area -->
+    <main class="flex-grow flex items-center justify-center relative bg-neutral-800" id="play-area">
+        
+        <!-- ขาตั้ง (Visual) -->
+        <div class="absolute bottom-10 w-48 h-12 bg-neutral-900 rounded-lg transform skew-x-12 opacity-50"></div>
+        <div class="absolute bottom-10 w-48 h-12 bg-neutral-900 rounded-lg transform -skew-x-12 opacity-50"></div>
+
+        <div class="drum-container wood-texture rounded-3xl" id="drum-wrapper">
+            <!-- สายรัดหนัง (Visual Decoration) -->
+            <div class="absolute w-full h-full flex justify-around items-center px-12 z-10 opacity-60 pointer-events-none">
+                <div class="w-2 h-full strap rotate-12"></div>
+                <div class="w-2 h-full strap -rotate-12"></div>
+                <div class="w-2 h-full strap rotate-6"></div>
+                <div class="w-2 h-full strap -rotate-6"></div>
+                <div class="w-2 h-full strap"></div>
+            </div>
+
+            <!-- หน้าตะโพนใหญ่ (เสียงทุ้ม) -->
+            <div id="head-large" class="taphon-head head-left leather-texture shadow-2xl" 
+                 ontouchstart="playTone('low', this); return false;" 
+                 onmousedown="playTone('low', this)">
+                <div class="khao-suk"></div>
+                <span class="note-label text-2xl">เท่ง</span>
+            </div>
+
+            <!-- ตัวกลอง -->
+            <div class="absolute inset-0 z-0"></div>
+
+            <!-- หน้าตะโพนเล็ก (เสียงแหลม) -->
+            <div id="head-small" class="taphon-head head-right leather-texture shadow-2xl"
+                 ontouchstart="playTone('high', this); return false;" 
+                 onmousedown="playTone('high', this)">
+                <span class="note-label text-2xl">มัด</span>
+            </div>
+        </div>
+        
+        <div class="absolute top-4 text-gray-500 text-sm pointer-events-none">แตะที่หน้ากลองเพื่อเล่น</div>
+    </main>
+
+    <!-- Control Bar -->
+    <footer class="bg-neutral-900 p-3 h-20 shrink-0 grid grid-cols-4 gap-2 items-center justify-items-center">
+        
+        <!-- Toggle Notes -->
+        <button onclick="toggleNotes()" class="control-btn flex flex-col items-center justify-center w-full h-full bg-neutral-800 rounded-lg text-amber-100 hover:bg-neutral-700">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M12.136.326A1.5 1.5 0 0 1 14 1.78V3h.5A1.5 1.5 0 0 1 16 4.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 13.5v-9a1.5 1.5 0 0 1 1.432-1.499L12.136.326zM5.562 3H13V1.78a.5.5 0 0 0-.621-.484L5.562 3zM1.5 4a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h13a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-13z"/>
+            </svg>
+            <span class="text-xs mt-1">โน้ต</span>
+        </button>
+
+        <!-- Record -->
+        <button id="rec-btn" onclick="toggleRecord()" class="control-btn flex flex-col items-center justify-center w-full h-full bg-neutral-800 rounded-lg text-red-400 hover:bg-neutral-700">
+            <div class="w-4 h-4 rounded-full bg-current mb-1"></div>
+            <span class="text-xs" id="rec-text">อัดเสียง</span>
+        </button>
+
+        <!-- Playback -->
+        <button id="play-btn" onclick="playRecording()" disabled class="control-btn flex flex-col items-center justify-center w-full h-full bg-neutral-800 rounded-lg text-green-400 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-neutral-700">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/>
+            </svg>
+            <span class="text-xs mt-1">ฟัง</span>
+        </button>
+
+        <!-- Download -->
+        <button id="dl-btn" onclick="downloadRecording()" disabled class="control-btn flex flex-col items-center justify-center w-full h-full bg-neutral-800 rounded-lg text-blue-400 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-neutral-700">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 1-.708.708l3 3z"/>
+            </svg>
+            <span class="text-xs mt-1">โหลด</span>
+        </button>
+
+    </footer>
+
+    <script>
+        // --- Web Audio API Setup ---
+        let audioCtx;
+        let masterGain;
+        let recorder;
+        let audioChunks = [];
+        let audioBlob;
+        let isRecording = false;
+        let dest; // MediaStreamDestination for recording
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // Master Volume
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.8;
+                masterGain.connect(audioCtx.destination);
+
+                // Setup Recording Destination
+                dest = audioCtx.createMediaStreamDestination();
+                masterGain.connect(dest);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // --- Sound Synthesis (การสังเคราะห์เสียง) ---
+        function playTone(type, element) {
+            initAudio(); // Ensure context is ready
+            
+            // Visual Feedback
+            if(element) {
+                element.classList.remove('hit-anim');
+                void element.offsetWidth; // trigger reflow
+                element.classList.add('hit-anim');
+            }
+
+            const t = audioCtx.currentTime;
+            
+            // 1. Impact (The "Thwack" sound)
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            // 2. Resonance (The body sound)
+            const oscRes = audioCtx.createOscillator();
+            const gainRes = audioCtx.createGain();
+
+            // 3. Noise (The skin texture)
+            const bufferSize = audioCtx.sampleRate * 0.1; // 0.1 sec noise
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'lowpass';
+            const noiseGain = audioCtx.createGain();
+
+            if (type === 'low') {
+                // --- หน้าใหญ่ (Thoet / Pa) ---
+                // Deep, booming, long decay
+                osc.frequency.setValueAtTime(80, t);
+                osc.frequency.exponentialRampToValueAtTime(40, t + 0.1);
+                
+                gain.gain.setValueAtTime(1.0, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.6); // Long decay
+
+                oscRes.frequency.value = 120;
+                gainRes.gain.setValueAtTime(0.3, t);
+                gainRes.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+
+                noiseFilter.frequency.value = 400;
+                noiseGain.gain.setValueAtTime(0.3, t);
+                noiseGain.gain.linearRampToValueAtTime(0, t + 0.05);
+
+            } else {
+                // --- หน้าเล็ก (Tup / Tib) ---
+                // Higher, tighter, snappy
+                osc.frequency.setValueAtTime(220, t);
+                osc.frequency.exponentialRampToValueAtTime(180, t + 0.08);
+
+                gain.gain.setValueAtTime(0.8, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2); // Short decay
+
+                oscRes.frequency.value = 350;
+                gainRes.gain.setValueAtTime(0.2, t);
+                gainRes.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+
+                noiseFilter.frequency.value = 1000;
+                noiseGain.gain.setValueAtTime(0.5, t);
+                noiseGain.gain.linearRampToValueAtTime(0, t + 0.08); // More snap
+            }
+
+            // Connect graph
+            osc.connect(gain);
+            gain.connect(masterGain);
+
+            oscRes.connect(gainRes);
+            gainRes.connect(masterGain);
+
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(masterGain);
+
+            // Start
+            osc.start(t);
+            osc.stop(t + 1);
+            oscRes.start(t);
+            oscRes.stop(t + 1);
+            noise.start(t);
+        }
+
+        // --- Logic UI ---
+        function toggleNotes() {
+            document.getElementById('drum-wrapper').classList.toggle('show-notes');
+        }
+
+        // --- Logic Recording ---
+        function toggleRecord() {
+            initAudio();
+            const btn = document.getElementById('rec-btn');
+            const status = document.getElementById('status-text');
+
+            if (isRecording) {
+                // Stop Recording
+                recorder.stop();
+                isRecording = false;
+                btn.classList.remove('active-record');
+                document.getElementById('rec-text').innerText = 'อัดเสียง';
+                status.innerText = 'บันทึกเสร็จสิ้น';
+            } else {
+                // Start Recording
+                audioChunks = [];
+                // Use the destination stream we created earlier
+                recorder = new MediaRecorder(dest.stream);
+                
+                recorder.ondataavailable = (e) => {
+                    audioChunks.push(e.data);
+                };
+
+                recorder.onstop = () => {
+                    audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    document.getElementById('play-btn').disabled = false;
+                    document.getElementById('dl-btn').disabled = false;
+                };
+
+                recorder.start();
+                isRecording = true;
+                btn.classList.add('active-record');
+                document.getElementById('rec-text').innerText = 'หยุดอัด';
+                status.innerText = 'กำลังบันทึก...';
+            }
+        }
+
+        function playRecording() {
+            if (!audioBlob) return;
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            document.getElementById('status-text').innerText = 'กำลังเล่นไฟล์ที่อัด...';
+            audio.play();
+            audio.onended = () => {
+                document.getElementById('status-text').innerText = 'เล่นจบแล้ว';
+            };
+        }
+
+        function downloadRecording() {
+            if (!audioBlob) return;
+            const url = URL.createObjectURL(audioBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'taphon_recording_' + new Date().getTime() + '.webm';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                document.getElementById('status-text').innerText = 'ดาวน์โหลดเรียบร้อย';
+            }, 100);
+        }
+
+        // Init on load to setup layout but wait for user interaction for audio
+        window.addEventListener('resize', () => {
+            // Fix layout on some mobile browsers hiding address bar
+            document.body.style.height = window.innerHeight + 'px';
+        });
+        document.body.style.height = window.innerHeight + 'px';
+
+    </script>
+</body>
+</html>

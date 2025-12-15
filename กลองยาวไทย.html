@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>กลองยาวจำลอง (Virtual Klong Yao)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #2d1b0e; /* Dark wood color */
+            background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20.5V18H0v-2h20v5.1L6 4.1 7.4 2.8 21.6 17l4.4-4.4L11.8.8 13.2-.6 27.5 13.7 34 7.3 35.4 8.7 29 15.1l8.1 8.1-1.4 1.4-8.1-8.1-5.3 5.3 14.2 14.2-1.4 1.4-14.2-14.2-4.4 4.4 14.2 14.2-1.4 1.4-14.2-14.2L2.6 37.4 1.2 36l14.2-14.2L0 20.5h20z' fill='%234a3018' fill-opacity='0.15' fill-rule='evenodd'/%3E%3C/svg%3E");
+            touch-action: none; /* Prevent browser zooming/scrolling */
+            overflow: hidden; /* Prevent scrollbars */
+            user-select: none; /* Prevent text selection */
+            -webkit-user-select: none;
+        }
+
+        /* Drum Head Texture */
+        .drum-head {
+            background: radial-gradient(circle, #f3e5ab 0%, #e0c87e 50%, #d6c485 75%, #b69b4c 100%);
+            box-shadow: 
+                inset 0 0 30px rgba(0,0,0,0.3),
+                0 10px 20px rgba(0,0,0,0.5),
+                0 0 0 10px #5c3a21, /* Inner rim */
+                0 0 0 20px #8b5a2b, /* Outer rim wood */
+                0 15px 30px rgba(0,0,0,0.6); /* Drop shadow */
+            position: relative;
+            transition: transform 0.05s ease;
+            cursor: pointer;
+        }
+
+        .drum-head:active {
+            transform: scale(0.98);
+        }
+
+        /* Texture overlay for realistic skin look */
+        .drum-texture {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: 50%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.15'/%3E%3C/svg%3E");
+            pointer-events: none;
+        }
+
+        /* "Rice Paste" Center tuning spot (Khoon) */
+        .khoon {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 25%;
+            height: 25%;
+            background: radial-gradient(circle, #3e2723 0%, #5d4037 80%, transparent 100%);
+            border-radius: 50%;
+            opacity: 0.8;
+            filter: blur(2px);
+            pointer-events: none;
+        }
+
+        /* Hit animations */
+        @keyframes ripple {
+            0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4); }
+            100% { box-shadow: 0 0 0 30px rgba(255, 255, 255, 0); }
+        }
+        .hit-anim {
+            animation: ripple 0.3s linear;
+        }
+
+        /* Note labels */
+        .note-label {
+            position: absolute;
+            color: rgba(62, 39, 35, 0.7);
+            font-weight: bold;
+            pointer-events: none;
+            text-shadow: 0 1px 1px rgba(255,255,255,0.5);
+            display: none; /* Hidden by default */
+        }
+        .show-notes .note-label {
+            display: block;
+        }
+
+        /* Control Panel */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-control {
+            transition: all 0.2s;
+        }
+        .btn-control:active {
+            transform: scale(0.95);
+        }
+        .recording-pulse {
+            animation: pulse-red 1.5s infinite;
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        /* Start Overlay */
+        #start-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 50;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            text-align: center;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between overflow-hidden">
+
+    <!-- Start Overlay (Required for AudioContext) -->
+    <div id="start-overlay">
+        <div class="p-6 bg-white/10 backdrop-blur-md rounded-xl border border-white/20 animate-bounce cursor-pointer" onclick="initAudio()">
+            <i class="fas fa-drum text-6xl mb-4 text-yellow-400"></i>
+            <h1 class="text-2xl font-bold">แตะเพื่อเริ่มตีกลองยาว</h1>
+            <p class="text-sm mt-2 opacity-80">Tap to Start</p>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <div class="flex justify-between items-center p-4 pt-6 z-10">
+        <div>
+            <h1 class="text-white text-xl font-bold drop-shadow-md"><i class="fas fa-music text-yellow-500 mr-2"></i>กลองยาวไทย</h1>
+            <p class="text-yellow-200/70 text-xs">Virtual Klong Yao Simulator</p>
+        </div>
+        <div id="status-indicator" class="text-xs text-green-400 font-mono hidden">
+            <i class="fas fa-circle text-[8px] mr-1"></i>พร้อมใช้งาน
+        </div>
+    </div>
+
+    <!-- Main Instrument Area -->
+    <div class="flex-1 flex justify-center items-center relative" id="drum-container">
+        
+        <!-- The Drum -->
+        <div id="drum" class="drum-head w-[85vw] h-[85vw] max-w-[500px] max-h-[500px] rounded-full relative">
+            
+            <div class="drum-texture"></div>
+            
+            <!-- Center Target (Jo) -->
+            <div class="khoon"></div>
+            
+            <!-- Note Labels (Visual Guide) -->
+            <div class="note-label text-2xl" style="top: 50%; left: 50%; transform: translate(-50%, -50%);">
+                จ๊ะ (Jo)
+            </div>
+            <div class="note-label text-xl" style="top: 15%; left: 50%; transform: translate(-50%, -50%);">
+                เท่ง (Ting)
+            </div>
+            <div class="note-label text-xl" style="bottom: 15%; left: 50%; transform: translate(-50%, -50%);">
+                เท่ง (Ting)
+            </div>
+            <div class="note-label text-xl" style="left: 15%; top: 50%; transform: translate(-50%, -50%);">
+                เท่ง (Ting)
+            </div>
+            <div class="note-label text-xl" style="right: 15%; top: 50%; transform: translate(-50%, -50%);">
+                เท่ง (Ting)
+            </div>
+            
+            <!-- Visual Hit Feedback Elements (Generated via JS) -->
+        </div>
+
+    </div>
+
+    <!-- Controls -->
+    <div class="glass-panel pb-8 pt-4 px-4 w-full z-20 rounded-t-3xl">
+        <div class="flex justify-between items-center gap-2 max-w-md mx-auto">
+            
+            <!-- Show Notes -->
+            <button id="btn-notes" class="btn-control flex flex-col items-center justify-center w-16 h-16 rounded-2xl bg-white/10 text-white border border-white/20" onclick="toggleNotes()">
+                <i class="fas fa-eye text-xl mb-1"></i>
+                <span class="text-[10px]">โน้ต</span>
+            </button>
+
+            <!-- Record -->
+            <button id="btn-record" class="btn-control flex flex-col items-center justify-center w-20 h-20 rounded-full bg-red-600/80 text-white shadow-lg border-4 border-red-900/50" onclick="toggleRecord()">
+                <i class="fas fa-microphone text-2xl mb-1"></i>
+                <span class="text-[10px]" id="rec-text">อัดเสียง</span>
+            </button>
+
+            <!-- Playback Group -->
+            <div class="flex gap-2">
+                <button id="btn-play" class="btn-control flex flex-col items-center justify-center w-16 h-16 rounded-2xl bg-blue-500/80 text-white disabled:opacity-30 disabled:grayscale" onclick="playRecording()" disabled>
+                    <i class="fas fa-play text-xl mb-1"></i>
+                    <span class="text-[10px]">ฟัง</span>
+                </button>
+
+                <button id="btn-download" class="btn-control flex flex-col items-center justify-center w-16 h-16 rounded-2xl bg-green-500/80 text-white disabled:opacity-30 disabled:grayscale" onclick="downloadRecording()" disabled>
+                    <i class="fas fa-download text-xl mb-1"></i>
+                    <span class="text-[10px]">โหลด</span>
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- Audio Engine (Web Audio API) ---
+        let audioCtx;
+        let masterGain;
+        let recorder;
+        let recordedChunks = [];
+        let audioBlob;
+        let audioUrl;
+        let isRecording = false;
+        let destStream; // For recording synth audio
+
+        const drum = document.getElementById('drum');
+        
+        async function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.8; // Master volume
+                masterGain.connect(audioCtx.destination);
+
+                // Setup Stream for Recording
+                destStream = audioCtx.createMediaStreamDestination();
+                masterGain.connect(destStream);
+
+                document.getElementById('start-overlay').style.display = 'none';
+                document.getElementById('status-indicator').classList.remove('hidden');
+            }
+            
+            if (audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+            }
+        }
+
+        // Sound Synthesis Functions
+        function playSound(type) {
+            if (!audioCtx) return;
+
+            const t = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.connect(gain);
+            gain.connect(masterGain);
+
+            if (type === 'jo') {
+                // "Jo" Sound: Deep, Resonant, Pitch bends down slightly
+                // Representing the center hit (with the tuning paste)
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(130, t);
+                osc.frequency.exponentialRampToValueAtTime(80, t + 0.5);
+                
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(1, t + 0.02); // Attack
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.8); // Decay
+                
+                osc.start(t);
+                osc.stop(t + 0.8);
+
+                // Add a subtle thump overlay
+                const thumpOsc = audioCtx.createOscillator();
+                const thumpGain = audioCtx.createGain();
+                thumpOsc.connect(thumpGain);
+                thumpGain.connect(masterGain);
+                thumpOsc.frequency.setValueAtTime(60, t);
+                thumpGain.gain.setValueAtTime(0.5, t);
+                thumpGain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+                thumpOsc.start(t);
+                thumpOsc.stop(t + 0.2);
+
+            } else if (type === 'ting') {
+                // "Ting" Sound: Higher pitch, sharper, rim sound
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(350, t);
+                
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(0.8, t + 0.01); // Sharp Attack
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3); // Short Decay
+                
+                osc.start(t);
+                osc.stop(t + 0.3);
+
+                // Add "Slap" noise for realistic skin contact
+                const bufferSize = audioCtx.sampleRate * 0.1; // 0.1 sec noise
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                const noiseGain = audioCtx.createGain();
+                noise.connect(noiseGain);
+                noiseGain.connect(masterGain);
+                
+                // Highpass filter for the snap
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.value = 1000;
+                noise.disconnect();
+                noise.connect(filter);
+                filter.connect(noiseGain);
+
+                noiseGain.gain.setValueAtTime(0.3, t);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+                noise.start(t);
+            }
+        }
+
+        // --- Input Handling (Touch/Click) ---
+        function handleHit(e) {
+            e.preventDefault(); // Prevent default touch actions
+            if(!audioCtx) initAudio();
+
+            const rect = drum.getBoundingClientRect();
+            const radius = rect.width / 2;
+            const centerX = rect.left + radius;
+            const centerY = rect.top + radius;
+
+            // Handle multi-touch
+            const touches = e.changedTouches || [e];
+
+            for (let i = 0; i < touches.length; i++) {
+                const clientX = touches[i].clientX;
+                const clientY = touches[i].clientY;
+
+                // Calculate distance from center
+                const dist = Math.sqrt(Math.pow(clientX - centerX, 2) + Math.pow(clientY - centerY, 2));
+                const distNormalized = dist / radius; // 0 to 1
+
+                // Create visual Ripple effect at tap location
+                createRipple(clientX, clientY);
+
+                // Determine Sound based on distance
+                // < 0.35 = Center (Jo), > 0.35 = Rim (Ting)
+                if (distNormalized < 0.45) {
+                    playSound('jo');
+                    animateDrum('scale(0.96)');
+                } else {
+                    playSound('ting');
+                    animateDrum('scale(0.98)');
+                }
+            }
+        }
+
+        // Visual Effects
+        function createRipple(x, y) {
+            const ripple = document.createElement('div');
+            ripple.style.position = 'fixed';
+            ripple.style.left = `${x}px`;
+            ripple.style.top = `${y}px`;
+            ripple.style.width = '10px';
+            ripple.style.height = '10px';
+            ripple.style.background = 'rgba(255, 255, 255, 0.6)';
+            ripple.style.borderRadius = '50%';
+            ripple.style.transform = 'translate(-50%, -50%)';
+            ripple.style.pointerEvents = 'none';
+            ripple.style.boxShadow = '0 0 10px 5px rgba(255, 255, 255, 0.4)';
+            ripple.className = 'hit-anim';
+            
+            document.body.appendChild(ripple);
+
+            setTimeout(() => {
+                ripple.remove();
+            }, 300);
+        }
+
+        function animateDrum(transform) {
+            drum.style.transform = transform;
+            setTimeout(() => {
+                drum.style.transform = 'scale(1)';
+            }, 50);
+        }
+
+        // Event Listeners
+        drum.addEventListener('touchstart', handleHit, {passive: false});
+        drum.addEventListener('mousedown', handleHit);
+
+        // --- Controls Logic ---
+        
+        function toggleNotes() {
+            const drumEl = document.getElementById('drum');
+            const btn = document.getElementById('btn-notes');
+            if (drumEl.classList.contains('show-notes')) {
+                drumEl.classList.remove('show-notes');
+                btn.classList.remove('bg-yellow-500/80');
+                btn.classList.add('bg-white/10');
+            } else {
+                drumEl.classList.add('show-notes');
+                btn.classList.remove('bg-white/10');
+                btn.classList.add('bg-yellow-500/80');
+            }
+        }
+
+        function toggleRecord() {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        }
+
+        function startRecording() {
+            if (!audioCtx) initAudio();
+            
+            recordedChunks = [];
+            // Record from the destination stream node
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
+            recorder = new MediaRecorder(destStream.stream, { mimeType: mimeType });
+
+            recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    recordedChunks.push(e.data);
+                }
+            };
+
+            recorder.onstop = () => {
+                audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+                audioUrl = URL.createObjectURL(audioBlob);
+                
+                // Enable buttons
+                document.getElementById('btn-play').disabled = false;
+                document.getElementById('btn-download').disabled = false;
+            };
+
+            recorder.start();
+            isRecording = true;
+
+            // UI Updates
+            const recBtn = document.getElementById('btn-record');
+            recBtn.classList.add('recording-pulse', 'bg-red-700');
+            recBtn.innerHTML = '<i class="fas fa-stop text-2xl mb-1"></i><span class="text-[10px]">หยุดอัด</span>';
+            
+            // Disable play/download while recording
+            document.getElementById('btn-play').disabled = true;
+            document.getElementById('btn-download').disabled = true;
+        }
+
+        function stopRecording() {
+            recorder.stop();
+            isRecording = false;
+
+            // UI Updates
+            const recBtn = document.getElementById('btn-record');
+            recBtn.classList.remove('recording-pulse', 'bg-red-700');
+            recBtn.classList.add('bg-red-600/80');
+            recBtn.innerHTML = '<i class="fas fa-microphone text-2xl mb-1"></i><span class="text-[10px]">อัดเสียง</span>';
+        }
+
+        function playRecording() {
+            if (!audioUrl) return;
+            const audio = new Audio(audioUrl);
+            
+            const playBtn = document.getElementById('btn-play');
+            const originalHTML = playBtn.innerHTML;
+            
+            playBtn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl mb-1"></i><span class="text-[10px]">เล่นอยู่</span>';
+            playBtn.disabled = true;
+
+            audio.onended = () => {
+                playBtn.innerHTML = originalHTML;
+                playBtn.disabled = false;
+            };
+            
+            audio.play();
+        }
+
+        function downloadRecording() {
+            if (!audioUrl) return;
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = audioUrl;
+            
+            // Generate filename with timestamp
+            const date = new Date();
+            const timestamp = `${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`;
+            a.download = `klong-yao-recording-${timestamp}.webm`;
+            
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+            }, 100);
+        }
+
+        // Prevent context menu on long press
+        window.oncontextmenu = function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            return false;
+        };
+
+    </script>
+</body>
+</html>

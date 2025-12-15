@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ระนาดเอก Pro (Thai Ranat Ek)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        :root {
+            --wood-dark: #3e2723;
+            --wood-light: #8d6e63;
+            --gold: #ffd700;
+            --string-color: #f5f5f5;
+            --bg-color: #1a1a1a;
+        }
+
+        * {
+            box-sizing: border-box;
+            touch-action: none; /* ป้องกันการซูมและเลื่อนบนมือถือ */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh; /* Fallback */
+            height: 100dvh; /* Dynamic height for mobile browsers */
+            background-color: var(--bg-color);
+            font-family: 'Sarabun', sans-serif;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* ล็อคหน้าจอไม่ให้เลื่อน */
+            background: radial-gradient(circle at center, #2c1e1e 0%, #000000 100%);
+            padding-bottom: env(safe-area-inset-bottom); /* For iPhone notch/bar */
+        }
+
+        /* Control Panel */
+        #controls {
+            height: 50px; /* Fixed compact height */
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            border-bottom: 1px solid var(--gold);
+            z-index: 100;
+            gap: 8px;
+            padding: 0 10px;
+            flex-shrink: 0;
+        }
+
+        .btn {
+            background: linear-gradient(145deg, #5d4037, #3e2723);
+            color: var(--gold);
+            border: 1px solid var(--gold);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+            background: #3e2723;
+        }
+
+        .btn.recording {
+            background: #b71c1c;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+        }
+
+        /* Stage area for Ranat */
+        #stage {
+            flex-grow: 1;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            padding: 10px; /* เพิ่ม Padding เพื่อไม่ให้ชนขอบ */
+            perspective: 1000px;
+            overflow: hidden;
+        }
+
+        /* The Instrument Body (Rang Ranat) */
+        #ranat-container {
+            width: 92%; /* ลดความกว้างลงจาก 98% ให้เหลือขอบมากขึ้น */
+            max-width: 1000px; /* จำกัดขนาดสูงสุดให้เล็กลง */
+            height: 55%; /* ลดความสูงลงเพื่อให้ปุ่มดูไม่ยืดเกินไป */
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end; /* Curve simulation */
+            margin-bottom: 20px;
+        }
+
+        /* The Base/Boat shape simulation */
+        .rang-base {
+            position: absolute;
+            bottom: -25px;
+            width: 100%;
+            height: 80px; /* ลดความสูงของฐานลงเล็กน้อย */
+            background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPjxkZWZzPjxsaW5lYXJHcmFkaWVudCBpZD0iZ3JhZCIgeDE9IjAlIiB5MT0iMCUiIHgyPSIwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0eWxlPSJzdG9wLWNvbG9yOiM1ZDQwMzc7c3RvcC1vcGFjaXR5OjEiIC8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdHlsZT0ic3RvcC1jb2xvcjojM2UyNzIzO3N0b3Atb3BhY2l0eToxIiAvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JhZCkiIC8+PC9zdmc+');
+            background-size: cover;
+            border-bottom-left-radius: 50% 100%;
+            border-bottom-right-radius: 50% 100%;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            border: 2px solid var(--gold);
+            z-index: 1;
+        }
+
+        /* Keys Container */
+        #keys-wrapper {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end; /* This aligns keys to form curve based on height */
+            width: 98%; /* ลดขอบเขตปุ่มลงเล็กน้อยไม่ให้หลุดขอบฐาน */
+            height: 140%; /* เพิ่มสัดส่วนความสูงของปุ่มเทียบกับฐานที่เล็กลง */
+            z-index: 10;
+            padding-bottom: 20px;
+            position: relative;
+        }
+
+        /* String (Roi Chueak) */
+        .string-line {
+            position: absolute;
+            bottom: 42%;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--string-color);
+            border-radius: 50%;
+            z-index: 5;
+            box-shadow: 0 2px 2px rgba(0,0,0,0.3);
+            pointer-events: none;
+        }
+
+        /* Individual Key (Luk Ranat) */
+        .key {
+            position: relative;
+            background: linear-gradient(90deg, #5d4037 0%, #a1887f 20%, #8d6e63 50%, #a1887f 80%, #5d4037 100%);
+            border-radius: 4px; /* ปรับมุมมนให้เล็กลงนิดหน่อย */
+            cursor: pointer;
+            box-shadow: 2px 4px 6px rgba(0,0,0,0.4);
+            transition: transform 0.05s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: bold;
+            font-size: 0.8rem; /* ปรับขนาดฟอนต์ให้พอดี */
+            text-shadow: 1px 1px 2px black;
+            border-top: 1px solid rgba(255,255,255,0.3);
+            border-bottom: 1px solid rgba(0,0,0,0.6);
+            /* Flex properties for sizing */
+            flex: 1; 
+            margin: 0 2px; /* เพิ่มระยะห่างระหว่างปุ่มเล็กน้อยเพื่อให้แยกง่ายขึ้น */
+            height: 100%; 
+        }
+
+        .key::after {
+            /* Simulate the node/mounting point */
+            content: '';
+            position: absolute;
+            top: 25%;
+            width: 70%;
+            height: 50%;
+            background: radial-gradient(rgba(255,255,255,0.15), transparent);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .key:active, .key.active {
+            transform: translateY(6px) scale(0.95);
+            background: linear-gradient(90deg, #4e342e 0%, #8d6e63 50%, #4e342e 100%);
+        }
+
+        .note-label {
+            position: absolute;
+            bottom: 10px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            font-size: 1em;
+        }
+
+        .show-notes .note-label {
+            opacity: 1;
+        }
+
+        /* Mallet Animation Indicator (Visual Feedback) */
+        .hit-effect {
+            position: absolute;
+            width: 35px;
+            height: 35px;
+            background: radial-gradient(circle, rgba(255,215,0,0.8) 0%, rgba(255,215,0,0) 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: hitFade 0.3s ease-out forwards;
+            z-index: 20;
+        }
+
+        @keyframes hitFade {
+            0% { transform: scale(0.5); opacity: 1; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+
+        /* Status Text */
+        #status-msg {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+            z-index: 200;
+            font-size: 1.2rem;
+            white-space: nowrap;
+        }
+
+        /* Mobile Landscape Optimization */
+        @media (orientation: portrait) {
+            #stage {
+                /* ปรับตำแหน่งและขนาดในแนวตั้งให้กระชับยิ่งขึ้น */
+                position: absolute;
+                top: 48%;
+                left: 50%;
+                /* ใช้ 90vh แทน 100vh เพื่อให้เหลือขอบหัวท้าย */
+                width: 88vh; 
+                /* ใช้ 88vw แทน 100vw เพื่อให้เหลือขอบซ้ายขวา */
+                height: 88vw; 
+                transform: translate(-50%, -50%) rotate(90deg);
+                transform-origin: center center;
+                padding: 0;
+            }
+            
+            #ranat-container {
+                height: 60%; /* ปรับความสูงปุ่มในแนวตั้ง */
+                width: 100%;
+            }
+
+            #controls {
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                height: 60px;
+                z-index: 101;
+                border-top: 1px solid var(--gold);
+                border-bottom: none;
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="controls">
+        <button class="btn" onclick="toggleNotes()">
+            <span id="note-btn-text">👁️ โน้ต</span>
+        </button>
+        <button class="btn" id="recordBtn" onclick="toggleRecord()">
+            ⏺️ อัด
+        </button>
+        <button class="btn" id="playBtn" onclick="playRecording()" disabled>
+            ▶️ เล่น
+        </button>
+        <button class="btn" id="dlBtn" onclick="downloadRecording()" disabled>
+            ⬇️ โหลด
+        </button>
+    </div>
+
+    <div id="stage">
+        <div id="ranat-container">
+            <div class="rang-base"></div>
+            <div class="string-line"></div>
+            <div id="keys-wrapper">
+                <!-- Keys will be generated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <div id="status-msg"></div>
+
+    <script>
+        // --- Configuration ---
+        const totalKeys = 21; // Standard Ranat Ek usually has 21-22 keys
+        // Thai Scale Logic: Equidistant 7-tone scale.
+        // Formula: Freq = Base * 2^(index/7)
+        // Starting roughly around Low So (Sol) ~ 240Hz for mobile speakers clarity
+        const baseFreq = 240; 
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // State
+        let isRecording = false;
+        let recordedChunks = [];
+        let mediaRecorder;
+        let audioDest;
+        let recordedBlob;
+        let recordedAudio = new Audio();
+        let showNotes = false;
+
+        // Thai Solfege (Sound names)
+        const thaiNotes = ['ซ', 'ล', 'ท', 'ด', 'ร', 'ม', 'ฟ']; // Sol, La, Ti, Do, Re, Mi, Fa
+
+        // --- Initialization ---
+        function init() {
+            const keysWrapper = document.getElementById('keys-wrapper');
+            
+            for (let i = 0; i < totalKeys; i++) {
+                const key = document.createElement('div');
+                key.className = 'key';
+                key.dataset.index = i;
+                
+                // Calculate Thai Frequency
+                // i=0 -> So (Low)
+                const freq = baseFreq * Math.pow(2, i / 7);
+                key.dataset.freq = freq;
+
+                // Label
+                const noteName = thaiNotes[i % 7];
+                const label = document.createElement('span');
+                label.className = 'note-label';
+                label.innerText = noteName;
+                key.appendChild(label);
+
+                // Visual Styling: Curve Simulation
+                // Middle keys are shorter/lower, End keys are longer/higher visually (but in Ranat, middle is thickest)
+                // Actually, Ranat keys (Luk) length: Low pitch = Long/Big, High pitch = Short/Small
+                // Let's adjust Height based on pitch (Standard Xylophone physics)
+                // Longest (Left) -> Shortest (Right)
+                const heightPercent = 100 - (i * 2.5); 
+                key.style.height = `${Math.max(45, heightPercent)}%`; // Increased min height
+                
+                // Add Touch Event
+                key.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); // Stop scrolling
+                    playNote(freq, key);
+                }, { passive: false });
+
+                // Add Mouse Event for Desktop testing
+                key.addEventListener('mousedown', (e) => {
+                    playNote(freq, key);
+                });
+
+                keysWrapper.appendChild(key);
+            }
+
+            // Init Recorder Destination
+            audioDest = audioCtx.createMediaStreamDestination();
+        }
+
+        // --- Audio Engine ---
+        function playNote(freq, element) {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            const t = audioCtx.currentTime;
+
+            // 1. Oscillator (The Sound)
+            const osc = audioCtx.createOscillator();
+            // Thai Ranat has a woody sound. Sine is too pure. Triangle is too harsh.
+            // Let's use Sine but add a tiny bit of Triangle for "hit" texture or just Shape Envelope.
+            osc.type = 'sine'; 
+            osc.frequency.setValueAtTime(freq, t);
+
+            // 2. Gain Node (The Volume Envelope)
+            const gain = audioCtx.createGain();
+            
+            // "Wood" Envelope: Very fast attack, fast decay
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(0.8, t + 0.01); // Attack (Hit)
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4); // Decay (Short sustain)
+
+            // Connect graph
+            osc.connect(gain);
+            gain.connect(audioCtx.destination); // Speaker
+            gain.connect(audioDest); // Recorder input
+
+            // Start/Stop
+            osc.start(t);
+            osc.stop(t + 0.5);
+
+            // Visual Feedback
+            element.classList.add('active');
+            createHitEffect(element);
+            setTimeout(() => element.classList.remove('active'), 100);
+        }
+
+        // --- Visual Effects ---
+        function createHitEffect(element) {
+            const effect = document.createElement('div');
+            effect.className = 'hit-effect';
+            // Center effect on key
+            const rect = element.getBoundingClientRect();
+            // We need to account for stage rotation in portrait mode?
+            // Simple approach: append to element so coordinates are relative
+            element.appendChild(effect); 
+            effect.style.left = '50%';
+            effect.style.top = '50%';
+            effect.style.transform = 'translate(-50%, -50%)';
+            
+            setTimeout(() => effect.remove(), 350);
+        }
+
+        function toggleNotes() {
+            showNotes = !showNotes;
+            const wrapper = document.getElementById('keys-wrapper');
+            const btnText = document.getElementById('note-btn-text');
+            
+            if (showNotes) {
+                wrapper.classList.add('show-notes');
+                btnText.innerText = "👁️ ซ่อน";
+            } else {
+                wrapper.classList.remove('show-notes');
+                btnText.innerText = "👁️ โน้ต";
+            }
+        }
+
+        // --- Recording Logic ---
+        function toggleRecord() {
+            const btn = document.getElementById('recordBtn');
+            const playBtn = document.getElementById('playBtn');
+            const dlBtn = document.getElementById('dlBtn');
+
+            if (!isRecording) {
+                // Start Recording
+                recordedChunks = [];
+                mediaRecorder = new MediaRecorder(audioDest.stream);
+                
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    recordedBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+                    const audioURL = URL.createObjectURL(recordedBlob);
+                    recordedAudio.src = audioURL;
+                    playBtn.disabled = false;
+                    dlBtn.disabled = false;
+                    showStatus("บันทึกเสร็จสิ้น");
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                btn.classList.add('recording');
+                btn.innerHTML = "⏹️ หยุด";
+                playBtn.disabled = true;
+                dlBtn.disabled = true;
+                
+                // Ensure AudioCtx is running
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                showStatus("กำลังบันทึก...");
+
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                btn.classList.remove('recording');
+                btn.innerHTML = "⏺️ อัด";
+            }
+        }
+
+        function playRecording() {
+            if (!recordedAudio.src) return;
+            recordedAudio.play();
+            showStatus("กำลังเล่นเสียงที่อัดไว้...");
+        }
+
+        function downloadRecording() {
+            if (!recordedBlob) return;
+            const url = URL.createObjectURL(recordedBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'ranat_sound_' + new Date().getTime() + '.webm';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            showStatus("ดาวน์โหลดเรียบร้อย");
+        }
+
+        function showStatus(msg) {
+            const el = document.getElementById('status-msg');
+            el.innerText = msg;
+            el.style.display = 'block';
+            setTimeout(() => {
+                el.style.display = 'none';
+            }, 2000);
+        }
+
+        // Run
+        window.onload = init;
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>กลองมโหระทึกจำลอง (Virtual Mahorathop Drum)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #1a1a1a;
+            color: #fff;
+            overflow: hidden; /* Prevent scrolling on mobile */
+            touch-action: manipulation;
+        }
+
+        /* Bronze Drum Texture */
+        .drum-surface {
+            background: radial-gradient(circle, #b8860b 0%, #8b4513 60%, #3e1f08 100%);
+            box-shadow: 
+                0 10px 25px rgba(0,0,0,0.5),
+                inset 0 0 50px rgba(0,0,0,0.6),
+                inset 0 0 10px rgba(255,215,0,0.3);
+            border: 8px solid #5d3308;
+            position: relative;
+            transition: transform 0.05s ease;
+        }
+
+        .drum-surface:active {
+            transform: scale(0.99);
+        }
+
+        /* Star Pattern (SVG Overlay) */
+        .star-pattern {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60%;
+            height: 60%;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        /* Interaction Zones */
+        .hit-zone {
+            position: absolute;
+            border-radius: 50%;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: rgba(255,255,255,0.6);
+            transition: background 0.1s;
+        }
+
+        .hit-zone.active {
+            background: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
+        }
+
+        /* Center Zone */
+        .zone-center {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 35%;
+            height: 35%;
+            z-index: 10;
+        }
+
+        /* Rim Zone (Ring) */
+        .zone-rim {
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+            /* Clip path to create a ring shape conceptually, handled by logic */
+        }
+        
+        /* Specific clickable overlays for mobile mapping */
+        .zone-top { top: 2%; left: 50%; transform: translateX(-50%); width: 30%; height: 20%; position: absolute; z-index: 20; }
+        .zone-bottom { bottom: 2%; left: 50%; transform: translateX(-50%); width: 30%; height: 20%; position: absolute; z-index: 20; }
+        .zone-left { top: 50%; left: 2%; transform: translateY(-50%); width: 20%; height: 30%; position: absolute; z-index: 20; }
+        .zone-right { top: 50%; right: 2%; transform: translateY(-50%); width: 20%; height: 30%; position: absolute; z-index: 20; }
+        
+        /* Frogs (Decoration) */
+        .frog {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="%233e1f08" d="M384 96c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zm-256 0c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zM96 160c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zm320 0c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32z"/></svg>') no-repeat center center;
+            background-size: contain;
+            z-index: 25;
+            cursor: pointer;
+        }
+
+        .control-btn {
+            transition: all 0.2s;
+        }
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .glow-text {
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        /* Note visualizer */
+        .note-display {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s;
+        }
+        .note-display.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col items-center justify-between py-4 bg-stone-900">
+
+    <!-- Header -->
+    <header class="text-center w-full px-4">
+        <h1 class="text-2xl md:text-3xl font-bold text-amber-500 glow-text mb-1">กลองมโหระทึก</h1>
+        <p class="text-xs text-stone-400">แตะที่กลางกลอง หรือขอบกลอง เพื่อเล่นเสียง</p>
+    </header>
+
+    <!-- Visualizer / Note Display -->
+    <div id="visualizer" class="h-12 flex items-center justify-center w-full">
+        <span id="currentNote" class="text-3xl font-bold text-amber-200 note-display">🎵</span>
+    </div>
+
+    <!-- Main Instrument -->
+    <main class="flex-grow flex items-center justify-center w-full relative">
+        <div class="relative w-[340px] h-[340px] md:w-[450px] md:h-[450px]">
+            
+            <!-- The Drum Body -->
+            <div id="drum" class="drum-surface w-full h-full rounded-full flex items-center justify-center">
+                
+                <!-- SVG Star Pattern -->
+                <svg class="star-pattern" viewBox="0 0 100 100" fill="#3e1f08">
+                    <polygon points="50,5 61,35 95,35 68,55 79,85 50,65 21,85 32,55 5,35 39,35" />
+                    <circle cx="50" cy="50" r="10" fill="#5d3308" />
+                </svg>
+
+                <!-- Center Zone -->
+                <div id="zone-center" class="hit-zone zone-center" data-note="BONG">
+                </div>
+
+                <!-- Decoration Frogs -->
+                <div class="frog" style="top: 10px; left: 50%; transform: translateX(-50%);"></div>
+                <div class="frog" style="bottom: 10px; left: 50%; transform: translateX(-50%) rotate(180deg);"></div>
+                <div class="frog" style="left: 10px; top: 50%; transform: translateY(-50%) rotate(-90deg);"></div>
+                <div class="frog" style="right: 10px; top: 50%; transform: translateY(-50%) rotate(90deg);"></div>
+
+            </div>
+
+            <!-- Invisible Click Zones for better mobile UX -->
+            <!-- Rim / Edge sounds -->
+            <div class="hit-zone zone-top" data-note="TING"></div>
+            <div class="hit-zone zone-bottom" data-note="TING"></div>
+            <div class="hit-zone zone-left" data-note="CLANG"></div>
+            <div class="hit-zone zone-right" data-note="CLANG"></div>
+
+        </div>
+    </main>
+
+    <!-- Controls -->
+    <footer class="w-full px-6 pb-6">
+        <div class="bg-stone-800 rounded-2xl p-4 shadow-lg border border-stone-700">
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex items-center space-x-2">
+                    <div id="recIndicator" class="w-3 h-3 rounded-full bg-red-900 transition-colors duration-300"></div>
+                    <span id="timer" class="font-mono text-amber-500">00:00</span>
+                </div>
+                <div class="text-xs text-stone-500">สถานะ: <span id="statusText">พร้อมใช้งาน</span></div>
+            </div>
+
+            <div class="grid grid-cols-4 gap-3">
+                <button id="btnRecord" class="control-btn flex flex-col items-center justify-center p-3 bg-red-700 hover:bg-red-600 rounded-xl text-white">
+                    <i class="fas fa-microphone text-xl mb-1"></i>
+                    <span class="text-[10px]">อัดเสียง</span>
+                </button>
+                
+                <button id="btnStop" class="control-btn flex flex-col items-center justify-center p-3 bg-stone-600 hover:bg-stone-500 rounded-xl text-white" disabled>
+                    <i class="fas fa-stop text-xl mb-1"></i>
+                    <span class="text-[10px]">หยุด</span>
+                </button>
+
+                <button id="btnPlay" class="control-btn flex flex-col items-center justify-center p-3 bg-green-700 hover:bg-green-600 rounded-xl text-white" disabled>
+                    <i class="fas fa-play text-xl mb-1"></i>
+                    <span class="text-[10px]">เล่น</span>
+                </button>
+
+                <button id="btnDownload" class="control-btn flex flex-col items-center justify-center p-3 bg-blue-700 hover:bg-blue-600 rounded-xl text-white" disabled>
+                    <i class="fas fa-download text-xl mb-1"></i>
+                    <span class="text-[10px]">โหลด</span>
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // --- Web Audio API Setup ---
+        let audioCtx;
+        let dest; // For recording
+        let masterGain;
+        let mediaRecorder;
+        let chunks = [];
+        let audioBlob;
+        let playbackAudio = new Audio();
+
+        // Timer variables
+        let startTime;
+        let timerInterval;
+
+        // Initialize Audio Context on first interaction
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // Destination for recording
+                dest = audioCtx.createMediaStreamDestination();
+                
+                // Master Gain to Output and Recording Destination
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.8;
+                
+                masterGain.connect(audioCtx.destination);
+                masterGain.connect(dest);
+                
+                document.getElementById('statusText').innerText = "ระบบเสียงทำงาน";
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // --- Synthesis Engine (Bronze Drum Physics Simulation) ---
+        function playSound(type) {
+            initAudio();
+
+            const t = audioCtx.currentTime;
+            
+            // Base Frequencies for Mahorathop (Deep, Metallic)
+            // Using inharmonic partials to simulate bell/bronze
+            let fund, ratios, gains, duration;
+
+            if (type === 'CENTER') {
+                // Deep Gong sound
+                fund = 90; 
+                ratios = [1, 1.41, 2.3, 4.1];
+                gains = [1, 0.6, 0.3, 0.1];
+                duration = 2.5;
+                showNote("โหม่ง (Center)");
+            } else if (type === 'RIM') {
+                // Sharper, higher pitch
+                fund = 250;
+                ratios = [1, 1.6, 3.2, 5.5];
+                gains = [0.8, 0.7, 0.4, 0.2];
+                duration = 1.2;
+                showNote("แกง (Rim)");
+            } else if (type === 'SIDE') {
+                // Dull metallic thud
+                fund = 180;
+                ratios = [1, 1.2];
+                gains = [0.7, 0.3];
+                duration = 0.5;
+                showNote("ตุ้บ (Side)");
+            } else if (type === 'FROG') {
+                // High decorative ping
+                fund = 800;
+                ratios = [1, 2];
+                gains = [0.5, 0.1];
+                duration = 0.8;
+                showNote("กบ (Frog)");
+            }
+
+            // Create oscillators for partials
+            ratios.forEach((ratio, i) => {
+                const osc = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+
+                osc.type = i === 0 ? 'sine' : 'triangle'; // Fund is sine, overtones add texture
+                osc.frequency.value = fund * ratio;
+
+                // Envelope
+                gainNode.gain.setValueAtTime(0, t);
+                gainNode.gain.linearRampToValueAtTime(gains[i], t + 0.01); // Attack
+                gainNode.gain.exponentialRampToValueAtTime(0.001, t + duration); // Decay
+
+                osc.connect(gainNode);
+                gainNode.connect(masterGain);
+
+                osc.start(t);
+                osc.stop(t + duration);
+            });
+
+            // Add a Bandpass filter for that "Bronze" hollow sound
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = fund * 1.5;
+            filter.Q.value = 1;
+            
+            // Connect specific gain nodes to filter if needed, 
+            // but for simplicity here we keep direct connection.
+        }
+
+        function showNote(text) {
+            const el = document.getElementById('currentNote');
+            el.innerText = text;
+            el.classList.remove('show');
+            void el.offsetWidth; // trigger reflow
+            el.classList.add('show');
+
+            // Reset after animation
+            setTimeout(() => {
+                el.classList.remove('show');
+            }, 1000);
+        }
+
+        // --- Interaction Handlers ---
+
+        function handleHit(type, element) {
+            playSound(type);
+            
+            // Visual feedback
+            if(element) {
+                element.classList.add('active');
+                setTimeout(() => element.classList.remove('active'), 100);
+            }
+            
+            // Animate Drum
+            const drum = document.getElementById('drum');
+            drum.style.transform = "scale(0.98)";
+            setTimeout(() => drum.style.transform = "scale(1)", 50);
+        }
+
+        // Center Zone
+        document.getElementById('zone-center').addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            handleHit('CENTER', e.target);
+        });
+
+        // Side/Rim Zones
+        document.querySelectorAll('.zone-top, .zone-bottom').forEach(el => {
+            el.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                handleHit('RIM', el);
+            });
+        });
+
+        document.querySelectorAll('.zone-left, .zone-right').forEach(el => {
+            el.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                handleHit('SIDE', el);
+            });
+        });
+
+        // Frogs
+        document.querySelectorAll('.frog').forEach(el => {
+            el.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                e.stopPropagation(); // Don't trigger underlying drum
+                handleHit('FROG', null);
+            });
+        });
+
+        // --- Recording Logic ---
+
+        const btnRecord = document.getElementById('btnRecord');
+        const btnStop = document.getElementById('btnStop');
+        const btnPlay = document.getElementById('btnPlay');
+        const btnDownload = document.getElementById('btnDownload');
+        const recIndicator = document.getElementById('recIndicator');
+        const timerDisplay = document.getElementById('timer');
+
+        btnRecord.addEventListener('click', () => {
+            initAudio(); // Ensure context is running
+            chunks = [];
+            
+            // Create MediaRecorder from the WebAudio destination
+            try {
+                mediaRecorder = new MediaRecorder(dest.stream);
+            } catch (err) {
+                alert("Browser recording not supported. Try Chrome/Firefox.");
+                return;
+            }
+
+            mediaRecorder.ondataavailable = (evt) => {
+                chunks.push(evt.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(chunks, { type: 'audio/webm' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                playbackAudio.src = audioUrl;
+                
+                // Enable buttons
+                btnPlay.disabled = false;
+                btnDownload.disabled = false;
+                
+                document.getElementById('statusText').innerText = "บันทึกเสร็จสิ้น";
+            };
+
+            mediaRecorder.start();
+            startTimer();
+
+            // UI Updates
+            btnRecord.disabled = true;
+            btnStop.disabled = false;
+            btnPlay.disabled = true;
+            btnDownload.disabled = true;
+            recIndicator.classList.replace('bg-red-900', 'bg-red-500');
+            recIndicator.classList.add('animate-pulse');
+            document.getElementById('statusText').innerText = "กำลังบันทึก...";
+        });
+
+        btnStop.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                stopTimer();
+
+                // UI Updates
+                btnRecord.disabled = false;
+                btnStop.disabled = true;
+                recIndicator.classList.replace('bg-red-500', 'bg-red-900');
+                recIndicator.classList.remove('animate-pulse');
+            }
+        });
+
+        btnPlay.addEventListener('click', () => {
+            if (audioBlob) {
+                document.getElementById('statusText').innerText = "กำลังเล่นเสียง...";
+                playbackAudio.play();
+                playbackAudio.onended = () => {
+                    document.getElementById('statusText').innerText = "เล่นจบแล้ว";
+                };
+            }
+        });
+
+        btnDownload.addEventListener('click', () => {
+            if (audioBlob) {
+                const url = URL.createObjectURL(audioBlob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'mahorathop_sound_' + new Date().getTime() + '.webm';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.getElementById('statusText').innerText = "ดาวน์โหลดเรียบร้อย";
+            }
+        });
+
+        // Timer Function
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                const date = new Date(elapsed);
+                const m = date.getMinutes().toString().padStart(2, '0');
+                const s = date.getSeconds().toString().padStart(2, '0');
+                timerDisplay.innerText = `${m}:${s}`;
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+        }
+
+    </script>
+</body>
+</html>

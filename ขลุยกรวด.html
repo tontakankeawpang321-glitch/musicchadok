@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ขลุ่ยกรวดจำลอง (Virtual Khlui Kruat)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #1a1a1a;
+            color: #fff;
+            overflow: hidden; /* Prevent scroll on mobile */
+            touch-action: manipulation;
+        }
+
+        /* Wood Texture Effect */
+        .wood-texture {
+            background: linear-gradient(90deg, #4e342e, #6d4c41, #8d6e63, #6d4c41, #4e342e);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+            border-radius: 50px;
+            position: relative;
+        }
+
+        .hole {
+            background: radial-gradient(circle at 30% 30%, #3e2723, #000);
+            border: 2px solid #a1887f;
+            border-radius: 50%;
+            transition: transform 0.1s, box-shadow 0.1s, background 0.1s;
+            cursor: pointer;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .hole:active, .hole.active {
+            transform: scale(0.92);
+            background: radial-gradient(circle at 30% 30%, #5d4037, #2d1b16);
+            border-color: #ffd700; /* Gold ring when pressed */
+            box-shadow: 0 0 15px #ffd700;
+        }
+
+        .hole span {
+            pointer-events: none;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            color: #eecfa1;
+        }
+
+        .gold-ring {
+            border: 4px solid #ffd700;
+            background: linear-gradient(45deg, #ffd700, #b8860b);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        /* Control Panel */
+        .control-btn {
+            transition: all 0.2s;
+        }
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        .recording-pulse {
+            animation: pulse-red 1.5s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        /* Start Overlay */
+        #start-overlay {
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(5px);
+            z-index: 50;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-between py-4 bg-gray-900">
+
+    <!-- Start Overlay (Required for AudioContext) -->
+    <div id="start-overlay" class="fixed inset-0 flex flex-col items-center justify-center text-center p-6">
+        <div class="text-yellow-500 text-6xl mb-4"><i class="fas fa-music"></i></div>
+        <h1 class="text-3xl font-bold mb-2 text-white">ขลุ่ยกรวดจำลอง</h1>
+        <p class="text-gray-300 mb-6">แตะเพื่อเริ่มใช้งานเครื่องดนตรี</p>
+        <button id="start-btn" class="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-8 rounded-full text-xl shadow-lg transform transition hover:scale-105">
+            เริ่มเล่น
+        </button>
+    </div>
+
+    <!-- Header & Controls -->
+    <div class="w-full max-w-md px-4 flex flex-col items-center space-y-4">
+        <div class="flex justify-between items-center w-full bg-gray-800 p-3 rounded-xl border border-gray-700 shadow-lg">
+            <h2 class="text-yellow-500 font-bold text-lg"><i class="fas fa-wind mr-2"></i>ขลุ่ยไทย</h2>
+            
+            <div class="flex space-x-2">
+                <button id="record-btn" class="control-btn bg-gray-700 text-red-400 p-3 rounded-full w-10 h-10 flex items-center justify-center border border-gray-600" title="อัดเสียง">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button id="stop-btn" class="control-btn bg-gray-700 text-gray-400 p-3 rounded-full w-10 h-10 flex items-center justify-center border border-gray-600" disabled title="หยุด">
+                    <i class="fas fa-stop"></i>
+                </button>
+                <button id="play-btn" class="control-btn bg-gray-700 text-green-400 p-3 rounded-full w-10 h-10 flex items-center justify-center border border-gray-600" disabled title="ฟังเสียงที่อัด">
+                    <i class="fas fa-play"></i>
+                </button>
+                <button id="download-btn" class="control-btn bg-gray-700 text-blue-400 p-3 rounded-full w-10 h-10 flex items-center justify-center border border-gray-600" disabled title="ดาวน์โหลด">
+                    <i class="fas fa-download"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Status Indicator -->
+        <div id="status-text" class="text-xs text-gray-400 h-4">พร้อมใช้งาน</div>
+    </div>
+
+    <!-- The Flute Body -->
+    <div class="flex-grow flex items-center justify-center w-full relative my-4">
+        <!-- Flute Pipe -->
+        <div class="wood-texture w-24 md:w-32 h-[95%] flex flex-col items-center justify-evenly py-6 border-x-4 border-black/30 shadow-2xl relative">
+            
+            <!-- Mouthpiece area decoration -->
+            <div class="absolute top-0 w-full h-8 gold-ring rounded-t-3xl"></div>
+            
+            <!-- Holes (Notes) -->
+            <!-- Khlui Kruat Key (Usually Bb) mapping relative to C Major visual for ease of use -->
+            <!-- Freqs: Bb4, C5, D5, Eb5, F5, G5, A5, Bb5 -->
+            
+            <button class="hole w-14 h-14 md:w-16 md:h-16" data-note="Bb5" data-label="ดํ">
+                <span class="text-xl">ดํ</span>
+            </button>
+            <button class="hole w-14 h-14 md:w-16 md:h-16" data-note="A5" data-label="ท">
+                <span class="text-xl">ท</span>
+            </button>
+            <button class="hole w-14 h-14 md:w-16 md:h-16" data-note="G5" data-label="ล">
+                <span class="text-xl">ล</span>
+            </button>
+            <button class="hole w-14 h-14 md:w-16 md:h-16" data-note="F5" data-label="ซ">
+                <span class="text-xl">ซ</span>
+            </button>
+            <button class="hole w-14 h-14 md:w-16 md:h-16" data-note="Eb5" data-label="ฟ">
+                <span class="text-xl">ฟ</span>
+            </button>
+            <button class="hole w-14 h-14 md:w-16 md:h-16" data-note="D5" data-label="ม">
+                <span class="text-xl">ม</span>
+            </button>
+            <button class="hole w-14 h-14 md:w-16 md:h-16" data-note="C5" data-label="ร">
+                <span class="text-xl">ร</span>
+            </button>
+            <button class="hole w-14 h-14 md:w-16 md:h-16" data-note="Bb4" data-label="ด">
+                <span class="text-xl">ด</span>
+            </button>
+
+            <!-- Bottom decoration -->
+            <div class="absolute bottom-4 w-full h-4 bg-yellow-900 opacity-50"></div>
+        </div>
+    </div>
+
+    <div class="text-gray-500 text-xs mb-2">กดค้างเพื่อลากเสียงยาว • ปล่อยเพื่อหยุด</div>
+
+    <script>
+        // --- Configuration ---
+        // Frequencies for Khlui Kruat (approx Key of Bb)
+        // Authentic Thai tuning is equidistant 7-tone, but here we use Western Equal Temperament
+        // for better compatibility with modern ears/browsers, transposed to Bb.
+        const NOTE_FREQUENCIES = {
+            'Bb4': 466.16, // Low Do
+            'C5':  523.25, // Re
+            'D5':  587.33, // Mi
+            'Eb5': 622.25, // Fa
+            'F5':  698.46, // Sol
+            'G5':  783.99, // La
+            'A5':  880.00, // Ti
+            'Bb5': 932.33  // High Do
+        };
+
+        let audioCtx;
+        let masterGain;
+        let mediaRecorder;
+        let audioChunks = [];
+        let dest; // MediaStreamDestination for recording
+        let activeOscillators = {}; // Keep track of playing notes
+        let isRecording = false;
+        let audioBlob = null;
+        let audioUrl = null;
+        let playbackAudio = new Audio();
+
+        // DOM Elements
+        const startOverlay = document.getElementById('start-overlay');
+        const startBtn = document.getElementById('start-btn');
+        const statusText = document.getElementById('status-text');
+        const holes = document.querySelectorAll('.hole');
+        const recordBtn = document.getElementById('record-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const playBtn = document.getElementById('play-btn');
+        const downloadBtn = document.getElementById('download-btn');
+
+        // --- Audio Engine ---
+        
+        async function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // Master Gain (Volume Control)
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.4; // Prevent clipping
+                
+                // Create Destination for Recorder
+                dest = audioCtx.createMediaStreamDestination();
+                
+                // Connect Master to both Speakers and Recorder
+                masterGain.connect(audioCtx.destination);
+                masterGain.connect(dest);
+            }
+            if (audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+            }
+        }
+
+        function playNote(noteKey) {
+            if (!audioCtx) return;
+            if (activeOscillators[noteKey]) return; // Already playing
+
+            const freq = NOTE_FREQUENCIES[noteKey];
+            const now = audioCtx.currentTime;
+
+            // 1. Oscillator (The Sound Source) - Triangle is good for woodwinds
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine'; // Sine is smoother, more flute-like base
+            osc.frequency.setValueAtTime(freq, now);
+
+            // 2. Harmonics (Secondary Oscillator for richness)
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'triangle';
+            osc2.frequency.setValueAtTime(freq, now);
+            
+            // 3. Vibrato (LFO - Low Frequency Oscillator)
+            const lfo = audioCtx.createOscillator();
+            lfo.type = 'sine';
+            lfo.frequency.value = 5; // 5Hz vibrato
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = 3; // Depth of vibrato
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+            lfoGain.connect(osc2.frequency);
+
+            // 4. Envelope (Attack/Decay)
+            const noteGain = audioCtx.createGain();
+            noteGain.gain.setValueAtTime(0, now);
+            // Attack: rapid breath in
+            noteGain.gain.linearRampToValueAtTime(0.8, now + 0.05); 
+            // Decay/Sustain
+            noteGain.gain.exponentialRampToValueAtTime(0.6, now + 0.2);
+
+            const harmonicGain = audioCtx.createGain();
+            harmonicGain.gain.value = 0.15; // Lower volume for harmonic
+
+            // Connect Graph
+            osc.connect(noteGain);
+            osc2.connect(harmonicGain);
+            harmonicGain.connect(noteGain);
+            noteGain.connect(masterGain);
+
+            // Start
+            osc.start(now);
+            osc2.start(now);
+            lfo.start(now);
+
+            // Store ref to stop later
+            activeOscillators[noteKey] = {
+                osc, osc2, lfo, noteGain
+            };
+        }
+
+        function stopNote(noteKey) {
+            if (!activeOscillators[noteKey]) return;
+
+            const { osc, osc2, lfo, noteGain } = activeOscillators[noteKey];
+            const now = audioCtx.currentTime;
+
+            // Release envelope (fade out)
+            const release = 0.15;
+            noteGain.gain.cancelScheduledValues(now);
+            noteGain.gain.setValueAtTime(noteGain.gain.value, now);
+            noteGain.gain.exponentialRampToValueAtTime(0.001, now + release);
+
+            // Stop oscillators after fade out
+            osc.stop(now + release);
+            osc2.stop(now + release);
+            lfo.stop(now + release);
+
+            setTimeout(() => {
+                // Garbage collection simulation
+                osc.disconnect();
+                osc2.disconnect();
+                lfo.disconnect();
+                noteGain.disconnect();
+            }, release * 1000 + 100);
+
+            delete activeOscillators[noteKey];
+        }
+
+        // --- Interaction Handlers ---
+
+        function handleNoteStart(e) {
+            e.preventDefault(); // Prevent scrolling/selecting
+            const btn = e.currentTarget;
+            const note = btn.dataset.note;
+            btn.classList.add('active');
+            playNote(note);
+        }
+
+        function handleNoteEnd(e) {
+            e.preventDefault();
+            const btn = e.currentTarget;
+            const note = btn.dataset.note;
+            btn.classList.remove('active');
+            stopNote(note);
+        }
+
+        // Touch support tweaks for sliding fingers (Advanced)
+        // For simplicity in this version, we stick to discrete taps which is more stable across devices.
+
+        holes.forEach(hole => {
+            // Mouse
+            hole.addEventListener('mousedown', handleNoteStart);
+            hole.addEventListener('mouseup', handleNoteEnd);
+            hole.addEventListener('mouseleave', handleNoteEnd);
+
+            // Touch
+            hole.addEventListener('touchstart', handleNoteStart, {passive: false});
+            hole.addEventListener('touchend', handleNoteEnd, {passive: false});
+            hole.addEventListener('touchcancel', handleNoteEnd, {passive: false});
+        });
+
+        startBtn.addEventListener('click', async () => {
+            await initAudio();
+            startOverlay.style.opacity = '0';
+            setTimeout(() => {
+                startOverlay.style.display = 'none';
+            }, 500);
+        });
+
+        // --- Recording Logic ---
+
+        recordBtn.addEventListener('click', () => {
+            if (!audioCtx) return;
+            
+            // Cleanup previous
+            audioChunks = [];
+            if(audioUrl) URL.revokeObjectURL(audioUrl);
+            playBtn.disabled = true;
+            downloadBtn.disabled = true;
+
+            const stream = dest.stream;
+            mediaRecorder = new MediaRecorder(stream);
+
+            mediaRecorder.ondataavailable = (e) => {
+                audioChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const blobType = mediaRecorder.mimeType || 'audio/webm';
+                audioBlob = new Blob(audioChunks, { type: blobType });
+                audioUrl = URL.createObjectURL(audioBlob);
+                
+                playBtn.disabled = false;
+                downloadBtn.disabled = false;
+                playBtn.classList.remove('text-gray-400');
+                downloadBtn.classList.remove('text-gray-400');
+                
+                statusText.innerText = "บันทึกเสร็จสิ้น พร้อมเล่นหรือดาวน์โหลด";
+                statusText.className = "text-green-400 text-xs h-4";
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            
+            // UI Updates
+            recordBtn.classList.add('recording-pulse', 'bg-red-900', 'text-white');
+            recordBtn.disabled = true;
+            stopBtn.disabled = false;
+            stopBtn.classList.remove('text-gray-400');
+            stopBtn.classList.add('text-white');
+            
+            statusText.innerText = "กำลังบันทึกเสียง...";
+            statusText.className = "text-red-400 text-xs h-4 animate-pulse";
+        });
+
+        stopBtn.addEventListener('click', () => {
+            if (isRecording && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                isRecording = false;
+
+                // UI Updates
+                recordBtn.classList.remove('recording-pulse', 'bg-red-900', 'text-white');
+                recordBtn.disabled = false;
+                stopBtn.disabled = true;
+                stopBtn.classList.add('text-gray-400');
+            }
+            // Also stop playback if playing
+            if (!playbackAudio.paused) {
+                playbackAudio.pause();
+                playbackAudio.currentTime = 0;
+            }
+        });
+
+        playBtn.addEventListener('click', () => {
+            if (audioUrl) {
+                playbackAudio.src = audioUrl;
+                playbackAudio.play();
+                statusText.innerText = "กำลังเล่นเสียงที่บันทึก...";
+                
+                playbackAudio.onended = () => {
+                    statusText.innerText = "เล่นจบแล้ว";
+                };
+            }
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            if (audioUrl) {
+                const a = document.createElement('a');
+                a.href = audioUrl;
+                const extension = (mediaRecorder.mimeType.includes('wav')) ? 'wav' : 'webm';
+                a.download = `khlui-recording-${new Date().getTime()}.${extension}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                statusText.innerText = "ดาวน์โหลดเรียบร้อย";
+            }
+        });
+
+    </script>
+</body>
+</html>

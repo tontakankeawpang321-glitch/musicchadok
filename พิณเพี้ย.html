@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>พิณเพียะล้านนาจำลอง (Lanna Phin Phia)</title>
+    <style>
+        /* CSS Reset & Basic Setup */
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* ป้องกันการเลื่อน */
+            background-color: #1a0f0a; /* สีพื้นหลังไม้เข้ม */
+            font-family: 'Sarabun', sans-serif;
+            color: #e0d0b0;
+            display: flex;
+            flex-direction: column;
+            touch-action: none; /* ป้องกัน gesture ของ browser */
+        }
+
+        /* Background Pattern (Wood Texture Simulation) */
+        .wood-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%),
+                repeating-linear-gradient(45deg, #3e2723 0, #3e2723 10px, #2d1b16 10px, #2d1b16 20px);
+            z-index: -1;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.4);
+            border-bottom: 2px solid #8d6e63;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            letter-spacing: 1px;
+            color: #ffecb3;
+            text-shadow: 1px 1px 2px black;
+        }
+
+        /* Main Instrument Area */
+        #instrument-container {
+            flex-grow: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            perspective: 1000px;
+        }
+
+        /* The Resonator (Coconut Shell) */
+        .resonator {
+            position: absolute;
+            width: 280px;
+            height: 280px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #5d4037, #261612);
+            box-shadow: 
+                inset -10px -10px 30px rgba(0,0,0,0.8),
+                0 10px 20px rgba(0,0,0,0.5);
+            border: 4px solid #3e2723;
+            z-index: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Decorative Gold Pattern on Resonator */
+        .resonator::after {
+            content: '';
+            width: 80%;
+            height: 80%;
+            border-radius: 50%;
+            border: 2px dashed #8d6e63;
+            opacity: 0.3;
+        }
+
+        /* Bridge Area */
+        .bridge {
+            position: absolute;
+            bottom: 20%;
+            width: 160px;
+            height: 30px;
+            background: linear-gradient(to bottom, #8d6e63, #3e2723);
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            z-index: 1;
+        }
+
+        /* Strings Container */
+        .strings-layer {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            justify-content: space-around;
+            padding: 20px 40px;
+            z-index: 5;
+        }
+
+        /* Individual String */
+        .string-col {
+            position: relative;
+            height: 100%;
+            width: 60px; /* Touch target size */
+            display: flex;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .string-line {
+            width: 3px;
+            height: 100%;
+            background: linear-gradient(to right, #cfd8dc, #b0bec5, #78909c); /* Metallic look */
+            box-shadow: 1px 0 2px rgba(0,0,0,0.5);
+            transition: transform 0.05s ease;
+        }
+
+        /* String vibration animation */
+        .vibrating {
+            animation: vibrate 0.2s infinite linear;
+        }
+
+        @keyframes vibrate {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(2px); }
+            50% { transform: translateX(-2px); }
+            75% { transform: translateX(1px); }
+            100% { transform: translateX(0); }
+        }
+
+        /* Note Badge */
+        .note-badge {
+            position: absolute;
+            top: 40%;
+            background: rgba(255, 236, 179, 0.9);
+            color: #3e2723;
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 50%;
+            font-size: 1rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        .show-notes .note-badge {
+            opacity: 1;
+        }
+
+        /* Controls Area */
+        #controls {
+            background: rgba(30, 20, 15, 0.95);
+            padding: 15px 10px 25px 10px; /* Extra padding bottom for iPhone home bar */
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            border-top: 1px solid #5d4037;
+            flex-shrink: 0;
+            z-index: 20;
+        }
+
+        .btn {
+            background: #4e342e;
+            border: 1px solid #8d6e63;
+            color: #ffecb3;
+            padding: 10px 15px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            min-width: 65px;
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+            background: #3e2723;
+        }
+
+        .btn.active {
+            background: #ff6f00;
+            color: white;
+            border-color: #ffca28;
+            box-shadow: 0 0 8px rgba(255, 111, 0, 0.6);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            filter: grayscale(1);
+        }
+
+        .icon {
+            font-size: 1.5rem;
+            margin-bottom: 2px;
+        }
+
+        /* Status Indicator */
+        #status-bar {
+            position: absolute;
+            top: 60px;
+            width: 100%;
+            text-align: center;
+            pointer-events: none;
+            z-index: 15;
+        }
+
+        .status-msg {
+            display: inline-block;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            color: #81c784;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="wood-bg"></div>
+
+    <header>
+        <h1>พิณเพียะ (Phin Phia)</h1>
+    </header>
+
+    <div id="status-bar"><span id="msg" class="status-msg">พร้อมใช้งาน</span></div>
+
+    <div id="instrument-container">
+        <!-- Resonator Graphic -->
+        <div class="resonator">
+            <div class="bridge"></div>
+        </div>
+
+        <!-- Strings -->
+        <div class="strings-layer" id="strings-layer">
+            <!-- Strings will be generated by JS or defined here -->
+            <div class="string-col" data-note="G2" data-freq="98.00">
+                <div class="string-line" style="width: 4px;"></div>
+                <div class="note-badge">ซอลฺ</div>
+            </div>
+            <div class="string-col" data-note="C3" data-freq="130.81">
+                <div class="string-line" style="width: 3.5px;"></div>
+                <div class="note-badge">โด</div>
+            </div>
+            <div class="string-col" data-note="E3" data-freq="164.81">
+                <div class="string-line" style="width: 3px;"></div>
+                <div class="note-badge">มี</div>
+            </div>
+            <div class="string-col" data-note="G3" data-freq="196.00">
+                <div class="string-line" style="width: 2.5px;"></div>
+                <div class="note-badge">ซอล</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button class="btn" id="btn-notes">
+            <span class="icon">🎵</span>
+            <span>โน้ต</span>
+        </button>
+        <button class="btn" id="btn-record">
+            <span class="icon">🔴</span>
+            <span id="txt-record">อัดเสียง</span>
+        </button>
+        <button class="btn" id="btn-play" disabled>
+            <span class="icon">▶️</span>
+            <span>เล่น</span>
+        </button>
+        <button class="btn" id="btn-download" disabled>
+            <span class="icon">⬇️</span>
+            <span>โหลด</span>
+        </button>
+    </div>
+
+    <script>
+        /**
+         * Phin Phia Simulator Logic
+         * - Audio Synthesis: Uses Web Audio API (Oscillators + Filters) to mimic a brass string.
+         * - Interaction: Touch/Click events mapped to strings.
+         * - Recording: MediaRecorder API.
+         */
+
+        // --- Audio Engine ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        let masterGain;
+        let reverbNode;
+        let mediaStreamDest; // For recording
+        
+        // Setup Audio Context (must be triggered by user interaction first)
+        function initAudio() {
+            if (audioCtx) return;
+            
+            audioCtx = new AudioContext();
+            
+            // Create Master Gain
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.8;
+
+            // Create Reverb (Convolution Reverb or simple Delay for 'Gourd' effect)
+            // Using a simple delay/feedback network for metal/gourd resonance
+            reverbNode = audioCtx.createConvolver();
+            // Create an impulse response for reverb (synthetic)
+            const rate = audioCtx.sampleRate;
+            const length = rate * 2.0; // 2 seconds
+            const decay = 2.0;
+            const impulse = audioCtx.createBuffer(2, length, rate);
+            const impulseL = impulse.getChannelData(0);
+            const impulseR = impulse.getChannelData(1);
+            for (let i = 0; i < length; i++) {
+                const n = length - i;
+                // Add some metallic ring to the reverb
+                impulseL[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+                impulseR[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+            }
+            reverbNode.buffer = impulse;
+
+            // Wet/Dry mix
+            const reverbGain = audioCtx.createGain();
+            reverbGain.gain.value = 0.4; // Amount of reverb
+
+            // Wiring
+            // Sources -> MasterGain -> Destination
+            // Sources -> Reverb -> MasterGain
+            
+            // Setup Recording Destination
+            mediaStreamDest = audioCtx.createMediaStreamDestination();
+            
+            masterGain.connect(audioCtx.destination);
+            masterGain.connect(mediaStreamDest); // Route master to recorder
+            reverbNode.connect(masterGain); 
+        }
+
+        // Play Tone Function (Physical Modeling-ish)
+        function playStringSound(freq) {
+            if (!audioCtx) initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const t = audioCtx.currentTime;
+
+            // 1. The Fundamental Tone (Sine/Triangle mix for warmth)
+            const osc = audioCtx.createOscillator();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, t);
+
+            // 2. The "Buzz" (Sawtooth for metallic string zing)
+            const oscBuzz = audioCtx.createOscillator();
+            oscBuzz.type = 'sawtooth';
+            oscBuzz.frequency.setValueAtTime(freq, t);
+            // Detune slightly for realism
+            oscBuzz.detune.setValueAtTime(5, t); 
+
+            // Envelopes
+            const gainNode = audioCtx.createGain();
+            const gainBuzz = audioCtx.createGain();
+
+            // Pluck Attack
+            gainNode.gain.setValueAtTime(0, t);
+            gainNode.gain.linearRampToValueAtTime(0.7, t + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, t + 2.5); // Long sustain like Phia
+
+            gainBuzz.gain.setValueAtTime(0, t);
+            gainBuzz.gain.linearRampToValueAtTime(0.3, t + 0.01);
+            gainBuzz.gain.exponentialRampToValueAtTime(0.001, t + 0.5); // Buzz dies quicker
+
+            // Filter (Lowpass to dampen the pluck)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(3000, t);
+            filter.frequency.exponentialRampToValueAtTime(500, t + 0.2); // "Wah" effect of pluck
+
+            // Connections
+            osc.connect(gainNode);
+            oscBuzz.connect(gainBuzz);
+
+            gainNode.connect(filter);
+            gainBuzz.connect(filter);
+
+            filter.connect(masterGain);
+            filter.connect(reverbNode); // Send to reverb
+
+            // Start/Stop
+            osc.start(t);
+            oscBuzz.start(t);
+            osc.stop(t + 3);
+            oscBuzz.stop(t + 3);
+
+            // Cleanup
+            setTimeout(() => {
+                osc.disconnect();
+                oscBuzz.disconnect();
+                gainNode.disconnect();
+                gainBuzz.disconnect();
+                filter.disconnect();
+            }, 3000);
+        }
+
+
+        // --- UI & Interaction Logic ---
+        const strings = document.querySelectorAll('.string-col');
+        const container = document.getElementById('strings-layer');
+        const btnNotes = document.getElementById('btn-notes');
+        const statusMsg = document.getElementById('msg');
+        
+        let showNotes = false;
+
+        // Show toast message
+        function showMessage(text) {
+            statusMsg.textContent = text;
+            statusMsg.style.opacity = 1;
+            setTimeout(() => statusMsg.style.opacity = 0, 2000);
+        }
+
+        // Handle Input (Touch & Mouse)
+        function triggerString(element) {
+            const freq = parseFloat(element.getAttribute('data-freq'));
+            const line = element.querySelector('.string-line');
+
+            // Audio
+            playStringSound(freq);
+
+            // Visual
+            line.classList.remove('vibrating');
+            void line.offsetWidth; // Trigger reflow
+            line.classList.add('vibrating');
+
+            // Haptic (if supported)
+            if (navigator.vibrate) navigator.vibrate(15);
+        }
+
+        strings.forEach(str => {
+            // Touch start is faster than click on mobile
+            str.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // Prevent scroll/zoom
+                triggerString(str);
+            }, { passive: false });
+
+            // Mouse fallback
+            str.addEventListener('mousedown', (e) => {
+                triggerString(str);
+            });
+        });
+
+        // Toggle Notes
+        btnNotes.addEventListener('click', () => {
+            showNotes = !showNotes;
+            if(showNotes) {
+                container.classList.add('show-notes');
+                btnNotes.classList.add('active');
+            } else {
+                container.classList.remove('show-notes');
+                btnNotes.classList.remove('active');
+            }
+        });
+
+
+        // --- Recording Logic ---
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob;
+        let isRecording = false;
+
+        const btnRecord = document.getElementById('btn-record');
+        const txtRecord = document.getElementById('txt-record');
+        const btnPlay = document.getElementById('btn-play');
+        const btnDownload = document.getElementById('btn-download');
+        let recordedAudio = new Audio();
+
+        btnRecord.addEventListener('click', () => {
+            if (!audioCtx) initAudio();
+
+            if (!isRecording) {
+                // Start Recording
+                startRecording();
+            } else {
+                // Stop Recording
+                stopRecording();
+            }
+        });
+
+        function startRecording() {
+            // Check Audio Context state
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            
+            // Reset existing
+            audioChunks = [];
+            
+            // Determine mimeType
+            let options = { mimeType: 'audio/webm' };
+            if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                options = { mimeType: 'audio/mp4' }; // Safari fallback
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(mediaStreamDest.stream, options);
+            } catch (e) {
+                alert('อุปกรณ์ของคุณไม่รองรับการบันทึกเสียงนี้');
+                return;
+            }
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                recordedAudio.src = audioUrl;
+                
+                // Enable buttons
+                btnPlay.disabled = false;
+                btnDownload.disabled = false;
+                showMessage("บันทึกเสร็จสิ้น");
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            btnRecord.classList.add('active');
+            txtRecord.textContent = "หยุดอัด";
+            btnPlay.disabled = true;
+            btnDownload.disabled = true;
+            showMessage("กำลังบันทึก...");
+        }
+
+        function stopRecording() {
+            mediaRecorder.stop();
+            isRecording = false;
+            btnRecord.classList.remove('active');
+            txtRecord.textContent = "อัดเสียง";
+        }
+
+        // Playback Recorded Audio
+        btnPlay.addEventListener('click', () => {
+            if (audioBlob) {
+                recordedAudio.play();
+                btnPlay.classList.add('active');
+                recordedAudio.onended = () => btnPlay.classList.remove('active');
+            }
+        });
+
+        // Download
+        btnDownload.addEventListener('click', () => {
+            if (audioBlob) {
+                const url = URL.createObjectURL(audioBlob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                // Generate filename with timestamp
+                const date = new Date();
+                const ts = `${date.getHours()}${date.getMinutes()}`;
+                a.download = `phin-phia-${ts}.webm`;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+            }
+        });
+
+        // Initialize Audio Context on first click anywhere (Browser Policy)
+        document.body.addEventListener('click', () => {
+            if(!audioCtx) initAudio();
+        }, { once: true });
+        
+        document.body.addEventListener('touchstart', () => {
+            if(!audioCtx) initAudio();
+        }, { once: true });
+
+    </script>
+</body>
+</html>

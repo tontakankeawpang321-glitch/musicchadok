@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ฆ้องคู่เสมือนจริง (Khong Khu Virtual)</title>
+    <style>
+        /* Reset & Layout */
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none; /* ป้องกันการเลื่อน/ซูม */
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* ไม่ให้ล้นขอบ */
+            background-color: #1a1510; /* สีพื้นหลังมืด */
+            font-family: 'Sarabun', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Container หลัก */
+        #app-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle, #2c2520 0%, #000000 100%);
+        }
+
+        /* ตัวรางฆ้อง (The Frame) */
+        .khong-frame {
+            position: relative;
+            width: 90vw;
+            max-width: 600px; /* จำกัดความกว้างบนจอใหญ่ */
+            height: 50vh; /* ใช้ความสูงครึ่งจอ */
+            background:  linear-gradient(90deg, #5d4037 0%, #8d6e63 50%, #5d4037 100%);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7), inset 0 0 20px rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 20px;
+            border: 4px solid #3e2723;
+        }
+
+        /* ลายไม้ (Texture overlay) */
+        .khong-frame::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 2px, transparent 2px, transparent 10px);
+            pointer-events: none;
+            border-radius: 10px;
+        }
+
+        /* ลูกฆ้อง (The Gongs) */
+        .gong-wrapper {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .gong {
+            position: relative;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #ffd700, #b8860b, #553e00);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.6), inset 0 0 10px rgba(0,0,0,0.8);
+            cursor: pointer;
+            transition: transform 0.05s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        /* ขนาดฆ้องตามหน้าจอ */
+        .gong-large {
+            width: 35vmin;
+            height: 35vmin;
+            max-width: 220px;
+            max-height: 220px;
+        }
+
+        .gong-small {
+            width: 30vmin;
+            height: 30vmin;
+            max-width: 190px;
+            max-height: 190px;
+        }
+
+        /* ปุ่มนูนกลางฆ้อง (The Nipple/Boss) */
+        .gong-boss {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #ffdf00, #cd853f, #3e2723);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            width: 25%;
+            height: 25%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 1px solid rgba(0,0,0,0.2);
+        }
+
+        /* วงแหวนรอบฆ้อง */
+        .gong::after {
+            content: '';
+            position: absolute;
+            width: 70%;
+            height: 70%;
+            border-radius: 50%;
+            border: 2px solid rgba(62, 39, 35, 0.3);
+            pointer-events: none;
+        }
+
+        /* Animation ตอนตี */
+        .gong:active, .gong.hit {
+            transform: scale(0.95);
+            filter: brightness(1.1);
+        }
+
+        /* ตัวโน้ต */
+        .note-label {
+            position: absolute;
+            color: #3e2723;
+            font-weight: bold;
+            font-size: 1.5rem;
+            opacity: 0; /* ซ่อนเป็นค่าเริ่มต้น */
+            transition: opacity 0.3s;
+            pointer-events: none;
+            text-shadow: 0 1px 1px rgba(255,255,255,0.5);
+        }
+
+        .gong-wrapper.show-notes .note-label {
+            opacity: 1;
+        }
+
+        /* แผงควบคุม (Control Panel) */
+        .controls {
+            margin-top: 30px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 90%;
+            z-index: 20;
+        }
+
+        button {
+            background: #4e342e;
+            color: #ffd700;
+            border: 2px solid #8d6e63;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            font-family: 'Sarabun', sans-serif;
+            transition: all 0.2s;
+            outline: none;
+            min-width: 44px; /* รองรับนิ้วมือ */
+        }
+
+        button:active {
+            transform: translateY(2px);
+            background: #3e2723;
+        }
+
+        button.active {
+            background: #b71c1c; /* สีแดงเมื่ออัดเสียง */
+            color: white;
+            border-color: red;
+            animation: pulse 1.5s infinite;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(100%);
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+        }
+
+        .status-text {
+            position: absolute;
+            top: 20px;
+            color: #ffd700;
+            font-size: 0.9rem;
+            text-shadow: 0 2px 4px black;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <div class="status-text" id="statusDisplay">พร้อมใช้งาน (กดที่ฆ้องเพื่อเริ่ม)</div>
+
+        <!-- รางฆ้อง -->
+        <div class="khong-frame">
+            <!-- ฆ้องลูกใหญ่ (เสียงต่ำ) -->
+            <div class="gong-wrapper" id="wrapper-low">
+                <div class="gong gong-large" id="gong-low" data-note="low">
+                    <div class="gong-boss">
+                        <span class="note-label">ทุ้ม</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ฆ้องลูกเล็ก (เสียงสูง) -->
+            <div class="gong-wrapper" id="wrapper-high">
+                <div class="gong gong-small" id="gong-high" data-note="high">
+                    <div class="gong-boss">
+                        <span class="note-label">แหลม</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ปุ่มควบคุม -->
+        <div class="controls">
+            <button id="btn-toggle-notes">แสดงโน้ต</button>
+            <button id="btn-record">อัดเสียง</button>
+            <button id="btn-stop" disabled>หยุด</button>
+            <button id="btn-play" disabled>เล่นเสียงที่อัด</button>
+            <button id="btn-download" disabled>ดาวน์โหลด</button>
+        </div>
+    </div>
+
+    <script>
+        // --- ส่วนจัดการ Audio Context (Web Audio API) ---
+        // เราใช้การสังเคราะห์เสียง (Synthesis) เพื่อความเสถียร ไม่ต้องรอโหลดไฟล์ และปรับแต่งเสียงได้สมจริง
+        
+        let audioCtx;
+        let masterGain;
+        let dest; // MediaStreamDestination สำหรับการอัดเสียง
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordedBlob = null;
+        let recordedAudio = null;
+
+        // ค่าความถี่ (Frequency) ของฆ้อง
+        const FREQ_LOW = 200; // เสียงทุ้ม (ประมาณ G3)
+        const FREQ_HIGH = 260; // เสียงแหลม (ประมาณ C4)
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // สร้าง Master Gain เพื่อควบคุมเสียงรวม
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.8;
+                
+                // สร้าง Destination สำหรับ Recorder
+                dest = audioCtx.createMediaStreamDestination();
+                
+                // ต่อ Master -> Speaker และ Master -> Recorder
+                masterGain.connect(audioCtx.destination);
+                masterGain.connect(dest);
+
+                document.getElementById('statusDisplay').innerText = "ระบบเสียงทำงาน";
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // ฟังก์ชันสร้างเสียงฆ้อง (Gong Synthesis)
+        function playGongSound(freq) {
+            if (!audioCtx) initAudio();
+
+            const t = audioCtx.currentTime;
+            
+            // 1. Fundamental Oscillator (เสียงหลัก)
+            const osc1 = audioCtx.createOscillator();
+            const gain1 = audioCtx.createGain();
+            osc1.type = 'sine'; // ฆ้องมีเสียงพื้นฐานเป็น sine
+            osc1.frequency.value = freq;
+            
+            // Envelope (การดัง-เบา)
+            gain1.gain.setValueAtTime(0, t);
+            gain1.gain.linearRampToValueAtTime(1, t + 0.01); // Attack เร็ว
+            gain1.gain.exponentialRampToValueAtTime(0.001, t + 2.5); // Decay ยาวนาน (หางเสียง)
+
+            // 2. Overtone Oscillator (เสียงกังวานโลหะ) - ไม่ลงตัวทางฮาร์มอนิก
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.type = 'triangle'; 
+            osc2.frequency.value = freq * 1.42; // ทำให้เสียงมีความเป็นโลหะ (Unharmonic)
+            
+            gain2.gain.setValueAtTime(0, t);
+            gain2.gain.linearRampToValueAtTime(0.3, t + 0.01);
+            gain2.gain.exponentialRampToValueAtTime(0.001, t + 1.0); // หายไปเร็วกว่าเสียงหลัก
+
+            // 3. Impact Noise (เสียงกระทบไม้)
+            const osc3 = audioCtx.createOscillator();
+            const gain3 = audioCtx.createGain();
+            osc3.type = 'square';
+            osc3.frequency.value = 100;
+            
+            gain3.gain.setValueAtTime(0, t);
+            gain3.gain.linearRampToValueAtTime(0.1, t + 0.005);
+            gain3.gain.exponentialRampToValueAtTime(0.001, t + 0.05); // สั้นมาก
+
+            // เชื่อมต่อ
+            osc1.connect(gain1);
+            osc2.connect(gain2);
+            osc3.connect(gain3);
+
+            gain1.connect(masterGain);
+            gain2.connect(masterGain);
+            gain3.connect(masterGain);
+
+            // เริ่มและหยุด
+            osc1.start(t);
+            osc2.start(t);
+            osc3.start(t);
+
+            osc1.stop(t + 3);
+            osc2.stop(t + 3);
+            osc3.stop(t + 3);
+        }
+
+        // --- ส่วนจัดการ UI และ Interaction ---
+
+        const gongLow = document.getElementById('gong-low');
+        const gongHigh = document.getElementById('gong-high');
+        const wrappers = document.querySelectorAll('.gong-wrapper');
+
+        function triggerGong(element, type) {
+            initAudio(); // ตรวจสอบว่าเปิดเสียงหรือยัง
+            
+            // เล่นเสียง
+            if (type === 'low') playGongSound(FREQ_LOW);
+            else playGongSound(FREQ_HIGH);
+
+            // Animation
+            element.classList.add('hit');
+            setTimeout(() => {
+                element.classList.remove('hit');
+            }, 100);
+        }
+
+        // รองรับทั้ง Mouse และ Touch
+        function addInteraction(element, type) {
+            const handleStart = (e) => {
+                e.preventDefault(); // ป้องกัน double tap zoom
+                triggerGong(element, type);
+            };
+            
+            element.addEventListener('mousedown', handleStart);
+            element.addEventListener('touchstart', handleStart, { passive: false });
+        }
+
+        addInteraction(gongLow, 'low');
+        addInteraction(gongHigh, 'high');
+
+        // ปุ่มแสดงโน้ต
+        let showNotes = false;
+        document.getElementById('btn-toggle-notes').addEventListener('click', () => {
+            showNotes = !showNotes;
+            wrappers.forEach(w => {
+                if(showNotes) w.classList.add('show-notes');
+                else w.classList.remove('show-notes');
+            });
+        });
+
+        // --- ส่วนจัดการการอัดเสียง (Recording Logic) ---
+        
+        const btnRecord = document.getElementById('btn-record');
+        const btnStop = document.getElementById('btn-stop');
+        const btnPlay = document.getElementById('btn-play');
+        const btnDownload = document.getElementById('btn-download');
+        const statusDisplay = document.getElementById('statusDisplay');
+
+        btnRecord.addEventListener('click', () => {
+            initAudio();
+            audioChunks = [];
+            
+            // Browser compatibility check
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+            
+            try {
+                mediaRecorder = new MediaRecorder(dest.stream, { mimeType: mimeType });
+            } catch (e) {
+                // Fallback for Safari/iOS if webm not supported
+                mediaRecorder = new MediaRecorder(dest.stream); 
+            }
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    audioChunks.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const audioUrl = URL.createObjectURL(recordedBlob);
+                recordedAudio = new Audio(audioUrl);
+                
+                statusDisplay.innerText = "บันทึกเสร็จสิ้น";
+                btnPlay.disabled = false;
+                btnDownload.disabled = false;
+                btnRecord.classList.remove('active');
+                btnRecord.disabled = false;
+                btnStop.disabled = true;
+            };
+
+            mediaRecorder.start();
+            statusDisplay.innerText = "กำลังบันทึก... (เล่นฆ้องได้เลย)";
+            btnRecord.classList.add('active');
+            btnRecord.disabled = true;
+            btnStop.disabled = false;
+            btnPlay.disabled = true;
+            btnDownload.disabled = true;
+        });
+
+        btnStop.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+        });
+
+        btnPlay.addEventListener('click', () => {
+            if (recordedAudio) {
+                statusDisplay.innerText = "กำลังเล่นเสียงที่อัด...";
+                recordedAudio.currentTime = 0;
+                recordedAudio.play();
+                recordedAudio.onended = () => {
+                    statusDisplay.innerText = "เล่นจบแล้ว";
+                };
+            }
+        });
+
+        btnDownload.addEventListener('click', () => {
+            if (recordedBlob) {
+                const url = URL.createObjectURL(recordedBlob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'khong_khu_recording.webm';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+            }
+        });
+
+    </script>
+</body>
+</html>

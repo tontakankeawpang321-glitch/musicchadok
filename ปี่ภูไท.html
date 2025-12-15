@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ปี่ภูไทจำลอง (Virtual Phuthai Pi)</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #1a1a1a;
+            color: white;
+            overflow: hidden; /* Prevent scrolling on mobile */
+            touch-action: none; /* Crucial for fast response on touch */
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* Bamboo Texture Effect */
+        .bamboo-bg {
+            background: #d4a35a;
+            background: linear-gradient(90deg, #8b5a2b 0%, #d4a35a 20%, #e6c585 50%, #d4a35a 80%, #8b5a2b 100%);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+            border-radius: 50px;
+            position: relative;
+        }
+        
+        /* Bamboo Joints */
+        .joint {
+            height: 2px;
+            background: rgba(0,0,0,0.3);
+            width: 100%;
+            margin: 15px 0;
+            box-shadow: 0 1px 1px rgba(255,255,255,0.2);
+        }
+
+        .note-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #4a3b2a, #1a150e);
+            border: 4px solid #8b6c42;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.8), 2px 2px 5px rgba(0,0,0,0.4);
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: #d4a35a;
+            text-shadow: 1px 1px 2px black;
+            cursor: pointer;
+            position: relative;
+            z-index: 10;
+        }
+
+        .note-btn:active, .note-btn.active {
+            transform: scale(0.95);
+            background: radial-gradient(circle at 30% 30%, #2a2218, #000000);
+            border-color: #d4a35a;
+            box-shadow: 0 0 15px #d4a35a;
+        }
+
+        /* Glow effect for recording */
+        .recording-pulse {
+            animation: pulse-red 1.5s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+        }
+
+        /* Intro Overlay */
+        #overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-btn {
+            transition: all 0.2s;
+        }
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center">
+
+    <!-- Start Overlay -->
+    <div id="overlay">
+        <div class="text-center p-6">
+            <h1 class="text-4xl text-yellow-500 mb-4 font-bold">ปี่ภูไทจำลอง</h1>
+            <p class="text-gray-300 mb-8">Virtual Phuthai Pi Instrument</p>
+            <button id="startBtn" class="bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-4 px-8 rounded-full text-xl shadow-lg transform transition hover:scale-105">
+                <i class="fas fa-play mr-2"></i> เริ่มเล่น (Start)
+            </button>
+            <p class="mt-4 text-sm text-gray-500">แตะเพื่อเปิดระบบเสียง / Tap to enable audio</p>
+        </div>
+    </div>
+
+    <!-- Header / Controls -->
+    <div class="w-full max-w-md bg-gray-900 p-4 shadow-lg z-20 flex justify-between items-center border-b border-gray-700">
+        <div>
+            <h2 class="text-yellow-500 font-bold text-lg"><i class="fas fa-music mr-2"></i>ปี่ภูไท</h2>
+        </div>
+        <div class="flex gap-2">
+            <button id="recBtn" class="control-btn bg-red-900 hover:bg-red-600 text-white w-10 h-10 rounded-full flex items-center justify-center border border-red-500">
+                <i class="fas fa-circle"></i>
+            </button>
+            <button id="stopBtn" class="control-btn bg-gray-700 text-white w-10 h-10 rounded-full flex items-center justify-center" disabled>
+                <i class="fas fa-stop"></i>
+            </button>
+            <button id="playRecBtn" class="control-btn bg-green-800 hover:bg-green-600 text-white w-10 h-10 rounded-full flex items-center justify-center border border-green-500" disabled>
+                <i class="fas fa-play"></i>
+            </button>
+            <button id="downloadBtn" class="control-btn bg-blue-800 hover:bg-blue-600 text-white w-10 h-10 rounded-full flex items-center justify-center border border-blue-500 hidden">
+                <i class="fas fa-download"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div id="statusText" class="w-full max-w-md bg-black text-center text-xs text-yellow-500 py-1">
+        พร้อมใช้งาน (Ready)
+    </div>
+
+    <!-- Main Instrument Area -->
+    <div class="flex-grow w-full max-w-md relative flex justify-center items-center py-4 overflow-hidden">
+        
+        <!-- Background Decor -->
+        <div class="absolute inset-0 z-0 opacity-20" style="background-image: url('https://www.transparenttextures.com/patterns/woven.png');"></div>
+
+        <!-- The Pipe (Bamboo) -->
+        <div class="bamboo-bg w-24 h-full flex flex-col items-center justify-between py-6 relative z-10 shadow-2xl">
+            
+            <!-- Top Joint -->
+            <div class="joint"></div>
+            
+            <!-- Note Buttons Container -->
+            <div class="flex flex-col gap-3 items-center w-full h-full justify-center" id="noteContainer">
+                <!-- Generated by JS -->
+            </div>
+
+            <!-- Bottom Joint -->
+            <div class="joint"></div>
+            
+            <!-- Bottom Bell -->
+            <div class="w-28 h-12 bg-black rounded-b-full absolute -bottom-6 border-4 border-yellow-700" style="background: radial-gradient(circle, #3a2a1a 0%, #000 100%);"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. Configuration: ใส่ลิงค์ไฟล์เสียงที่นี่ ---
+        // เปลี่ยน 'sounds/xxx.wav' เป็นลิงค์ URL ของไฟล์เสียงจริง
+        const NOTES = [
+            { id: 'C5', label: 'โด (H)', labelEn: 'Do', file: 'ใส่ลิงค์ไฟล์เสียงที่นี่...' },
+            { id: 'B4', label: 'ที', labelEn: 'Ti', file: 'ใส่ลิงค์ไฟล์เสียงที่นี่...' },
+            { id: 'A4', label: 'ลา', labelEn: 'La', file: 'ใส่ลิงค์ไฟล์เสียงที่นี่...' },
+            { id: 'G4', label: 'ซอล', labelEn: 'Sol', file: 'ใส่ลิงค์ไฟล์เสียงที่นี่...' },
+            { id: 'F4', label: 'ฟา', labelEn: 'Fa', file: 'ใส่ลิงค์ไฟล์เสียงที่นี่...' },
+            { id: 'E4', label: 'มี', labelEn: 'Mi', file: 'ใส่ลิงค์ไฟล์เสียงที่นี่...' },
+            { id: 'D4', label: 'เร', labelEn: 'Re', file: 'ใส่ลิงค์ไฟล์เสียงที่นี่...' },
+            { id: 'C4', label: 'โด (L)', labelEn: 'Do', file: 'ใส่ลิงค์ไฟล์เสียงที่นี่...' }
+        ];
+
+        let audioCtx;
+        let masterGain;
+        let destStream; // For recording
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob;
+        let audioUrl;
+        let playbackAudio = new Audio();
+
+        // Audio Buffers (For MP3/WAV)
+        const audioBuffers = {};
+        const activeSources = {}; // Keep track of playing sources to stop them cleanly
+
+        // State
+        let isRecording = false;
+
+        // UI Elements
+        const startBtn = document.getElementById('startBtn');
+        const overlay = document.getElementById('overlay');
+        const statusText = document.getElementById('statusText');
+        const recBtn = document.getElementById('recBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const playRecBtn = document.getElementById('playRecBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const noteContainer = document.getElementById('noteContainer');
+
+        // --- 2. Initialization ---
+
+        startBtn.addEventListener('click', async () => {
+            try {
+                // Initialize Web Audio API
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // Create Master Gain (Volume)
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.8; // Base volume
+                masterGain.connect(audioCtx.destination);
+
+                // Setup Recording Destination
+                destStream = audioCtx.createMediaStreamDestination();
+                masterGain.connect(destStream);
+
+                // Load Sounds IMMEDIATELY on start
+                loadSoundFiles();
+
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.remove(), 500);
+                statusText.innerText = "พร้อมบรรเลง (Ready)";
+                
+                // Unlock audio context on mobile
+                if (audioCtx.state === 'suspended') {
+                    await audioCtx.resume();
+                }
+
+            } catch (e) {
+                alert("Audio init failed: " + e);
+            }
+        });
+
+        // --- 3. Sound Engine (Sample Only) ---
+
+        // Function to load external files
+        async function loadSoundFiles() {
+            NOTES.forEach(note => {
+                if(note.file && note.file !== 'ใส่ลิงค์ไฟล์เสียงที่นี่...') {
+                    fetch(note.file)
+                        .then(response => {
+                            if (!response.ok) throw new Error("HTTP error " + response.status);
+                            return response.arrayBuffer();
+                        })
+                        .then(arrayBuffer => audioCtx.decodeAudioData(arrayBuffer))
+                        .then(audioBuffer => {
+                            audioBuffers[note.id] = audioBuffer;
+                            console.log(`Loaded: ${note.id}`);
+                        })
+                        .catch(e => {
+                            console.log(`Waiting for sound file for ${note.id}... (No sound will play)`);
+                        });
+                }
+            });
+        }
+
+        function playNote(noteId) {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            // Check if we already have a source playing for this note (prevent stacking)
+            if (activeSources[noteId]) return; 
+
+            // Play Sample (WAV/MP3) ONLY if loaded
+            if (audioBuffers[noteId]) {
+                const source = audioCtx.createBufferSource();
+                source.buffer = audioBuffers[noteId];
+                
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime);
+                
+                source.connect(gainNode);
+                gainNode.connect(masterGain);
+                
+                source.start(0);
+                activeSources[noteId] = { source: source, gain: gainNode };
+            } else {
+                // Do nothing if no sound file (Silence)
+                console.log(`Note ${noteId} pressed, but no sound file loaded.`);
+            }
+        }
+
+        function stopNote(noteId) {
+            const active = activeSources[noteId];
+            if (active) {
+                const now = audioCtx.currentTime;
+                
+                // Release envelope (fade out slightly to avoid click)
+                active.gain.gain.cancelScheduledValues(now);
+                active.gain.gain.setValueAtTime(active.gain.gain.value, now);
+                active.gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1); 
+                
+                active.source.stop(now + 0.1);
+
+                // Cleanup after fade out
+                setTimeout(() => {
+                    delete activeSources[noteId];
+                }, 150);
+            }
+        }
+
+        // --- 4. Render UI & Interactions ---
+
+        function createNoteButtons() {
+            NOTES.forEach(note => {
+                const btn = document.createElement('div');
+                btn.className = 'note-btn';
+                btn.innerHTML = `<div>${note.label}<br><span class="text-xs text-yellow-600">${note.labelEn}</span></div>`;
+                btn.dataset.note = note.id;
+
+                // Touch Events (Mobile)
+                btn.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); // Prevent scroll/zoom
+                    btn.classList.add('active');
+                    playNote(note.id);
+                }, { passive: false });
+
+                btn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    btn.classList.remove('active');
+                    stopNote(note.id);
+                });
+
+                // Mouse Events (Desktop)
+                btn.addEventListener('mousedown', () => {
+                    btn.classList.add('active');
+                    playNote(note.id);
+                });
+                
+                btn.addEventListener('mouseup', () => {
+                    btn.classList.remove('active');
+                    stopNote(note.id);
+                });
+                
+                btn.addEventListener('mouseleave', () => {
+                    btn.classList.remove('active');
+                    stopNote(note.id);
+                });
+
+                noteContainer.appendChild(btn);
+            });
+        }
+        
+        createNoteButtons();
+
+        // Keyboard Support
+        const KEY_MAP = {
+            'a': 7, 's': 6, 'd': 5, 'f': 4, 
+            'j': 3, 'k': 2, 'l': 1, ';': 0
+        };
+
+        document.addEventListener('keydown', (e) => {
+            if (KEY_MAP.hasOwnProperty(e.key.toLowerCase())) {
+                const index = KEY_MAP[e.key.toLowerCase()];
+                const note = NOTES[index];
+                const btn = noteContainer.children[index];
+                
+                if (!btn.classList.contains('active')) {
+                    btn.classList.add('active');
+                    playNote(note.id);
+                }
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (KEY_MAP.hasOwnProperty(e.key.toLowerCase())) {
+                const index = KEY_MAP[e.key.toLowerCase()];
+                const note = NOTES[index];
+                const btn = noteContainer.children[index];
+                
+                btn.classList.remove('active');
+                stopNote(note.id);
+            }
+        });
+
+
+        // --- 5. Recording Logic ---
+
+        recBtn.addEventListener('click', () => {
+            if (!audioCtx) return;
+            
+            // Start Recording
+            audioChunks = [];
+            // Supported MIME types check
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+            
+            mediaRecorder = new MediaRecorder(destStream.stream, { mimeType: mimeType });
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(audioChunks, { type: mimeType });
+                audioUrl = URL.createObjectURL(audioBlob);
+                playbackAudio.src = audioUrl;
+                
+                // UI Updates
+                playRecBtn.disabled = false;
+                downloadBtn.classList.remove('hidden');
+                statusText.innerText = "บันทึกเสร็จสิ้น (Recorded)";
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            
+            // UI Updates
+            recBtn.classList.add('recording-pulse');
+            recBtn.disabled = true;
+            stopBtn.disabled = false;
+            playRecBtn.disabled = true;
+            downloadBtn.classList.add('hidden');
+            statusText.innerText = "กำลังบันทึก... (Recording...)";
+        });
+
+        stopBtn.addEventListener('click', () => {
+            if (isRecording && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                isRecording = false;
+                recBtn.classList.remove('recording-pulse');
+                recBtn.disabled = false;
+                stopBtn.disabled = true;
+            } else {
+                playbackAudio.pause();
+                playbackAudio.currentTime = 0;
+            }
+        });
+
+        playRecBtn.addEventListener('click', () => {
+            if (audioUrl) {
+                playbackAudio.play();
+                statusText.innerText = "กำลังเล่นเสียงที่อัด... (Playing)";
+                playbackAudio.onended = () => {
+                    statusText.innerText = "พร้อมบรรเลง (Ready)";
+                };
+            }
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            if (audioUrl) {
+                const a = document.createElement('a');
+                a.href = audioUrl;
+                a.download = `phuthai-pi-rec-${new Date().getTime()}.webm`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        });
+
+    </script>
+</body>
+</html>

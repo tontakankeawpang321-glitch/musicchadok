@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ตะโพนมอญจำลอง (Virtual Taphon Mon)</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        :root {
+            --wood-dark: #3e2723;
+            --wood-light: #5d4037;
+            --skin-color: #d7ccc8;
+            --skin-shadow: #a1887f;
+            --gold: #ffc107;
+            --bg-color: #1a1a1a;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(circle at center, #2c2c2c 0%, #000000 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            font-family: 'Sarabun', sans-serif;
+            overflow: hidden; /* ป้องกันการเลื่อน */
+            touch-action: none; /* ป้องกัน gesture ของ browser */
+        }
+
+        /* Header UI */
+        .header {
+            width: 100%;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            z-index: 10;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(5px);
+        }
+
+        .title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--gold);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        /* Control Panel */
+        .controls {
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn.recording {
+            background: #e53935;
+            border-color: #e53935;
+            animation: pulse 1.5s infinite;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(229, 57, 53, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0); }
+        }
+
+        /* Instrument Container */
+        .instrument-container {
+            flex-grow: 1;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            padding: 20px;
+        }
+
+        /* The Taphon Mon Visuals */
+        .taphon-body {
+            width: 90%;
+            max-width: 600px;
+            height: 280px; /* Base height */
+            background: linear-gradient(90deg, #281812 0%, var(--wood-light) 20%, var(--wood-dark) 50%, var(--wood-light) 80%, #281812 100%);
+            border-radius: 60px / 100px; /* Barrel shape */
+            position: relative;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Decoration: Ropes/Straps */
+        .rope {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: #8d6e63;
+            box-shadow: 1px 0 2px rgba(0,0,0,0.5);
+            z-index: 1;
+        }
+        .rope:nth-child(1) { left: 20%; transform: rotate(-5deg); }
+        .rope:nth-child(2) { left: 35%; transform: rotate(-2deg); }
+        .rope:nth-child(3) { right: 35%; transform: rotate(2deg); }
+        .rope:nth-child(4) { right: 20%; transform: rotate(5deg); }
+
+        /* Drum Heads (Touch Zones) */
+        .drum-head {
+            position: relative;
+            z-index: 5;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, var(--skin-color), var(--skin-shadow));
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5), 5px 0 15px rgba(0,0,0,0.4);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.05s;
+            cursor: pointer;
+            overflow: hidden;
+            /* Border representing the rim/frame */
+            border: 8px solid #3e2723; 
+        }
+
+        .drum-head:active, .drum-head.hit {
+            transform: scale(0.96);
+            filter: brightness(0.9);
+        }
+
+        /* Left Head (Big - Low Pitch) */
+        .head-left {
+            width: 160px;
+            height: 160px;
+            margin-left: -20px; /* Pull out slightly */
+            border-width: 10px;
+        }
+
+        /* Right Head (Small - High Pitch) */
+        .head-right {
+            width: 130px;
+            height: 130px;
+            margin-right: -15px;
+            border-width: 8px;
+        }
+
+        /* Top/Center Body Hit Zone (Rim/Wood) */
+        .body-zone {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            z-index: 6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: rgba(255,255,255,0.5);
+            font-size: 0.8rem;
+        }
+
+        .body-zone:active, .body-zone.hit {
+            background: rgba(255, 215, 0, 0.1);
+            border-color: var(--gold);
+        }
+
+        /* Rice/Paste Mark (Khos) on Left Head */
+        .rice-paste {
+            width: 60px;
+            height: 60px;
+            background: #212121;
+            border-radius: 50%;
+            opacity: 0.8;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        /* Note Labels */
+        .note-label {
+            position: absolute;
+            color: var(--wood-dark);
+            font-weight: bold;
+            font-size: 1.5rem;
+            opacity: 0; /* Hidden by default */
+            transition: opacity 0.3s;
+            pointer-events: none;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+        }
+
+        .show-notes .note-label {
+            opacity: 1;
+        }
+
+        /* Stand legs (Decoration) */
+        .stand-leg {
+            position: absolute;
+            bottom: -40px;
+            width: 20px;
+            height: 60px;
+            background: #2d1e18;
+            z-index: 0;
+        }
+        .leg-left { left: 20%; transform: rotate(15deg); }
+        .leg-right { right: 20%; transform: rotate(-15deg); }
+
+        /* Audio Player */
+        #audioPlayer {
+            display: none;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        /* Footer/Help */
+        .footer {
+            padding: 10px;
+            color: #666;
+            font-size: 0.8rem;
+            text-align: center;
+        }
+
+        /* Landscape adjustments for Mobile */
+        @media (orientation: landscape) and (max-height: 500px) {
+            .taphon-body {
+                height: 70vh;
+                max-width: 80vw;
+            }
+            .head-left { width: 35vh; height: 35vh; }
+            .head-right { width: 28vh; height: 28vh; }
+            .header { padding: 5px 20px; }
+            .title { font-size: 1rem; }
+        }
+
+        /* Ripple Effect on Click */
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.4);
+            transform: scale(0);
+            animation: ripple-anim 0.4s linear;
+            pointer-events: none;
+        }
+
+        @keyframes ripple-anim {
+            to {
+                transform: scale(2.5);
+                opacity: 0;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="title"><i class="fas fa-drum"></i> ตะโพนมอญ</div>
+        <div class="controls">
+            <button class="btn" id="btnNote" onclick="toggleNotes()">
+                <i class="fas fa-music"></i> <span style="display:none" class="desktop-text">โน้ต</span>
+            </button>
+            <button class="btn" id="btnRecord" onclick="toggleRecord()">
+                <i class="fas fa-microphone"></i>
+            </button>
+            <button class="btn" id="btnPlay" disabled onclick="playRecording()">
+                <i class="fas fa-play"></i>
+            </button>
+            <button class="btn" id="btnDownload" disabled onclick="downloadRecording()">
+                <i class="fas fa-download"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="instrument-container">
+        <!-- Stand Legs -->
+        <div style="position: relative; width: 100%; max-width: 600px; display: flex; justify-content: center;">
+            <div class="stand-leg leg-left"></div>
+            <div class="stand-leg leg-right"></div>
+            
+            <!-- Drum Body -->
+            <div class="taphon-body">
+                <!-- Ropes -->
+                <div class="rope"></div>
+                <div class="rope"></div>
+                <div class="rope"></div>
+                <div class="rope"></div>
+
+                <!-- Left Head (Big) -->
+                <div class="drum-head head-left" id="headLeft" data-sound="low">
+                    <div class="rice-paste"></div>
+                    <span class="note-label">เทิง</span>
+                </div>
+
+                <!-- Body Tap Zone (Rim) -->
+                <div class="body-zone" id="bodyZone" data-sound="rim">
+                    <span>ขอบ/เกราะ</span>
+                </div>
+
+                <!-- Right Head (Small) -->
+                <div class="drum-head head-right" id="headRight" data-sound="high">
+                    <span class="note-label">ติง</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        แนะนำ: ใช้แนวนอนเพื่อประสบการณ์ที่ดีที่สุด | แตะเพื่อเล่น
+    </div>
+
+    <script>
+        // --- Audio Engine (Web Audio API) ---
+        let audioCtx;
+        let dest; // Destination for recording
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob;
+        let audioUrl;
+        let isRecording = false;
+        let isInitialized = false;
+
+        // Sound Parameters
+        const Sounds = {
+            low: { freq: 75, decay: 0.6, type: 'sine', punch: 150 },   // เทิง (หน้าใหญ่)
+            high: { freq: 180, decay: 0.3, type: 'triangle', punch: 50 }, // ติง (หน้าเล็ก)
+            rim: { freq: 400, decay: 0.1, type: 'square', punch: 20 }     // ขอบ/เกราะ
+        };
+
+        function initAudio() {
+            if (isInitialized) return;
+            
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            
+            // Create a MediaStreamDestination for recording
+            dest = audioCtx.createMediaStreamDestination();
+            
+            isInitialized = true;
+            console.log("Audio Context Initialized");
+        }
+
+        function playSound(type) {
+            if (!isInitialized) initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const params = Sounds[type];
+            const t = audioCtx.currentTime;
+
+            // 1. Main Tone (Oscillator)
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = params.type;
+            
+            // Pitch Envelope (Simulate skin tension drop)
+            osc.frequency.setValueAtTime(params.freq + params.punch, t);
+            osc.frequency.exponentialRampToValueAtTime(params.freq, t + 0.1);
+
+            // Amplitude Envelope
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(1, t + 0.01); // Attack
+            gain.gain.exponentialRampToValueAtTime(0.01, t + params.decay); // Decay
+
+            // 2. Impact Noise (Snap)
+            const noiseBufferSize = audioCtx.sampleRate * 0.05; // 50ms noise
+            const noiseBuffer = audioCtx.createBuffer(1, noiseBufferSize, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < noiseBufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            const noiseSrc = audioCtx.createBufferSource();
+            noiseSrc.buffer = noiseBuffer;
+            const noiseGain = audioCtx.createGain();
+            
+            // Noise Envelope
+            noiseGain.gain.setValueAtTime(0.5, t);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+
+            // Filter for noise
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'lowpass';
+            noiseFilter.frequency.value = 1000;
+
+            // Connections
+            // Connect to speakers (context.destination) AND recorder (dest)
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            gain.connect(dest);
+
+            noiseSrc.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+            noiseGain.connect(dest);
+
+            // Start & Stop
+            osc.start(t);
+            osc.stop(t + params.decay + 0.1);
+            noiseSrc.start(t);
+        }
+
+        // --- Interaction Logic ---
+        
+        const elements = {
+            headLeft: document.getElementById('headLeft'),
+            headRight: document.getElementById('headRight'),
+            bodyZone: document.getElementById('bodyZone')
+        };
+
+        function triggerDrum(element, soundType, e) {
+            // Prevent default touch behavior (scrolling/zoom)
+            if(e) e.preventDefault();
+            
+            // Visual Feedback
+            element.classList.add('hit');
+            createRipple(e, element);
+            
+            // Audio Feedback
+            playSound(soundType);
+
+            // Remove visual class
+            setTimeout(() => {
+                element.classList.remove('hit');
+            }, 100);
+        }
+
+        // Add Event Listeners (Support Touch and Mouse)
+        function addTouch(elem, sound) {
+            elem.addEventListener('touchstart', (e) => triggerDrum(elem, sound, e), {passive: false});
+            elem.addEventListener('mousedown', (e) => triggerDrum(elem, sound, e));
+        }
+
+        addTouch(elements.headLeft, 'low');
+        addTouch(elements.headRight, 'high');
+        addTouch(elements.bodyZone, 'rim');
+
+        // Ripple Effect
+        function createRipple(event, container) {
+            if(!event) return;
+            
+            const circle = document.createElement("span");
+            const diameter = Math.max(container.clientWidth, container.clientHeight);
+            const radius = diameter / 2;
+
+            let clientX, clientY;
+            
+            if (event.type === 'touchstart') {
+                clientX = event.touches[0].clientX;
+                clientY = event.touches[0].clientY;
+            } else {
+                clientX = event.clientX;
+                clientY = event.clientY;
+            }
+
+            const rect = container.getBoundingClientRect();
+            
+            circle.style.width = circle.style.height = `${diameter}px`;
+            circle.style.left = `${clientX - rect.left - radius}px`;
+            circle.style.top = `${clientY - rect.top - radius}px`;
+            circle.classList.add("ripple");
+
+            const existingRipple = container.getElementsByClassName("ripple")[0];
+            if (existingRipple) {
+                existingRipple.remove();
+            }
+
+            container.appendChild(circle);
+        }
+
+        // --- UI Functions ---
+
+        function toggleNotes() {
+            document.body.classList.toggle('show-notes');
+            const btn = document.getElementById('btnNote');
+            btn.style.background = document.body.classList.contains('show-notes') ? '#ffc107' : '';
+            btn.style.color = document.body.classList.contains('show-notes') ? '#000' : '#fff';
+        }
+
+        // --- Recording Logic ---
+
+        function toggleRecord() {
+            if (!isInitialized) initAudio();
+
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+
+        function startRecording() {
+            audioChunks = [];
+            
+            // Check browser support
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
+            
+            try {
+                mediaRecorder = new MediaRecorder(dest.stream, { mimeType: mimeType });
+            } catch (e) {
+                alert("อุปกรณ์ของคุณไม่รองรับการอัดเสียงผ่าน Web Audio");
+                return;
+            }
+
+            mediaRecorder.ondataavailable = event => {
+                audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(audioChunks, { type: mimeType });
+                audioUrl = URL.createObjectURL(audioBlob);
+                
+                // Enable Play/Download buttons
+                document.getElementById('btnPlay').disabled = false;
+                document.getElementById('btnDownload').disabled = false;
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            
+            // UI Update
+            const btn = document.getElementById('btnRecord');
+            btn.classList.add('recording');
+            btn.innerHTML = '<i class="fas fa-stop"></i>';
+        }
+
+        function stopRecording() {
+            mediaRecorder.stop();
+            isRecording = false;
+            
+            // UI Update
+            const btn = document.getElementById('btnRecord');
+            btn.classList.remove('recording');
+            btn.innerHTML = '<i class="fas fa-microphone"></i>';
+        }
+
+        function playRecording() {
+            if (!audioUrl) return;
+            const audio = new Audio(audioUrl);
+            audio.play();
+        }
+
+        function downloadRecording() {
+            if (!audioUrl) return;
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = audioUrl;
+            
+            const date = new Date();
+            const timestamp = `${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`;
+            a.download = `taphon-mon-${timestamp}.webm`;
+            
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(audioUrl); // Clean up? Maybe keep for replay.
+        }
+
+        // Initialize Audio on first touch anywhere (Mobile policy)
+        window.addEventListener('touchstart', initAudio, {once: true});
+        window.addEventListener('click', initAudio, {once: true});
+
+    </script>
+</body>
+</html>

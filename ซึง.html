@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sueng Simulator (ซึงจำลอง)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        :root {
+            --wood-dark: #3e2723;
+            --wood-medium: #5d4037;
+            --wood-light: #8d6e63;
+            --fret-color: #ffd700;
+            --string-color: #e0e0e0;
+            --highlight: rgba(255, 255, 255, 0.2);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none; /* ป้องกันการเลื่อน/ซูม */
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh; /* บังคับความสูงเท่าหน้าจอ */
+            background-color: #1a1a1a;
+            font-family: 'Sarabun', sans-serif;
+            overflow: hidden; /* ห้ามเลื่อน */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* UI Control Panel */
+        #controls {
+            width: 100%;
+            height: 50px; /* ลดความสูงลงเล็กน้อย */
+            flex-shrink: 0; /* ห้ามหด */
+            background: #212121;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        .btn {
+            background: #424242;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 5px;
+            font-size: 13px; /* ปรับขนาดฟอนต์ให้พอดีมือถือ */
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+
+        .btn:active { transform: scale(0.95); }
+        .btn.recording { background: #d32f2f; animation: pulse 1.5s infinite; }
+        .btn.playing { background: #388e3c; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(211, 47, 47, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); }
+        }
+
+        /* The Instrument Container */
+        #sueng-container {
+            flex-grow: 1; /* ยืดให้เต็มพื้นที่ที่เหลือ */
+            width: 100%;
+            max-width: 600px;
+            height: calc(100vh - 50px); /* ความสูงเท่าหน้าจอลบแถบเมนู */
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start; /* เรียงจากบนลงล่าง */
+            background: radial-gradient(circle, #333 10%, #000 90%);
+        }
+
+        /* Headstock (Top) */
+        .headstock {
+            flex-shrink: 0; /* ห้ามหดจนเพี้ยน */
+            width: 25vw;
+            max-width: 100px;
+            height: 10vh; /* ความสูงเป็น % ของหน้าจอ */
+            max-height: 80px;
+            min-height: 50px;
+            background: linear-gradient(135deg, var(--wood-dark), var(--wood-medium));
+            border-radius: 10px 10px 0 0;
+            box-shadow: 0 4px 5px rgba(0,0,0,0.5);
+            position: relative;
+            z-index: 2;
+            border: 2px solid #2d1b18;
+        }
+        
+        .peg {
+            width: 15%;
+            height: 40%;
+            background: #8d6e63;
+            position: absolute;
+            border-radius: 5px;
+            box-shadow: 2px 2px 2px rgba(0,0,0,0.3);
+        }
+        .peg.left { left: -10px; top: 20%; }
+        .peg.right { right: -10px; top: 20%; }
+
+        /* The Neck (Fretboard) */
+        .neck {
+            flex-grow: 1; /* ยืดให้เต็มพื้นที่ตรงกลาง */
+            width: 35vw; /* กว้างพอประมาณ */
+            max-width: 140px;
+            min-width: 100px;
+            background: linear-gradient(90deg, #3e2723 0%, #5d4037 20%, #4e342e 50%, #5d4037 80%, #3e2723 100%);
+            position: relative;
+            display: flex;
+            flex-direction: column; /* เรียงเฟรตแนวตั้ง */
+            border-left: 4px solid #281815;
+            border-right: 4px solid #281815;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+            z-index: 3; /* อยู่เหนือกล่องเสียง */
+        }
+
+        /* Strings */
+        .string {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: linear-gradient(90deg, #ccc, #fff, #ccc);
+            box-shadow: 1px 0 2px rgba(0,0,0,0.5);
+            z-index: 5;
+            pointer-events: none;
+        }
+        .string.low { left: 30%; height: 110%; }
+        .string.high { right: 30%; height: 110%; width: 2px; }
+
+        .string.vibrating {
+            animation: vibrate 0.1s linear infinite;
+        }
+
+        @keyframes vibrate {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(1px); }
+            50% { transform: translateX(-1px); }
+            75% { transform: translateX(1px); }
+            100% { transform: translateX(0); }
+        }
+
+        /* Frets (Interactive Areas) */
+        .fret-row {
+            flex: 1; /* แบ่งความสูงเท่าๆ กัน */
+            width: 100%;
+            display: flex;
+            border-bottom: 4px solid transparent;
+            position: relative;
+            min-height: 0; /* ป้องกัน Flex item ล้น */
+        }
+
+        .fret-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 5px; /* ปรับขนาดเฟรตบาร์ */
+            background: linear-gradient(to bottom, #ffd700, #b8860b);
+            border-radius: 2px;
+            z-index: 4;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.6);
+        }
+
+        .fret-cell {
+            flex: 1;
+            position: relative;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            -webkit-tap-highlight-color: transparent; 
+        }
+
+        .fret-cell:active {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .note-label {
+            color: #fff;
+            font-size: clamp(12px, 2vh, 16px); /* ขนาดตัวหนังสือยืดหยุ่น */
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s;
+            text-shadow: 0 1px 2px black;
+            background: rgba(0,0,0,0.3);
+            padding: 2px 6px;
+            border-radius: 10px;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        .show-notes .note-label { opacity: 1; }
+
+        .inlay {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: rgba(255,255,255,0.4);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        /* Soundbox (Body) */
+        .soundbox {
+            flex-shrink: 0; /* ห้ามหดจนเพี้ยน */
+            width: 30vh; /* ปรับขนาดตามความสูงจอ */
+            height: 30vh;
+            max-width: 250px;
+            max-height: 250px;
+            min-width: 180px;
+            min-height: 180px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, var(--wood-medium), var(--wood-dark));
+            border: 6px solid #3e2723;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.6);
+            margin-top: -3vh; /* ซ้อนทับคอซึงเล็กน้อย */
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2vh; /* เผื่อพื้นที่ด้านล่าง */
+        }
+
+        .soundhole {
+            width: 35%;
+            height: 35%;
+            background: #1a0f0d;
+            border-radius: 50%;
+            border: 3px solid #5d4037;
+            box-shadow: inset 0 0 20px black;
+        }
+        
+        .bridge {
+            position: absolute;
+            bottom: 20%;
+            width: 30%;
+            height: 5%;
+            background: #212121;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px black;
+            z-index: 6;
+        }
+
+        /* Overlay for "Click to Start" */
+        #overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            text-align: center;
+        }
+        #overlay h1 { color: #ffd700; margin-bottom: 10px; }
+        #start-btn {
+            padding: 15px 40px;
+            font-size: 20px;
+            background: #d4af37;
+            border: none;
+            border-radius: 30px;
+            color: #3e2723;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        /* Visual Feedback Circle */
+        .tap-effect {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 215, 0, 0.6);
+            transform: scale(0);
+            animation: ripple 0.4s linear;
+            pointer-events: none;
+            width: 40px;
+            height: 40px;
+            margin-left: -20px;
+            margin-top: -20px;
+            z-index: 20;
+        }
+
+        @keyframes ripple {
+            to { transform: scale(2); opacity: 0; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Overlay for Audio Context Start -->
+    <div id="overlay">
+        <h1>ซึงล้านนา (Sueng)</h1>
+        <p>แตะเพื่อเริ่มเล่นเครื่องดนตรี</p>
+        <button id="start-btn">เริ่มใช้งาน</button>
+    </div>
+
+    <!-- Controls -->
+    <div id="controls">
+        <button class="btn" id="btn-notes">🎵 โน้ต</button>
+        <button class="btn" id="btn-record">🔴 อัดเสียง</button>
+        <button class="btn" id="btn-play" disabled>▶️ เล่น</button>
+        <button class="btn" id="btn-download" disabled>⬇️ Save</button>
+    </div>
+
+    <!-- Instrument -->
+    <div id="sueng-container">
+        <!-- Headstock -->
+        <div class="headstock">
+            <div class="peg left"></div>
+            <div class="peg right"></div>
+        </div>
+
+        <!-- Neck -->
+        <div class="neck" id="fretboard">
+            <div class="string low" id="string-low"></div>
+            <div class="string high" id="string-high"></div>
+            <!-- Frets will be generated by JS -->
+        </div>
+
+        <!-- Body -->
+        <div class="soundbox">
+            <div class="soundhole"></div>
+            <div class="bridge"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- Audio Engine Configuration ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        let masterGain;
+        let destStream; // For recording
+        let mediaRecorder;
+        let recordedChunks = [];
+        let audioBlob;
+        let audioUrl;
+        let playbackSource;
+
+        // Sueng Tuning & Scale (CORRECTED REALISTIC PITCH)
+        // Tuning: Pair of strings tuned an octave apart (C4 and C5)
+        // Low String (สายทุ้ม): Start at C4 (Middle Do) -> 261.63 Hz (Standard Sueng Low)
+        // High String (สายเอก): Start at C5 (High Do) -> 523.25 Hz
+        const fretsData = [
+            // Open Strings
+            { label: "Open", low: 261.63, high: 523.25 }, // C4 (Low Do), C5 (High Do)
+            // Fret 1
+            { label: "1",    low: 293.66, high: 587.33 }, // D4 (Re), D5 (Re)
+            // Fret 2
+            { label: "2",    low: 329.63, high: 659.25 }, // E4 (Mi), E5 (Mi)
+            // Fret 3
+            { label: "3",    low: 392.00, high: 783.99 }, // G4 (Sol), G5 (Sol)
+            // Fret 4
+            { label: "4",    low: 440.00, high: 880.00 }, // A4 (La), A5 (La)
+            // Fret 5
+            { label: "5",    low: 523.25, high: 1046.50}, // C5 (Mid Do), C6 (Highest Do)
+        ];
+
+        // --- DOM Elements ---
+        const overlay = document.getElementById('overlay');
+        const startBtn = document.getElementById('start-btn');
+        const fretboard = document.getElementById('fretboard');
+        const btnNotes = document.getElementById('btn-notes');
+        const btnRecord = document.getElementById('btn-record');
+        const btnPlay = document.getElementById('btn-play');
+        const btnDownload = document.getElementById('btn-download');
+        const stringLowEl = document.getElementById('string-low');
+        const stringHighEl = document.getElementById('string-high');
+
+        // --- State ---
+        let showNotes = false;
+        let isRecording = false;
+        let isPlaying = false;
+
+        // --- Initialization ---
+        startBtn.addEventListener('click', initAudio);
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+                
+                // Create Master Gain
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.8;
+                
+                // Compressor to prevent clipping
+                const compressor = audioCtx.createDynamicsCompressor();
+                compressor.threshold.value = -24;
+                compressor.knee.value = 30;
+                compressor.ratio.value = 12;
+                compressor.attack.value = 0.003;
+                compressor.release.value = 0.25;
+
+                masterGain.connect(compressor);
+                compressor.connect(audioCtx.destination);
+
+                // Setup Recording Stream
+                destStream = audioCtx.createMediaStreamDestination();
+                compressor.connect(destStream); // Connect output to recorder
+            }
+            
+            overlay.style.opacity = 0;
+            setTimeout(() => overlay.style.display = 'none', 500);
+            
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            renderFretboard();
+        }
+
+        // --- Visual Rendering ---
+        function renderFretboard() {
+            fretboard.innerHTML = ''; // Clear existing
+            // Re-add strings
+            fretboard.appendChild(stringLowEl);
+            fretboard.appendChild(stringHighEl);
+
+            fretsData.forEach((fret, index) => {
+                const row = document.createElement('div');
+                row.className = 'fret-row';
+                
+                // Create left cell (Low string)
+                const cellLow = createFretCell(fret.low, fret.label, 'low', index);
+                // Create right cell (High string)
+                const cellHigh = createFretCell(fret.high, fret.label, 'high', index);
+
+                row.appendChild(cellLow);
+                row.appendChild(cellHigh);
+
+                // Fret bar (visual separator), except for top (Open)
+                if (index > 0) {
+                   const bar = document.createElement('div');
+                   bar.className = 'fret-bar';
+                   row.appendChild(bar);
+                }
+                
+                // Add marker inlay dots at Fret 3 (Sol) and Fret 5 (Octave Do)
+                if (index === 3 || index === 5) {
+                    const inlay = document.createElement('div');
+                    inlay.className = 'inlay';
+                    row.appendChild(inlay);
+                }
+
+                fretboard.appendChild(row);
+            });
+        }
+
+        function createFretCell(freq, noteName, stringType, index) {
+            const cell = document.createElement('div');
+            cell.className = 'fret-cell';
+            cell.dataset.freq = freq;
+            cell.dataset.string = stringType;
+
+            // Note Label
+            const label = document.createElement('span');
+            label.className = 'note-label';
+            
+            // ใช้ฟังก์ชัน getNoteName แบบไทย
+            let displayNote = getNoteName(freq);
+            if (index === 0) displayNote += " (สายเปล่า)";
+            label.innerText = displayNote;
+            cell.appendChild(label);
+
+            // Interaction Events
+            const trigger = (e) => {
+                e.preventDefault(); // Prevent ghost clicks
+                playTone(freq, stringType);
+                createRipple(e, cell);
+            };
+
+            cell.addEventListener('touchstart', trigger, {passive: false});
+            cell.addEventListener('mousedown', trigger);
+
+            return cell;
+        }
+
+        function getNoteName(freq) {
+            // Updated for realistic Sueng range C4 (261) to C6 (1046)
+            // Thresholds adjusted for the new frequencies
+            if(freq < 275) return "ด (ต่ำ)"; // C4 (Middle C) -> Low for Sueng
+            if(freq < 310) return "ร";      // D4
+            if(freq < 360) return "ม";      // E4
+            if(freq < 415) return "ซ";      // G4
+            if(freq < 490) return "ล";      // A4
+            if(freq < 550) return "ด";      // C5 (High Do)
+            if(freq < 620) return "ร (สูง)"; // D5
+            if(freq < 700) return "ม (สูง)"; // E5
+            if(freq < 820) return "ซ (สูง)"; // G5
+            if(freq < 950) return "ล (สูง)"; // A5
+            if(freq >= 950) return "ด (สูงมาก)"; // C6
+            return "";
+        }
+
+        // --- Audio Synthesis (Plucked String) ---
+        function playTone(freq, stringType) {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const t = audioCtx.currentTime;
+            
+            // Oscillator 1: Sawtooth (Bright, twangy)
+            const osc1 = audioCtx.createOscillator();
+            osc1.type = 'sawtooth';
+            osc1.frequency.value = freq;
+
+            // Oscillator 2: Triangle (Body, depth)
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'triangle';
+            osc2.frequency.value = freq;
+            osc2.detune.value = 5; 
+
+            // Gain Envelope (Pluck shape)
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0, t);
+            gainNode.gain.linearRampToValueAtTime(1, t + 0.01); // Fast attack
+            gainNode.gain.exponentialRampToValueAtTime(0.001, t + 1.2); // Decay slightly faster for higher pitch
+
+            // Filter (Simulate string dampening)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            // Brightness adjusted for higher pitch (Sueng is bright)
+            const brightness = freq * 8; 
+            filter.frequency.setValueAtTime(brightness, t);
+            filter.frequency.exponentialRampToValueAtTime(500, t + 0.4); // Sweep down
+
+            // Connections
+            osc1.connect(filter);
+            osc2.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(masterGain);
+
+            // Start/Stop
+            osc1.start(t);
+            osc2.start(t);
+            osc1.stop(t + 2);
+            osc2.stop(t + 2);
+
+            // Visual Vibration
+            const stringEl = stringType === 'low' ? stringLowEl : stringHighEl;
+            stringEl.classList.remove('vibrating');
+            void stringEl.offsetWidth; // Trigger reflow
+            stringEl.classList.add('vibrating');
+        }
+
+        // --- Visual Effects ---
+        function createRipple(e, target) {
+            const circle = document.createElement('div');
+            circle.className = 'tap-effect';
+            
+            // Get coordinates
+            let x, y;
+            if (e.touches && e.touches[0]) {
+                const rect = target.getBoundingClientRect();
+                x = e.touches[0].clientX - rect.left;
+                y = e.touches[0].clientY - rect.top;
+            } else {
+                x = e.offsetX;
+                y = e.offsetY;
+            }
+
+            circle.style.left = `${x}px`;
+            circle.style.top = `${y}px`;
+            
+            target.appendChild(circle);
+            setTimeout(() => circle.remove(), 500);
+        }
+
+        // --- Controls Functionality ---
+        
+        // Toggle Notes
+        btnNotes.addEventListener('click', () => {
+            showNotes = !showNotes;
+            document.body.classList.toggle('show-notes', showNotes);
+            btnNotes.innerText = showNotes ? "🎵 ซ่อนโน้ต" : "🎵 โน้ต";
+            btnNotes.style.background = showNotes ? "#5d4037" : "#424242";
+        });
+
+        // Recording Logic
+        btnRecord.addEventListener('click', () => {
+            if (!isRecording) {
+                // Start Recording
+                recordedChunks = [];
+                // Check browser support
+                const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+                
+                try {
+                    mediaRecorder = new MediaRecorder(destStream.stream, { mimeType: mimeType });
+                } catch (e) {
+                    alert("เบราว์เซอร์นี้ไม่รองรับการอัดเสียง");
+                    return;
+                }
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: mimeType });
+                    audioBlob = blob;
+                    audioUrl = URL.createObjectURL(blob);
+                    btnPlay.disabled = false;
+                    btnDownload.disabled = false;
+                    btnRecord.innerText = "🔴 อัดเสียง";
+                    btnRecord.classList.remove('recording');
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                btnRecord.innerText = "⏹ หยุด";
+                btnRecord.classList.add('recording');
+                btnPlay.disabled = true;
+                btnDownload.disabled = true;
+
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+            }
+        });
+
+        // Play Logic
+        btnPlay.addEventListener('click', () => {
+            if (!audioUrl) return;
+
+            if (isPlaying) {
+                if (playbackSource) playbackSource.stop(); // Basic stop implementation
+                isPlaying = false;
+                btnPlay.innerText = "▶️ เล่น";
+                btnPlay.classList.remove('playing');
+            } else {
+                const audio = new Audio(audioUrl);
+                audio.onended = () => {
+                    isPlaying = false;
+                    btnPlay.innerText = "▶️ เล่น";
+                    btnPlay.classList.remove('playing');
+                };
+                audio.play();
+                isPlaying = true;
+                btnPlay.innerText = "⏹ หยุดเล่น";
+                btnPlay.classList.add('playing');
+            }
+        });
+
+        // Download Logic
+        btnDownload.addEventListener('click', () => {
+            if (!audioUrl) return;
+            const a = document.createElement('a');
+            a.href = audioUrl;
+            // Detect extension based on blob type usually, but .webm is standard for web audio record
+            a.download = `sueng-recording-${new Date().getTime()}.webm`; 
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+
+    </script>
+</body>
+</html>

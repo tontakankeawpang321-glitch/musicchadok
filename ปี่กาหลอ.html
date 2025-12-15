@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ปี่กาหลอจำลอง (Virtual Pi Kaho)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap');
+        
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #2d3748; /* Dark theme */
+            color: white;
+            touch-action: manipulation; /* ป้องกันการซูมด้วยนิ้ว */
+            overflow: hidden; /* ป้องกันการเลื่อนหน้าจอ */
+        }
+
+        /* ดีไซน์ตัวปี่ */
+        .pi-body {
+            background: linear-gradient(90deg, #3e2723, #5d4037, #3e2723);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 10px 20px rgba(0,0,0,0.5);
+            border-radius: 50px;
+            position: relative;
+        }
+
+        /* รูนิ้วกด (Key Holes) */
+        .note-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #d7ccc8, #8d6e63);
+            border: 4px solid #3e2723;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.3);
+            transition: all 0.1s;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #3e2723;
+            font-size: 1.2rem;
+            user-select: none;
+            -webkit-user-select: none;
+            cursor: pointer; /* เพิ่ม cursor pointer */
+            -webkit-tap-highlight-color: transparent; /* ลบสี highlight เดิมของมือถือ */
+        }
+
+        .note-btn:active, .note-btn.active {
+            transform: scale(0.95);
+            background: radial-gradient(circle at 30% 30%, #5d4037, #3e2723); /* สีเข้มขึ้นเมื่อกด */
+            color: #d7ccc8;
+            box-shadow: inset 0 4px 8px rgba(0,0,0,0.6);
+        }
+
+        /* ปุ่มควบคุม (Record/Play) */
+        .control-btn {
+            transition: all 0.2s;
+        }
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        .recording-pulse {
+            animation: pulse-red 1.5s infinite;
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-between p-4 bg-gray-900">
+
+    <!-- ส่วนหัว -->
+    <div class="w-full text-center py-2 z-10">
+        <h1 class="text-xl font-bold text-yellow-500 tracking-wider">ปี่กาหลอจำลอง</h1>
+        <p class="text-xs text-gray-400">Virtual Pi Kaho</p>
+    </div>
+
+    <!-- ตัวเครื่องดนตรี (แนวตั้ง) -->
+    <div class="flex-grow flex items-center justify-center w-full max-w-sm relative">
+        <!-- ตัวถังปี่ -->
+        <div class="pi-body w-24 h-[95%] absolute flex flex-col items-center justify-between py-8">
+            <!-- ลวดลายหัวท้าย -->
+            <div class="w-full h-2 bg-yellow-600 absolute top-4 opacity-50"></div>
+            <div class="w-full h-2 bg-yellow-600 absolute bottom-4 opacity-50"></div>
+        </div>
+
+        <!-- ปุ่มกดเรียงแนวตั้ง -->
+        <!-- แก้ไข: เพิ่ม id ให้แต่ละปุ่มเพื่อให้ JS เรียกใช้ได้ถูกต้องไม่สับสนลำดับ -->
+        <div class="z-10 flex flex-col gap-3 h-[90%] justify-center">
+            <!-- ปุ่มโน้ต 7-1 (สูงไปต่ำ) -->
+            <button id="btn-6" class="note-btn" onpointerdown="playNote(6)" onpointerup="stopNote(6)" onpointerleave="stopNote(6)">ที</button>
+            <button id="btn-5" class="note-btn" onpointerdown="playNote(5)" onpointerup="stopNote(5)" onpointerleave="stopNote(5)">ลา</button>
+            <button id="btn-4" class="note-btn" onpointerdown="playNote(4)" onpointerup="stopNote(4)" onpointerleave="stopNote(4)">ซอล</button>
+            <button id="btn-3" class="note-btn" onpointerdown="playNote(3)" onpointerup="stopNote(3)" onpointerleave="stopNote(3)">ฟา</button>
+            <button id="btn-2" class="note-btn" onpointerdown="playNote(2)" onpointerup="stopNote(2)" onpointerleave="stopNote(2)">มี</button>
+            <button id="btn-1" class="note-btn" onpointerdown="playNote(1)" onpointerup="stopNote(1)" onpointerleave="stopNote(1)">เร</button>
+            <button id="btn-0" class="note-btn" onpointerdown="playNote(0)" onpointerup="stopNote(0)" onpointerleave="stopNote(0)">โด</button>
+        </div>
+    </div>
+
+    <!-- แผงควบคุมการอัดเสียง -->
+    <div class="w-full max-w-md bg-gray-800 rounded-2xl p-4 mt-4 shadow-lg border border-gray-700">
+        <div class="flex justify-between items-center mb-2">
+            <span id="status-text" class="text-xs text-gray-400">พร้อมใช้งาน</span>
+            <span id="timer" class="text-sm font-mono text-yellow-500">00:00</span>
+        </div>
+        
+        <div class="grid grid-cols-4 gap-2">
+            <!-- ปุ่มอัดเสียง -->
+            <button id="recordBtn" onclick="toggleRecording()" class="control-btn bg-red-600 hover:bg-red-700 text-white rounded-xl p-3 flex flex-col items-center">
+                <i class="fas fa-circle text-lg mb-1"></i>
+                <span class="text-[10px]">อัดเสียง</span>
+            </button>
+
+            <!-- ปุ่มเล่นเสียงที่อัด -->
+            <button id="playRecordBtn" onclick="playRecording()" disabled class="control-btn bg-gray-600 text-white rounded-xl p-3 flex flex-col items-center disabled:opacity-30 disabled:cursor-not-allowed">
+                <i class="fas fa-play text-lg mb-1"></i>
+                <span class="text-[10px]">ฟัง</span>
+            </button>
+
+            <!-- ปุ่มหยุด -->
+            <button onclick="stopPlayback()" class="control-btn bg-gray-700 hover:bg-gray-600 text-white rounded-xl p-3 flex flex-col items-center">
+                <i class="fas fa-stop text-lg mb-1"></i>
+                <span class="text-[10px]">หยุด</span>
+            </button>
+
+            <!-- ปุ่มดาวน์โหลด -->
+            <button id="downloadBtn" onclick="downloadRecording()" disabled class="control-btn bg-blue-600 hover:bg-blue-700 text-white rounded-xl p-3 flex flex-col items-center disabled:opacity-30 disabled:cursor-not-allowed">
+                <i class="fas fa-download text-lg mb-1"></i>
+                <span class="text-[10px]">โหลด</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. ตั้งค่าไฟล์เสียงที่นี่ (CONFIGURATION)
+        // ==========================================
+        
+        // ใส่ลิงค์ไฟล์เสียงจริง (.mp3, .wav) ในช่อง 'url'
+        const notesConfig = [
+            { note: "Do",  url: "" }, // โน้ตตัวที่ 1 (ล่างสุด)
+            { note: "Re",  url: "" },
+            { note: "Mi",  url: "" },
+            { note: "Fa",  url: "" },
+            { note: "Sol", url: "" },
+            { note: "La",  url: "" },
+            { note: "Ti",  url: "" }  // โน้ตตัวที่ 7 (บนสุด)
+        ];
+
+        // ==========================================
+        // 2. ระบบเสียง (AUDIO ENGINE)
+        // ==========================================
+        
+        let audioContext;
+        let audioBuffers = [];
+        let gainNode;
+        let destStream; // สำหรับอัดเสียง
+        
+        // ตัวแปรสำหรับการอัดเสียง
+        let mediaRecorder;
+        let recordedChunks = [];
+        let audioBlob = null;
+        let audioUrl = null;
+        let isRecording = false;
+        let recordingStartTime;
+        let timerInterval;
+
+        // เริ่มต้น AudioContext เมื่อมีการคลิกครั้งแรก (Browser Policy)
+        async function initAudio() {
+            if (audioContext) return;
+
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioContext = new AudioContext();
+            
+            // สร้าง Destination สำหรับอัดเสียง (ต่อพ่วงกับลำโพง)
+            destStream = audioContext.createMediaStreamDestination();
+            
+            // Main Gain Node (Volume หลัก)
+            gainNode = audioContext.createGain();
+            gainNode.gain.value = 1.0;
+            
+            // ต่อ Gain -> ลำโพง และ Gain -> เครื่องอัด
+            gainNode.connect(audioContext.destination);
+            gainNode.connect(destStream);
+
+            loadSounds();
+        }
+
+        // โหลดไฟล์เสียง
+        async function loadSounds() {
+            const statusText = document.getElementById('status-text');
+            statusText.innerText = "กำลังโหลดเสียง...";
+
+            const loadPromises = notesConfig.map(async (config, index) => {
+                if (!config.url) return null; // ข้ามถ้าไม่มีลิงค์
+                try {
+                    const response = await fetch(config.url);
+                    const arrayBuffer = await response.arrayBuffer();
+                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                    audioBuffers[index] = audioBuffer;
+                } catch (e) {
+                    console.warn(`โหลดเสียง ${config.note} ไม่สำเร็จ:`, e);
+                }
+            });
+
+            await Promise.all(loadPromises);
+            statusText.innerText = "พร้อมเล่น (แตะหน้าจอเพื่อเริ่ม)";
+        }
+
+        // ฟังก์ชันเล่นโน้ต
+        function playNote(index) {
+            if (!audioContext) initAudio();
+            if (audioContext.state === 'suspended') audioContext.resume();
+
+            // Visual Effect: เปลี่ยนมาใช้ getElementById เพื่อระบุปุ่มให้ถูกต้องแน่นอน
+            const btn = document.getElementById(`btn-${index}`);
+            if (btn) btn.classList.add('active');
+
+            // Play Sound
+            if (audioBuffers[index]) {
+                const source = audioContext.createBufferSource();
+                source.buffer = audioBuffers[index];
+                
+                // สร้าง Gain แยกสำหรับแต่ละโน้ตเพื่อให้เสียง Fade out ได้สวยงามถ้าต้องการ
+                const noteGain = audioContext.createGain();
+                noteGain.gain.setValueAtTime(1, audioContext.currentTime);
+                
+                source.connect(noteGain);
+                noteGain.connect(gainNode); // ต่อเข้า Main Mix
+                
+                source.start(0);
+            } else {
+                console.log(`Play Note Index: ${index} (No Audio File)`);
+            }
+        }
+
+        // ฟังก์ชันปล่อยนิ้ว
+        function stopNote(index) {
+            // Visual Effect: เปลี่ยนมาใช้ getElementById เช่นกัน
+            const btn = document.getElementById(`btn-${index}`);
+            if (btn) btn.classList.remove('active');
+        }
+
+        // ==========================================
+        // 3. ระบบอัดเสียง (RECORDER)
+        // ==========================================
+
+        function toggleRecording() {
+            if (!audioContext) initAudio();
+
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+
+        function startRecording() {
+            recordedChunks = [];
+            audioBlob = null;
+            
+            let options = { mimeType: 'audio/webm' };
+            if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                options = { mimeType: 'audio/mp4' }; // Fallback for Safari
+            }
+            
+            try {
+                mediaRecorder = new MediaRecorder(destStream.stream, options);
+            } catch (e) {
+                alert("Browser ของคุณไม่รองรับการอัดเสียงผ่าน Web Audio");
+                return;
+            }
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+                audioUrl = URL.createObjectURL(audioBlob);
+                
+                document.getElementById('playRecordBtn').disabled = false;
+                document.getElementById('playRecordBtn').classList.replace('bg-gray-600', 'bg-green-600');
+                document.getElementById('downloadBtn').disabled = false;
+                
+                document.getElementById('status-text').innerText = "อัดเสียงเสร็จสิ้น";
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            
+            document.getElementById('recordBtn').classList.add('recording-pulse');
+            document.getElementById('recordBtn').innerHTML = '<i class="fas fa-stop text-lg mb-1"></i><span class="text-[10px]">จบการอัด</span>';
+            document.getElementById('status-text').innerText = "กำลังอัดเสียง...";
+            
+            recordingStartTime = Date.now();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function stopRecording() {
+            mediaRecorder.stop();
+            isRecording = false;
+            
+            document.getElementById('recordBtn').classList.remove('recording-pulse');
+            document.getElementById('recordBtn').innerHTML = '<i class="fas fa-circle text-lg mb-1"></i><span class="text-[10px]">อัดเสียง</span>';
+            clearInterval(timerInterval);
+        }
+
+        let playbackAudio = new Audio();
+        
+        function playRecording() {
+            if (!audioUrl) return;
+            playbackAudio.src = audioUrl;
+            playbackAudio.play();
+            document.getElementById('status-text').innerText = "กำลังเล่นไฟล์ที่อัด...";
+            playbackAudio.onended = () => {
+                document.getElementById('status-text').innerText = "เล่นจบแล้ว";
+            };
+        }
+
+        function stopPlayback() {
+            if (!playbackAudio.paused) {
+                playbackAudio.pause();
+                playbackAudio.currentTime = 0;
+            }
+            if (isRecording) {
+                toggleRecording(); 
+            }
+            document.getElementById('status-text').innerText = "หยุดแล้ว";
+        }
+
+        function downloadRecording() {
+            if (!audioUrl) return;
+            const a = document.createElement('a');
+            a.href = audioUrl;
+            a.download = `pi-kaho-recording-${new Date().getTime()}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function updateTimer() {
+            const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+            const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
+            const s = (elapsed % 60).toString().padStart(2, '0');
+            document.getElementById('timer').innerText = `${m}:${s}`;
+        }
+
+        window.oncontextmenu = function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            return false;
+        };
+    </script>
+</body>
+</html>

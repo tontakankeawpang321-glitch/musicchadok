@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>กลองแขกเสมือนจริง (Glong Khaek)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #2c1e12; /* Dark wood base */
+            background-image: repeating-linear-gradient(45deg, #3d2b1f 25%, transparent 25%, transparent 75%, #3d2b1f 75%, #3d2b1f), repeating-linear-gradient(45deg, #3d2b1f 25%, #2c1e12 25%, #2c1e12 75%, #3d2b1f 75%, #3d2b1f);
+            background-position: 0 0, 10px 10px;
+            background-size: 20px 20px;
+            overflow: hidden; /* Prevent scrolling */
+            touch-action: none; /* Disable browser handling of gestures */
+            user-select: none;
+            -webkit-user-select: none;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Drum Skin Texture */
+        .drum-head {
+            background: radial-gradient(circle at 30% 30%, #e6d5b8, #cfb893, #a68b64);
+            box-shadow: 
+                inset 0 0 20px rgba(0,0,0,0.6),
+                0 10px 20px rgba(0,0,0,0.5),
+                0 0 0 8px #5c4033, /* Wood rim */
+                0 0 0 12px #2a1d12; /* Dark outer rim */
+            position: relative;
+            border-radius: 50%;
+            transition: transform 0.05s, filter 0.05s;
+            cursor: pointer;
+            overflow: hidden;
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+
+        /* Interaction feedback */
+        .drum-head:active, .drum-head.active {
+            transform: scale(0.96);
+            filter: brightness(0.9);
+        }
+
+        /* Center spot (Target) */
+        .drum-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 35%;
+            height: 35%;
+            background: radial-gradient(circle, rgba(0,0,0,0.1), transparent 70%);
+            border-radius: 50%;
+            pointer-events: none; /* Let clicks pass through to parent logic */
+            border: 1px dashed rgba(139, 69, 19, 0.3);
+        }
+
+        /* Rope Texture decoration */
+        .rope {
+            position: absolute;
+            background: #d4a76a;
+            width: 4px;
+            height: 20px;
+            z-index: -1;
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .control-panel {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            border-top: 2px solid #8b4513;
+            width: 100%;
+            padding: 10px 5px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .btn {
+            background: linear-gradient(to bottom, #8b5a2b, #5c3a1e);
+            border: 1px solid #a67c52;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.4);
+            transition: all 0.2s;
+            text-shadow: 1px 1px 2px black;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+        }
+
+        .btn.recording {
+            background: linear-gradient(to bottom, #ff4444, #cc0000);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
+        }
+
+        /* Start Overlay */
+        #start-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: white;
+            text-align: center;
+        }
+
+        .tap-zone-label {
+            position: absolute;
+            font-size: 0.8rem;
+            color: rgba(92, 64, 51, 0.7);
+            font-weight: bold;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <div class="w-full text-center py-2 z-10 pointer-events-none">
+        <h1 class="text-xl text-[#e6d5b8] font-bold drop-shadow-md tracking-wider">🥁 กลองแขก (Virtual)</h1>
+        <p class="text-xs text-[#a68b64]">แตะตรงกลางเพื่อเสียง "ทุ้ม" / แตะขอบเพื่อเสียง "แหลม"</p>
+    </div>
+
+    <!-- Drum Area -->
+    <div class="flex-grow flex flex-col justify-center items-center w-full max-w-lg relative gap-6 p-4">
+        
+        <!-- Drum 1: ตัวผู้ (Male) - Lower Pitch -->
+        <div class="relative w-full aspect-square max-h-[35vh] flex justify-center items-center">
+            <div id="drum-low" class="drum-head w-full h-full" data-drum="male">
+                <div class="drum-center"></div>
+                <span class="tap-zone-label top-4 left-1/2 transform -translate-x-1/2">ขอบ (ติง)</span>
+                <span class="tap-zone-label top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-black/40">กลาง (โจ๊ะ)</span>
+            </div>
+            <!-- Decorative Ropes -->
+            <div class="rope" style="top: -15px; left: 20%; transform: rotate(-10deg);"></div>
+            <div class="rope" style="top: -15px; right: 20%; transform: rotate(10deg);"></div>
+            <div class="rope" style="bottom: -15px; left: 20%; transform: rotate(10deg);"></div>
+            <div class="rope" style="bottom: -15px; right: 20%; transform: rotate(-10deg);"></div>
+            <div class="absolute -bottom-6 text-[#e6d5b8] text-sm font-bold opacity-80">ตัวผู้ (Male)</div>
+        </div>
+
+        <!-- Drum 2: ตัวเมีย (Female) - Higher Pitch -->
+        <div class="relative w-full aspect-square max-h-[35vh] flex justify-center items-center">
+            <div id="drum-high" class="drum-head w-full h-full" data-drum="female">
+                <div class="drum-center"></div>
+                <span class="tap-zone-label top-4 left-1/2 transform -translate-x-1/2">ขอบ (จ๊ะ)</span>
+                <span class="tap-zone-label top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-black/40">กลาง (ต้ม)</span>
+            </div>
+            <div class="absolute -bottom-6 text-[#e6d5b8] text-sm font-bold opacity-80">ตัวเมีย (Female)</div>
+        </div>
+
+    </div>
+
+    <!-- Controls -->
+    <div class="control-panel pb-6 pt-3 safe-area-bottom">
+        <button id="btn-record" class="btn" onclick="toggleRecording()">
+            <span id="record-text">⚪ อัดเสียง</span>
+        </button>
+        <button id="btn-play" class="btn bg-gray-600" onclick="playRecording()" disabled>
+            ▶️ เล่น
+        </button>
+        <button id="btn-download" class="btn bg-gray-600" onclick="downloadRecording()" disabled>
+            ⬇️ โหลด
+        </button>
+    </div>
+
+    <!-- Start Overlay -->
+    <div id="start-overlay" onclick="startApp()">
+        <div class="text-6xl mb-4">🥁</div>
+        <h2 class="text-2xl font-bold mb-2">กลองแขกจำลอง</h2>
+        <p class="mb-6 opacity-80">แตะเพื่อเริ่มใช้งาน</p>
+        <div class="animate-bounce bg-[#e6d5b8] text-[#2c1e12] px-6 py-2 rounded-full font-bold shadow-lg cursor-pointer">
+            เริ่มเลย
+        </div>
+    </div>
+
+    <script>
+        // --- Audio Engine Setup ---
+        let audioCtx;
+        let masterGain;
+        let dest; // For recording
+        let mediaRecorder;
+        let recordedChunks = [];
+        let audioBlob;
+        let audioUrl;
+        
+        // --- Sound Synthesis Functions ---
+        // We use Web Audio API to synthesize sounds to avoid loading files and ensure low latency
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // Create Master Gain
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.8;
+                masterGain.connect(audioCtx.destination);
+
+                // Setup Recording Stream
+                dest = audioCtx.createMediaStreamDestination();
+                masterGain.connect(dest);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Generate Noise Buffer for "Snap" sound
+        let noiseBuffer;
+        function createNoiseBuffer() {
+            if (!audioCtx) return;
+            const bufferSize = audioCtx.sampleRate * 2; // 2 seconds
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            noiseBuffer = buffer;
+        }
+
+        function playSound(type, pitchMultiplier = 1) {
+            if (!audioCtx) initAudio();
+            if (!noiseBuffer) createNoiseBuffer();
+
+            const t = audioCtx.currentTime;
+
+            // 1. Fundamental Tone (Sine Wave - Body of the drum)
+            const osc = audioCtx.createOscillator();
+            const oscGain = audioCtx.createGain();
+            
+            osc.connect(oscGain);
+            oscGain.connect(masterGain);
+
+            // 2. Snap/Slap Sound (Filtered Noise - Rim hit)
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = noiseBuffer;
+            const noiseFilter = audioCtx.createBiquadFilter();
+            const noiseGain = audioCtx.createGain();
+
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(masterGain);
+
+            // Sound Profiles
+            if (type === 'center') {
+                // "Thom" or "Jo" - Deep, Resonant
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(150 * pitchMultiplier, t);
+                osc.frequency.exponentialRampToValueAtTime(80 * pitchMultiplier, t + 0.15); // Pitch drop
+                
+                oscGain.gain.setValueAtTime(1, t);
+                oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.4); // Longer decay
+
+                // Less noise for center hit
+                noiseGain.gain.setValueAtTime(0.2, t);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+                noiseFilter.type = 'lowpass';
+                noiseFilter.frequency.setValueAtTime(600, t);
+
+            } else if (type === 'rim') {
+                // "Ting" or "Ja" - High, Sharp, Short
+                osc.type = 'triangle'; // Brighter waveform
+                osc.frequency.setValueAtTime(280 * pitchMultiplier, t);
+                osc.frequency.exponentialRampToValueAtTime(200 * pitchMultiplier, t + 0.1); 
+
+                oscGain.gain.setValueAtTime(0.6, t);
+                oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.15); // Short decay
+
+                // More noise for rim shot
+                noiseGain.gain.setValueAtTime(0.8, t);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+                noiseFilter.type = 'highpass';
+                noiseFilter.frequency.setValueAtTime(1200, t);
+            }
+
+            osc.start(t);
+            osc.stop(t + 0.5);
+            noise.start(t);
+            noise.stop(t + 0.5);
+        }
+
+        // --- Interaction Logic ---
+        
+        function handleHit(element, e) {
+            e.preventDefault(); // Prevent scrolling
+            initAudio();
+
+            // Get touch position relative to the element
+            const rect = element.getBoundingClientRect();
+            let clientX, clientY;
+
+            if (e.changedTouches) {
+                // Handle Multi-touch
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    processTouch(element, touch.clientX, touch.clientY, rect);
+                }
+            } else {
+                // Mouse click
+                processTouch(element, e.clientX, e.clientY, rect);
+            }
+        }
+
+        function processTouch(element, x, y, rect) {
+            // Visual Feedback
+            element.classList.add('active');
+            setTimeout(() => element.classList.remove('active'), 100);
+
+            // Calculate distance from center to determine Zone
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            const touchX = x - rect.left;
+            const touchY = y - rect.top;
+            
+            // Distance formula
+            const dist = Math.sqrt(Math.pow(touchX - centerX, 2) + Math.pow(touchY - centerY, 2));
+            const radius = rect.width / 2;
+            const centerZoneRadius = radius * 0.45; // 45% is center zone
+
+            const drumType = element.dataset.drum;
+            const pitchMod = drumType === 'female' ? 1.4 : 1.0; // Female drum is higher pitched
+
+            if (dist < centerZoneRadius) {
+                // Center Hit (Low/Deep)
+                playSound('center', pitchMod);
+            } else {
+                // Rim Hit (High/Slap)
+                playSound('rim', pitchMod);
+            }
+        }
+
+        // Bind Events
+        const drums = document.querySelectorAll('.drum-head');
+        drums.forEach(drum => {
+            drum.addEventListener('touchstart', (e) => handleHit(drum, e), { passive: false });
+            drum.addEventListener('mousedown', (e) => handleHit(drum, e));
+        });
+
+        // --- Recording Logic ---
+
+        let isRecording = false;
+
+        function toggleRecording() {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        }
+
+        function startRecording() {
+            initAudio();
+            recordedChunks = [];
+            // Check browser support for mimeTypes
+            const options = MediaRecorder.isTypeSupported('audio/webm') ? { mimeType: 'audio/webm' } : {};
+            
+            try {
+                mediaRecorder = new MediaRecorder(dest.stream, options);
+            } catch (e) {
+                alert("Browser recording not fully supported.");
+                return;
+            }
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+                audioUrl = URL.createObjectURL(audioBlob);
+                
+                // Enable buttons
+                document.getElementById('btn-play').disabled = false;
+                document.getElementById('btn-play').classList.remove('bg-gray-600');
+                document.getElementById('btn-play').classList.add('bg-green-600');
+                
+                document.getElementById('btn-download').disabled = false;
+                document.getElementById('btn-download').classList.remove('bg-gray-600');
+                document.getElementById('btn-download').classList.add('bg-blue-600');
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            
+            // UI Update
+            const btn = document.getElementById('btn-record');
+            btn.classList.add('recording');
+            document.getElementById('record-text').innerText = "⏹ หยุดอัด";
+        }
+
+        function stopRecording() {
+            mediaRecorder.stop();
+            isRecording = false;
+            
+            // UI Update
+            const btn = document.getElementById('btn-record');
+            btn.classList.remove('recording');
+            document.getElementById('record-text').innerText = "🔴 อัดใหม่";
+        }
+
+        function playRecording() {
+            if (!audioUrl) return;
+            const audio = new Audio(audioUrl);
+            audio.play();
+        }
+
+        function downloadRecording() {
+            if (!audioUrl) return;
+            const a = document.createElement('a');
+            a.href = audioUrl;
+            a.download = `glong-khaek-${new Date().getTime()}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // --- App Start ---
+        function startApp() {
+            initAudio();
+            createNoiseBuffer(); // Pre-generate noise
+            document.getElementById('start-overlay').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('start-overlay').style.display = 'none';
+            }, 500);
+        }
+
+        // Prevent ContextMenu on hold
+        window.oncontextmenu = function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            return false;
+        };
+
+    </script>
+</body>
+</html>

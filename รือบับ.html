@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>เครื่องดนตรีไทย: รือบับจำลอง</title>
+    <!-- Tailwind CSS for layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;500;700&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #1a1510; /* Dark Wood Color */
+            color: #f3e5ab; /* Gold text */
+            overflow: hidden; /* Prevent Scroll */
+            touch-action: none; /* Prevent browser gestures */
+            user-select: none;
+            -webkit-user-select: none;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Wood Texture Background */
+        .wood-bg {
+            background-image: repeating-linear-gradient(90deg, #2d241b 0px, #3e3226 2px, #2d241b 4px);
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        /* The Neck (Fingerboard) */
+        #fingerboard {
+            flex-grow: 1;
+            position: relative;
+            background: #111;
+            margin: 0 10px;
+            border-radius: 10px 10px 0 0;
+            box-shadow: inset 0 0 20px #000;
+            display: flex;
+            justify-content: space-around;
+            overflow: hidden;
+        }
+
+        /* Strings */
+        .string-container {
+            width: 45%;
+            height: 100%;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .string {
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(90deg, #aaa, #fff, #aaa);
+            box-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+            position: absolute;
+            pointer-events: none; /* Let clicks pass through to container */
+        }
+
+        /* Visual cues for notes (hidden by default) */
+        .fret-marker {
+            position: absolute;
+            width: 100%;
+            border-top: 1px dashed rgba(255, 215, 0, 0.3);
+            text-align: center;
+            font-size: 0.8rem;
+            color: rgba(255, 215, 0, 0.6);
+            pointer-events: none;
+            transform: translateY(-50%);
+        }
+
+        /* Active String Effect */
+        .string.vibrating {
+            animation: vibrate 0.05s infinite;
+            background: linear-gradient(90deg, #ffd700, #fff, #ffd700);
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
+        }
+
+        @keyframes vibrate {
+            0% { transform: translateX(-1px); }
+            50% { transform: translateX(1px); }
+            100% { transform: translateX(-1px); }
+        }
+
+        /* Control Panel */
+        #controls {
+            background: #0f0c08;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 2px solid #8b4513;
+            height: 80px;
+            z-index: 20;
+        }
+
+        .btn {
+            background: linear-gradient(180deg, #8b4513, #5a2d0c);
+            border: 1px solid #a0522d;
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            transition: all 0.1s;
+        }
+
+        .btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .btn.recording {
+            background: linear-gradient(180deg, #ff4444, #cc0000);
+            animation: pulse-red 1.5s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            padding: 10px;
+            background: #2d241b;
+            border-bottom: 2px solid #8b4513;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            z-index: 20;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Resonator Body (Decorative) */
+        #resonator {
+            height: 60px;
+            background: radial-gradient(circle at 50% 30%, #5a2d0c, #2d1806);
+            border-radius: 0 0 20px 20px;
+            margin: 0 10px 10px 10px;
+            position: relative;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        
+        #resonator::after {
+            content: '';
+            position: absolute;
+            top: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 40px;
+            background: #111; /* Skin */
+            border-radius: 50%;
+            opacity: 0.8;
+            box-shadow: inset 0 0 10px #000;
+        }
+
+        /* Touch Feedback */
+        .touch-point {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: rgba(255, 215, 0, 0.5);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            box-shadow: 0 0 10px gold;
+        }
+        
+        /* Modal */
+        #start-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            flex-direction: column;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Start Overlay (Required for AudioContext) -->
+    <div id="start-overlay">
+        <div class="text-center p-6 border-2 border-yellow-600 rounded-lg bg-gray-900">
+            <h1 class="text-3xl font-bold mb-4 text-yellow-500">เครื่องดนตรี: รือบับ</h1>
+            <p class="mb-6 text-gray-300">สัมผัสหน้าจอเพื่อเริ่มเล่น</p>
+            <button id="start-btn" class="px-8 py-3 bg-yellow-600 text-black font-bold rounded-full text-xl hover:bg-yellow-500 transition">
+                <i class="fa-solid fa-play mr-2"></i> เริ่มต้น
+            </button>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header>
+        <div class="text-lg font-bold text-yellow-500"><i class="fa-solid fa-music"></i> Thai Rebab</div>
+        <div class="text-xs text-gray-400">Low (ซ้าย) / High (ขวา)</div>
+    </header>
+
+    <!-- Fingerboard / Neck -->
+    <div id="fingerboard" class="wood-bg">
+        <!-- String 1 (Low) -->
+        <div id="string-low-area" class="string-container" data-string="low">
+            <div id="string-low" class="string"></div>
+            <div id="markers-low" class="w-full h-full absolute top-0 left-0 opacity-0 transition-opacity duration-300"></div>
+        </div>
+
+        <!-- String 2 (High) -->
+        <div id="string-high-area" class="string-container" data-string="high">
+            <div id="string-high" class="string"></div>
+            <div id="markers-high" class="w-full h-full absolute top-0 left-0 opacity-0 transition-opacity duration-300"></div>
+        </div>
+    </div>
+
+    <!-- Resonator Body -->
+    <div id="resonator"></div>
+
+    <!-- Controls -->
+    <div id="controls">
+        <button id="toggle-notes-btn" class="btn">
+            <i class="fa-solid fa-eye"></i> โน้ต
+        </button>
+
+        <div class="flex gap-2">
+            <button id="record-btn" class="btn">
+                <i class="fa-solid fa-circle"></i> อัดเสียง
+            </button>
+            <button id="play-btn" class="btn hidden disabled:opacity-50">
+                <i class="fa-solid fa-play"></i> ฟัง
+            </button>
+            <button id="download-btn" class="btn hidden">
+                <i class="fa-solid fa-download"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- Audio Context & Variables ---
+        let audioCtx;
+        let masterGain;
+        let destination; // For recording
+        
+        const voices = {}; // Store active oscillators by touch ID
+        let isRecording = false;
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordedAudioBlob;
+        let showNotes = false;
+
+        // Configuration
+        // Base frequencies (Standard Thai tuning often approximates Fifth interval)
+        // Let's use G3 (196Hz) for Low and D4 (293.66Hz) for High
+        const baseFreqs = {
+            'low': 196.00, 
+            'high': 293.66
+        };
+        
+        const notes = ['ด', 'ร', 'ม', 'ฟ', 'ซ', 'ล', 'ท', 'ดํ', 'รํ', 'มํ', 'ฟํ', 'ซํ'];
+        // Approx relative positions (0.0 to 1.0 from bottom to top)
+        // This is a "Fretless" mapping, simply linear pitch increase for simulation
+        
+        // --- Initialization ---
+        const startBtn = document.getElementById('start-btn');
+        const overlay = document.getElementById('start-overlay');
+        
+        startBtn.addEventListener('click', async () => {
+            await initAudio();
+            overlay.style.display = 'none';
+            generateMarkers();
+        });
+
+        async function initAudio() {
+            if (audioCtx) return;
+            
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            
+            // Create a destination for recording
+            destination = audioCtx.createMediaStreamDestination();
+            
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.8;
+            masterGain.connect(audioCtx.destination); // To speakers
+            masterGain.connect(destination); // To recorder
+        }
+
+        // --- Sound Synthesis (The Rebab Sound) ---
+        function createVoice(freq) {
+            const t = audioCtx.currentTime;
+            
+            // 1. Oscillators
+            // Rebab has a buzzy, nasal sound. Sawtooth is good, slightly filtered.
+            const osc1 = audioCtx.createOscillator();
+            osc1.type = 'sawtooth';
+            osc1.frequency.setValueAtTime(freq, t);
+
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'triangle'; // Add body
+            osc2.frequency.setValueAtTime(freq, t);
+            // Slightly detune for chorus effect (organic sound)
+            osc2.detune.value = 5; 
+
+            // 2. Filter (Resonance)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 2500; // Dampen the harsh high freq
+            filter.Q.value = 2; // Slight resonance
+
+            // 3. Gain Envelope (Bow attack)
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0, t);
+            gainNode.gain.linearRampToValueAtTime(0.4, t + 0.1); // Slow attack (bowing)
+            
+            // Connect graph
+            osc1.connect(filter);
+            osc2.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(masterGain);
+
+            osc1.start(t);
+            osc2.start(t);
+
+            return { osc1, osc2, gainNode, filter };
+        }
+
+        function updateVoicePitch(voice, freq) {
+            const t = audioCtx.currentTime;
+            // Smooth slide (glissando)
+            voice.osc1.frequency.setTargetAtTime(freq, t, 0.05);
+            voice.osc2.frequency.setTargetAtTime(freq, t, 0.05);
+        }
+
+        function stopVoice(voice) {
+            const t = audioCtx.currentTime;
+            // Release envelope (string ringing out slightly)
+            voice.gainNode.gain.cancelScheduledValues(t);
+            voice.gainNode.gain.setValueAtTime(voice.gainNode.gain.value, t);
+            voice.gainNode.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+            
+            voice.osc1.stop(t + 0.2);
+            voice.osc2.stop(t + 0.2);
+            
+            // Cleanup
+            setTimeout(() => {
+                voice.gainNode.disconnect();
+            }, 250);
+        }
+
+        // --- Interaction Logic ---
+        const fingerboard = document.getElementById('fingerboard');
+        const strings = {
+            'low': document.getElementById('string-low'),
+            'high': document.getElementById('string-high')
+        };
+
+        // Helper to get frequency from Y position
+        function getFreqFromPos(yRatio, baseFreq) {
+            // Fretboard length is roughly 1.5 octaves for this sim
+            // Higher y (top of screen) = lower pitch? No, usually top of neck is lower pitch on guitar/violin holding normally?
+            // Wait, for Thai Saw: Top of neck (pegs) = Open String (Low pitch). Bottom (near body) = High pitch.
+            // Let's assume standard holding: Fingers slide DOWN towards the body to increase pitch.
+            // Screen Top = Nut (Low Pitch), Screen Bottom = Body (High Pitch).
+            
+            const octaves = 1.2;
+            // Linear distance to exponential frequency
+            // freq = base * 2^(distance * octaves)
+            return baseFreq * Math.pow(2, yRatio * octaves);
+        }
+
+        function handleTouch(e) {
+            e.preventDefault();
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const rect = fingerboard.getBoundingClientRect();
+            const activeTouches = Array.from(e.touches);
+            const activeIds = activeTouches.map(t => t.identifier);
+
+            // Start/Update notes
+            activeTouches.forEach(touch => {
+                // Determine which string (Left or Right half of fingerboard)
+                const relativeX = touch.clientX - rect.left;
+                const stringType = relativeX < rect.width / 2 ? 'low' : 'high';
+                
+                // Determine Pitch
+                // Y Position: 0 at Top, 1 at Bottom.
+                let relativeY = (touch.clientY - rect.top) / rect.height;
+                // Clamp
+                relativeY = Math.max(0, Math.min(1, relativeY));
+
+                const freq = getFreqFromPos(relativeY, baseFreqs[stringType]);
+
+                if (!voices[touch.identifier]) {
+                    // New Touch -> Start Sound
+                    voices[touch.identifier] = {
+                        voice: createVoice(freq),
+                        string: stringType,
+                        element: createTouchPoint(touch.clientX, touch.clientY)
+                    };
+                    
+                    // Visual Vibration
+                    strings[stringType].classList.add('vibrating');
+                } else {
+                    // Moving Touch -> Slide Pitch
+                    updateVoicePitch(voices[touch.identifier].voice, freq);
+                    updateTouchPoint(voices[touch.identifier].element, touch.clientX, touch.clientY);
+                }
+            });
+
+            // Stop ended notes
+            Object.keys(voices).forEach(id => {
+                if (!activeIds.includes(parseInt(id))) {
+                    stopVoice(voices[id].voice);
+                    
+                    // Remove Visuals
+                    if (voices[id].element) voices[id].element.remove();
+                    
+                    // Check if we should stop string vibration
+                    const stillPlayingString = activeTouches.some(t => {
+                         const tx = t.clientX - rect.left;
+                         const s = tx < rect.width / 2 ? 'low' : 'high';
+                         return s === voices[id].string;
+                    });
+                    
+                    if (!stillPlayingString) {
+                         strings[voices[id].string].classList.remove('vibrating');
+                    }
+                    
+                    delete voices[id];
+                }
+            });
+        }
+
+        // --- Visual Helpers ---
+        function createTouchPoint(x, y) {
+            const el = document.createElement('div');
+            el.className = 'touch-point';
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            document.body.appendChild(el);
+            return el;
+        }
+
+        function updateTouchPoint(el, x, y) {
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+        }
+
+        function generateMarkers() {
+            const lowContainer = document.getElementById('markers-low');
+            const highContainer = document.getElementById('markers-high');
+            lowContainer.innerHTML = '';
+            highContainer.innerHTML = '';
+
+            // Simple chromatic scale markers logic
+            // 12 semitones in 1 octave
+            const semitones = 15; // Range of board
+            const boardHeight = fingerboard.offsetHeight;
+            const octavesRange = 1.2;
+
+            for (let i = 0; i <= semitones; i++) {
+                // Calculate position based on the log formula reverse
+                // freq = base * 2^(pos * octaves)
+                // semitone ratio = 2^(i/12)
+                // 2^(i/12) = 2^(pos * octaves) -> i/12 = pos * octaves -> pos = i / (12 * octaves)
+                
+                let pos = i / (12 * octavesRange);
+                if (pos > 0.95) break;
+
+                const topPct = pos * 100;
+                
+                // Add Marker Low String
+                if (i % 2 === 0 || i === 0) { // Show some markers, not all to avoid clutter
+                    // Need note name logic here if we want to be precise, 
+                    // but for visual aid just lines are okay.
+                    // Let's add note names roughly
+                    
+                    // Low String (G)
+                    // 0=G, 2=A, 4=B, 5=C, 7=D, 9=E, 11=F#, 12=G
+                    
+                    const m1 = document.createElement('div');
+                    m1.className = 'fret-marker';
+                    m1.style.top = topPct + '%';
+                    m1.innerHTML = (i === 0) ? "สายเปล่า" : ``; 
+                    lowContainer.appendChild(m1);
+
+                    const m2 = document.createElement('div');
+                    m2.className = 'fret-marker';
+                    m2.style.top = topPct + '%';
+                    m2.innerHTML = (i === 0) ? "สายเปล่า" : ``;
+                    highContainer.appendChild(m2);
+                }
+            }
+        }
+
+        // Event Listeners for Touch
+        fingerboard.addEventListener('touchstart', handleTouch, { passive: false });
+        fingerboard.addEventListener('touchmove', handleTouch, { passive: false });
+        fingerboard.addEventListener('touchend', handleTouch, { passive: false });
+        fingerboard.addEventListener('touchcancel', handleTouch, { passive: false });
+        
+        // Mouse Fallback for testing on PC
+        let mouseDown = false;
+        fingerboard.addEventListener('mousedown', (e) => {
+            mouseDown = true;
+            // Mock a touch object
+            const mockTouch = { identifier: 999, clientX: e.clientX, clientY: e.clientY };
+            handleTouch({ touches: [mockTouch], preventDefault: () => {} });
+        });
+        fingerboard.addEventListener('mousemove', (e) => {
+            if (mouseDown) {
+                const mockTouch = { identifier: 999, clientX: e.clientX, clientY: e.clientY };
+                handleTouch({ touches: [mockTouch], preventDefault: () => {} });
+            }
+        });
+        window.addEventListener('mouseup', (e) => {
+            mouseDown = false;
+            handleTouch({ touches: [], preventDefault: () => {} });
+        });
+
+
+        // --- UI Controls ---
+
+        // Toggle Notes
+        const toggleBtn = document.getElementById('toggle-notes-btn');
+        toggleBtn.addEventListener('click', () => {
+            showNotes = !showNotes;
+            const low = document.getElementById('markers-low');
+            const high = document.getElementById('markers-high');
+            if (showNotes) {
+                low.classList.remove('opacity-0');
+                high.classList.remove('opacity-0');
+                toggleBtn.classList.add('bg-yellow-700');
+            } else {
+                low.classList.add('opacity-0');
+                high.classList.add('opacity-0');
+                toggleBtn.classList.remove('bg-yellow-700');
+            }
+        });
+
+        // Recording Logic
+        const recordBtn = document.getElementById('record-btn');
+        const playBtn = document.getElementById('play-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        let audioPlayer = new Audio();
+
+        recordBtn.addEventListener('click', () => {
+            if (!audioCtx) return;
+            
+            if (!isRecording) {
+                // Start Recording
+                const stream = destination.stream;
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    recordedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const audioUrl = URL.createObjectURL(recordedAudioBlob);
+                    audioPlayer.src = audioUrl;
+                    
+                    // Enable Play and Download
+                    playBtn.classList.remove('hidden');
+                    downloadBtn.classList.remove('hidden');
+                    playBtn.disabled = false;
+                    
+                    // Setup Download
+                    downloadBtn.onclick = () => {
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = audioUrl;
+                        a.download = 'thai_rebab_recording.webm';
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => {
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(audioUrl); 
+                        }, 100);
+                    };
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.innerHTML = '<i class="fa-solid fa-stop"></i> หยุด';
+                recordBtn.classList.add('recording');
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.innerHTML = '<i class="fa-solid fa-circle"></i> อัดเสียง';
+                recordBtn.classList.remove('recording');
+            }
+        });
+
+        playBtn.addEventListener('click', () => {
+            if (recordedAudioBlob) {
+                audioPlayer.play();
+            }
+        });
+
+    </script>
+</body>
+</html>

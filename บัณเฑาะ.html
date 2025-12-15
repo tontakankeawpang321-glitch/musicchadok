@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>บัณเฑาะว์จำลอง (Virtual Bandho)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background: radial-gradient(circle at center, #2b0505 0%, #000000 100%);
+            color: #fff;
+            overflow: hidden; /* Prevent scrolling on mobile */
+            touch-action: manipulation;
+        }
+
+        /* Bandho Container */
+        .instrument-container {
+            position: relative;
+            height: 50vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        /* The Drum SVG Wrapper */
+        .bandho-svg {
+            width: 200px;
+            height: 300px;
+            cursor: pointer;
+            filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.3));
+            transition: transform 0.1s;
+            z-index: 10;
+        }
+
+        /* Ball Animation */
+        .ball-string {
+            transform-origin: 50% 50%;
+            transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .bandho-body {
+            fill: url(#goldGradient);
+        }
+
+        .drum-head {
+            fill: #e3dcd2; /* Skin color */
+            stroke: #8b4513;
+            stroke-width: 2;
+        }
+
+        /* Animation Classes */
+        .shake-left {
+            transform: rotate(-15deg);
+        }
+        .shake-right {
+            transform: rotate(15deg);
+        }
+
+        .hit-effect {
+            animation: pulse-ring 0.3s cubic-bezier(0.215, 0.61, 0.355, 1);
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Controls */
+        .control-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px 20px 0 0;
+            padding: 20px;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            border-top: 1px solid rgba(255, 215, 0, 0.3);
+        }
+
+        .btn {
+            border: none;
+            padding: 12px 20px;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn-gold {
+            background: linear-gradient(135deg, #FFD700, #DAA520);
+            color: #3e2723;
+        }
+
+        .btn-red {
+            background: linear-gradient(135deg, #ff5252, #d32f2f);
+            color: white;
+        }
+
+        .btn-green {
+            background: linear-gradient(135deg, #69f0ae, #2e7d32);
+            color: #003300;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid #FFD700;
+            color: #FFD700;
+        }
+
+        /* Visualizer */
+        #visualizer {
+            width: 100%;
+            height: 60px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        /* Overlay for "Start" */
+        #overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .pulse-text {
+            animation: pulse-gold 2s infinite;
+        }
+
+        @keyframes pulse-gold {
+            0% { text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+            50% { text-shadow: 0 0 25px rgba(255, 215, 0, 1); }
+            100% { text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+        }
+
+        /* Note Bubble */
+        .note-bubble {
+            position: absolute;
+            font-size: 24px;
+            font-weight: bold;
+            color: #FFD700;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(0);
+            transition: all 0.5s ease-out;
+        }
+        
+        .note-active {
+            opacity: 1;
+            transform: translateY(-50px);
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Start Overlay -->
+    <div id="overlay">
+        <h1 class="text-4xl font-bold text-yellow-400 mb-4 pulse-text">บัณเฑาะว์ไทย</h1>
+        <p class="mb-8 text-gray-300">จำลองเสียงสมจริงเสมือนจริง<br>Virtual Thai Bandho Instrument</p>
+        <button id="startBtn" class="btn btn-gold text-xl px-8 py-4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            เริ่มเล่น (Start)
+        </button>
+    </div>
+
+    <!-- Main Content -->
+    <div class="h-screen flex flex-col items-center">
+        <!-- Header -->
+        <div class="w-full text-center mt-6 z-20">
+            <h2 class="text-2xl text-yellow-500 font-bold tracking-wider">บัณเฑาะว์ (Bandho)</h2>
+            <p class="text-xs text-gray-400">แตะที่ตัวเครื่องเพื่อเขย่าและทำเสียง</p>
+        </div>
+
+        <!-- Instrument Area -->
+        <div class="instrument-container w-full" id="clickArea">
+            <div id="noteDisplay" class="note-bubble">ตุ๊บ!</div>
+            
+            <svg class="bandho-svg" id="bandhoSvg" viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:#B8860B;stop-opacity:1" />
+                        <stop offset="50%" style="stop-color:#FFD700;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#B8860B;stop-opacity:1" />
+                    </linearGradient>
+                    <radialGradient id="skinGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                        <stop offset="0%" style="stop-color:#f5f5dc;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#d2b48c;stop-opacity:1" />
+                    </radialGradient>
+                </defs>
+
+                <!-- Handle -->
+                <rect x="90" y="200" width="20" height="100" rx="5" fill="url(#goldGradient)" />
+                
+                <!-- Drum Body (Hourglass shape) -->
+                <path d="M60 50 Q100 150 60 250 L140 250 Q100 150 140 50 Z" class="bandho-body" stroke="#5c3a00" stroke-width="2"/>
+                
+                <!-- Drum Heads -->
+                <ellipse cx="100" cy="50" rx="40" ry="15" class="drum-head" fill="url(#skinGradient)" />
+                <ellipse cx="100" cy="250" rx="40" ry="15" class="drum-head" fill="url(#skinGradient)" />
+
+                <!-- The String and Ball (Animated Group) -->
+                <g id="stringGroup" class="ball-string">
+                    <!-- Pivot Point is center of drum waist approx -->
+                     <circle cx="100" cy="150" r="5" fill="#3e2723" />
+                     <!-- String -->
+                     <line x1="100" y1="150" x2="160" y2="120" stroke="#f0e68c" stroke-width="3" id="stringLine"/>
+                     <!-- Ball -->
+                     <circle cx="160" cy="120" r="12" fill="#8b0000" stroke="#ff0000" stroke-width="2" id="stringBall"/>
+                </g>
+            </svg>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="control-panel w-full max-w-md">
+            <!-- Recording Controls -->
+            <div class="flex justify-between items-center gap-2">
+                <button id="recordBtn" class="btn btn-red flex-1">
+                    <span id="recIcon">●</span> <span id="recText">อัดเสียง</span>
+                </button>
+                <button id="playBtn" class="btn btn-green flex-1" disabled>
+                    <span>▶</span> เล่นเสียง
+                </button>
+                <button id="downloadBtn" class="btn btn-outline" disabled title="Download">
+                    ⬇
+                </button>
+            </div>
+
+            <!-- Toggle Visualizer/Note -->
+            <div class="flex justify-between items-center mt-2 px-2">
+                <span class="text-sm text-gray-300">แสดงจังหวะ (Visualizer)</span>
+                <button id="noteToggle" class="w-12 h-6 rounded-full bg-green-500 relative transition-colors duration-200">
+                    <div class="w-4 h-4 bg-white rounded-full absolute top-1 right-1 transition-transform"></div>
+                </button>
+            </div>
+            
+            <canvas id="visualizer"></canvas>
+            
+            <p class="text-[10px] text-center text-gray-500 mt-2">© Thai Virtual Instruments. สัมผัสหน้าจอเพื่อเล่น</p>
+        </div>
+    </div>
+
+    <script>
+        // --- Audio Context & Synth Engine ---
+        let audioCtx;
+        let masterGain;
+        let dest; // MediaStreamDestination for recording
+        let isAudioInit = false;
+
+        // Recording globals
+        let mediaRecorder;
+        let recordedChunks = [];
+        let audioBlob;
+        let audioUrl;
+        let isRecording = false;
+
+        const startBtn = document.getElementById('startBtn');
+        const overlay = document.getElementById('overlay');
+
+        // Initialize Audio
+        function initAudio() {
+            if (isAudioInit) return;
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            
+            // Master Gain
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.8;
+            
+            // Recorder Destination
+            dest = audioCtx.createMediaStreamDestination();
+            masterGain.connect(audioCtx.destination);
+            masterGain.connect(dest); // Connect to recorder
+
+            isAudioInit = true;
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.style.display = 'none', 500);
+            
+            // Setup Visualizer
+            setupVisualizer();
+        }
+
+        startBtn.addEventListener('click', initAudio);
+
+        // --- Synthesis Logic (The Bandho Sound) ---
+        // Bandho sounds are dull thuds with a slight resonance.
+        function playBandhoSound() {
+            if (!isAudioInit) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const t = audioCtx.currentTime;
+
+            // 1. Low Frequency Impact (The "Thud")
+            const osc = audioCtx.createOscillator();
+            const oscGain = audioCtx.createGain();
+            
+            osc.frequency.setValueAtTime(180, t);
+            osc.frequency.exponentialRampToValueAtTime(80, t + 0.1); // Pitch drop
+            
+            oscGain.gain.setValueAtTime(1, t);
+            oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.15); // Quick decay
+
+            osc.connect(oscGain);
+            oscGain.connect(masterGain);
+
+            osc.start(t);
+            osc.stop(t + 0.2);
+
+            // 2. Noise Burst (The "Slap" on skin)
+            const bufferSize = audioCtx.sampleRate * 0.1; // 0.1 sec buffer
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1);
+            }
+
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'lowpass';
+            noiseFilter.frequency.value = 800;
+
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.5, t);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(masterGain);
+
+            noise.start(t);
+        }
+
+        // --- Visual Animation Logic ---
+        const bandhoSvg = document.getElementById('bandhoSvg');
+        const stringGroup = document.getElementById('stringGroup');
+        const clickArea = document.getElementById('clickArea');
+        const noteDisplay = document.getElementById('noteDisplay');
+        let isLeft = true; // Toggle direction
+
+        function triggerAnimation() {
+            // Remove previous classes to restart anim
+            bandhoSvg.classList.remove('shake-left', 'shake-right', 'hit-effect');
+            void bandhoSvg.offsetWidth; // Force reflow
+
+            // Rotate Drum
+            if (isLeft) {
+                bandhoSvg.classList.add('shake-left');
+                // Animate String
+                stringGroup.style.transform = 'rotate(45deg)'; 
+            } else {
+                bandhoSvg.classList.add('shake-right');
+                stringGroup.style.transform = 'rotate(-45deg)';
+            }
+            bandhoSvg.classList.add('hit-effect');
+            
+            // Reset String after short delay
+            setTimeout(() => {
+                stringGroup.style.transform = 'rotate(0deg)';
+                bandhoSvg.classList.remove('shake-left', 'shake-right');
+            }, 150);
+
+            // Toggle direction for next hit
+            isLeft = !isLeft;
+
+            // Show Note Bubble
+            if (showNotes) {
+                showNoteBubble();
+            }
+        }
+
+        function showNoteBubble() {
+            // Reset animation
+            noteDisplay.classList.remove('note-active');
+            void noteDisplay.offsetWidth;
+            
+            // Randomize position slightly
+            const rX = (Math.random() * 40) - 20;
+            noteDisplay.style.left = `calc(50% + ${rX}px)`;
+            
+            noteDisplay.classList.add('note-active');
+        }
+
+        function handleInteract(e) {
+            e.preventDefault(); // Prevent zoom/scroll
+            if(!isAudioInit) return;
+            
+            playBandhoSound();
+            triggerAnimation();
+        }
+
+        // Interaction Listeners (Touch & Click)
+        clickArea.addEventListener('mousedown', handleInteract);
+        clickArea.addEventListener('touchstart', handleInteract, {passive: false});
+        // Key press support (Spacebar)
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && isAudioInit) {
+                playBandhoSound();
+                triggerAnimation();
+            }
+        });
+
+        // --- Recording Logic ---
+        const recordBtn = document.getElementById('recordBtn');
+        const playBtn = document.getElementById('playBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const recText = document.getElementById('recText');
+        const recIcon = document.getElementById('recIcon');
+
+        recordBtn.addEventListener('click', () => {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        });
+
+        function startRecording() {
+            recordedChunks = [];
+            // Create recorder from the WebAudio destination
+            // Note: mimeType support varies. browser will pick default (usually webm/opus)
+            const options = { mimeType: 'audio/webm' };
+            
+            try {
+                mediaRecorder = new MediaRecorder(dest.stream, options);
+            } catch (e) {
+                // Fallback for Safari/Older browsers
+                mediaRecorder = new MediaRecorder(dest.stream);
+            }
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+                audioUrl = URL.createObjectURL(audioBlob);
+                playBtn.disabled = false;
+                downloadBtn.disabled = false;
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            
+            // UI Update
+            recordBtn.classList.replace('btn-red', 'btn-outline');
+            recordBtn.style.borderColor = '#ff5252';
+            recordBtn.style.color = '#ff5252';
+            recText.textContent = "หยุดอัด (Stop)";
+            recIcon.classList.add('animate-pulse');
+            
+            playBtn.disabled = true;
+            downloadBtn.disabled = true;
+        }
+
+        function stopRecording() {
+            mediaRecorder.stop();
+            isRecording = false;
+
+            // UI Update
+            recordBtn.classList.replace('btn-outline', 'btn-red');
+            recordBtn.style.borderColor = '';
+            recordBtn.style.color = '';
+            recText.textContent = "อัดเสียง (Rec)";
+            recIcon.classList.remove('animate-pulse');
+        }
+
+        playBtn.addEventListener('click', () => {
+            if (!audioUrl) return;
+            const audio = new Audio(audioUrl);
+            audio.play();
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            if (!audioUrl) return;
+            const a = document.createElement('a');
+            a.href = audioUrl;
+            a.download = `bandho-recording-${Date.now()}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+
+        // --- Visualizer / Note Toggle ---
+        const canvas = document.getElementById('visualizer');
+        const canvasCtx = canvas.getContext('2d');
+        const noteToggle = document.getElementById('noteToggle');
+        let analyser;
+        let showNotes = true;
+
+        // Resize canvas
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        noteToggle.addEventListener('click', () => {
+            showNotes = !showNotes;
+            const knob = noteToggle.querySelector('div');
+            if (showNotes) {
+                noteToggle.classList.add('bg-green-500');
+                noteToggle.classList.remove('bg-gray-500');
+                knob.style.transform = 'translateX(0)';
+                knob.style.left = 'auto';
+                knob.style.right = '4px';
+            } else {
+                noteToggle.classList.remove('bg-green-500');
+                noteToggle.classList.add('bg-gray-500');
+                knob.style.transform = 'translateX(-24px)';
+            }
+        });
+
+        function setupVisualizer() {
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 64; // Low res for simple bars
+            masterGain.connect(analyser); // Listen to master out
+            
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            function draw() {
+                requestAnimationFrame(draw);
+                analyser.getByteFrequencyData(dataArray);
+
+                canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.2)'; // Fade effect
+                canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+                const barWidth = (canvas.width / bufferLength) * 2.5;
+                let barHeight;
+                let x = 0;
+
+                for(let i = 0; i < bufferLength; i++) {
+                    barHeight = dataArray[i] / 2;
+                    // Gold color bars
+                    canvasCtx.fillStyle = `rgb(${barHeight + 100}, ${barHeight + 150}, 50)`;
+                    canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+
+                    x += barWidth + 1;
+                }
+            }
+            draw();
+        }
+
+    </script>
+</body>
+</html>

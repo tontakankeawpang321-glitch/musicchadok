@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ฉาบไทยจำลอง (Virtual Chab)</title>
+    <!-- ใช้ Tailwind CSS สำหรับ Layout ที่รวดเร็ว -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome สำหรับไอคอน -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #1a1a1a;
+            color: white;
+            overflow: hidden; /* ป้องกันการเลื่อนหน้าจอ */
+            touch-action: none; /* ป้องกัน Zoom/Scroll บนมือถือ */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* การสร้างกราฟิกฉาบด้วย CSS ล้วนๆ เพื่อความชัดและโหลดไว */
+        .cymbal {
+            position: relative;
+            border-radius: 50%;
+            background: radial-gradient(circle, #fceabb 0%, #fccd4d 50%, #f8b500 51%, #fbdf93 100%);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5), inset 0 0 20px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: transform 0.05s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 2px solid #b8860b;
+        }
+
+        /* ลวดลายวงแหวนบนเนื้อโลหะ */
+        .cymbal::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: 50%;
+            background: repeating-radial-gradient(
+                transparent 0,
+                transparent 4px,
+                rgba(0,0,0,0.1) 5px,
+                rgba(0,0,0,0.1) 6px
+            );
+            pointer-events: none;
+        }
+
+        /* ส่วนนูนตรงกลาง (Boos) */
+        .cymbal::after {
+            content: '';
+            position: absolute;
+            width: 20%;
+            height: 20%;
+            background: radial-gradient(circle, #fff5c3 0%, #daa520 100%);
+            border-radius: 50%;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+            pointer-events: none;
+        }
+
+        .cymbal:active, .cymbal.hit {
+            transform: scale(0.95) rotate(5deg);
+            filter: brightness(1.1);
+        }
+
+        /* แสงสะท้อน */
+        .shine {
+            position: absolute;
+            top: 10%;
+            left: 20%;
+            width: 30%;
+            height: 20%;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            transform: rotate(-45deg);
+            filter: blur(10px);
+            pointer-events: none;
+        }
+
+        .controls {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            border-radius: 15px;
+            padding: 10px;
+        }
+
+        .btn-control {
+            transition: all 0.2s;
+        }
+        .btn-control:active {
+            transform: scale(0.9);
+        }
+
+        .recording-dot {
+            width: 12px;
+            height: 12px;
+            background-color: red;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* ชื่อโน้ต */
+        .note-label {
+            position: absolute;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: rgba(0, 0, 0, 0.7);
+            text-shadow: 1px 1px 0 rgba(255,255,255,0.5);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 10;
+        }
+
+        .show-notes .note-label {
+            opacity: 1;
+        }
+
+        /* Layout สำหรับแนวนอนและแนวตั้ง */
+        .stage {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            height: 100%;
+        }
+
+        @media (orientation: portrait) {
+            .stage {
+                flex-direction: column;
+            }
+            .cymbal {
+                width: 70vw;
+                height: 70vw;
+                max-width: 300px;
+                max-height: 300px;
+            }
+        }
+
+        @media (orientation: landscape) {
+            .stage {
+                flex-direction: row;
+            }
+            .cymbal {
+                width: 40vh;
+                height: 40vh;
+                max-width: 350px;
+                max-height: 350px;
+            }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-between py-4 bg-gradient-to-b from-gray-900 to-black">
+
+    <!-- Header / Controls -->
+    <div class="w-full px-4 flex justify-between items-center z-20 h-16">
+        <h1 class="text-xl font-bold text-yellow-500 flex items-center gap-2">
+            <i class="fas fa-drum-steelpan"></i> ฉาบไทย
+        </h1>
+        
+        <div class="controls flex gap-3 items-center">
+            <!-- Toggle Notes -->
+            <button id="btn-notes" class="btn-control p-2 rounded-full bg-gray-700 text-white w-10 h-10 flex items-center justify-center border border-gray-600">
+                <i class="fas fa-music"></i>
+            </button>
+
+            <!-- Record -->
+            <button id="btn-record" class="btn-control p-2 rounded-full bg-red-600 text-white w-10 h-10 flex items-center justify-center shadow-lg border-2 border-red-400">
+                <i class="fas fa-microphone"></i>
+            </button>
+
+            <!-- Playback (Hidden initially) -->
+            <button id="btn-play" class="hidden btn-control p-2 rounded-full bg-green-600 text-white w-10 h-10 flex items-center justify-center shadow-lg">
+                <i class="fas fa-play"></i>
+            </button>
+
+            <!-- Download (Hidden initially) -->
+            <a id="btn-download" class="hidden btn-control p-2 rounded-full bg-blue-500 text-white w-10 h-10 flex items-center justify-center shadow-lg" download="my_cymbal_solo.webm">
+                <i class="fas fa-download"></i>
+            </a>
+        </div>
+    </div>
+
+    <div id="status-text" class="text-xs text-gray-400 h-4 mb-2">แตะที่ฉาบเพื่อเล่นเสียง</div>
+
+    <!-- Main Stage -->
+    <div id="stage" class="stage w-full flex-grow relative pb-8">
+        <!-- ฉาบเล็ก (เสียงสูง/สั้น) -->
+        <div class="cymbal" id="cymbal-left" data-note="ฉาบเล็ก">
+            <div class="shine"></div>
+            <span class="note-label">ฉาบเล็ก</span>
+        </div>
+
+        <!-- ฉาบใหญ่ (เสียงต่ำ/ก้อง) -->
+        <div class="cymbal" id="cymbal-right" data-note="ฉาบใหญ่">
+            <div class="shine"></div>
+            <span class="note-label">ฉาบใหญ่</span>
+        </div>
+    </div>
+
+    <script>
+        // --- Audio Engine (Web Audio API) ---
+        // ใช้การสังเคราะห์เสียง (Synthesis) แทนการโหลดไฟล์ mp3 เพื่อความเร็วสูงสุดและไม่ต้องรอโหลด
+        
+        let audioCtx;
+        let dest; // Destination for recording
+        let mainGain;
+        
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                // สร้าง Node สำหรับส่งเสียงไปทั้งลำโพงและตัวอัดเสียง
+                mainGain = audioCtx.createGain();
+                mainGain.gain.value = 0.8;
+                
+                dest = audioCtx.createMediaStreamDestination();
+                
+                mainGain.connect(audioCtx.destination); // ออกลำโพง
+                mainGain.connect(dest); // เข้าตัวอัด
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // ฟังก์ชันสร้างเสียง Noise (พื้นฐานของเสียงฉาบ)
+        function createNoiseBuffer() {
+            const bufferSize = audioCtx.sampleRate * 2; // 2 วินาที
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            return buffer;
+        }
+
+        // ฟังก์ชันสังเคราะห์เสียงฉาบ
+        function playCymbalSound(type) {
+            initAudio();
+            const t = audioCtx.currentTime;
+
+            // 1. Noise Component (เสียงซ่าของโลหะ)
+            const noiseBuffer = createNoiseBuffer();
+            const noiseSrc = audioCtx.createBufferSource();
+            noiseSrc.buffer = noiseBuffer;
+            
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'highpass';
+            noiseFilter.frequency.value = type === 'small' ? 2000 : 800; // ฉาบเล็กเสียงแหลมกว่า
+
+            const noiseGain = audioCtx.createGain();
+            // Envelope
+            noiseGain.gain.setValueAtTime(1, t);
+            // Decay: ฉาบเล็กสั้นกว่า (0.5s), ฉาบใหญ่ยาวกว่า (1.5s)
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + (type === 'small' ? 0.6 : 1.8));
+
+            noiseSrc.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(mainGain);
+            
+            noiseSrc.start(t);
+            noiseSrc.stop(t + 2);
+
+            // 2. Metallic Ring Component (เสียงก้องกังวานของโลหะ)
+            // ใช้ Oscillator หลายตัวเพื่อสร้างความไม่ประสานเสียง (Inharmonicity)
+            const ratios = type === 'small' ? [2, 3, 4.1, 5.8] : [1, 1.4, 1.9, 2.6];
+            const baseFreq = type === 'small' ? 800 : 350;
+
+            ratios.forEach(ratio => {
+                const osc = audioCtx.createOscillator();
+                osc.type = 'square'; // Square wave ให้เสียงโลหะได้ดี
+                osc.frequency.value = baseFreq * ratio;
+
+                const oscFilter = audioCtx.createBiquadFilter();
+                oscFilter.type = 'bandpass';
+                oscFilter.frequency.value = baseFreq * ratio;
+                oscFilter.Q.value = 10; // คัดเฉพาะความถี่นั้นๆ
+
+                const oscGain = audioCtx.createGain();
+                oscGain.gain.setValueAtTime(0.1, t);
+                oscGain.gain.exponentialRampToValueAtTime(0.001, t + (type === 'small' ? 0.3 : 0.8));
+
+                osc.connect(oscFilter);
+                oscFilter.connect(oscGain);
+                oscGain.connect(mainGain);
+
+                osc.start(t);
+                osc.stop(t + 1);
+            });
+        }
+
+        // --- Interaction Logic ---
+
+        const leftCymbal = document.getElementById('cymbal-left');
+        const rightCymbal = document.getElementById('cymbal-right');
+        const stage = document.getElementById('stage');
+        const btnNotes = document.getElementById('btn-notes');
+
+        function triggerCymbal(element, type) {
+            // Visual feedback
+            element.classList.add('hit');
+            setTimeout(() => element.classList.remove('hit'), 100);
+
+            // Audio trigger
+            playCymbalSound(type);
+        }
+
+        // รองรับ Touch Event (มือถือ) และ Click (เมาส์)
+        // ใช้ preventDefault เพื่อป้องกัน double tap zoom
+        const addHitListener = (el, type) => {
+            el.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // ป้องกัน ghost click
+                triggerCymbal(el, type);
+            }, { passive: false });
+
+            el.addEventListener('mousedown', (e) => {
+                triggerCymbal(el, type);
+            });
+        };
+
+        addHitListener(leftCymbal, 'small');
+        addHitListener(rightCymbal, 'large');
+
+        // Toggle Show Notes
+        btnNotes.addEventListener('click', () => {
+            stage.classList.toggle('show-notes');
+            btnNotes.classList.toggle('bg-yellow-500');
+            btnNotes.classList.toggle('text-black');
+        });
+
+
+        // --- Recording Logic ---
+        
+        let mediaRecorder;
+        let chunks = [];
+        let audioBlob;
+        let recordedAudio = new Audio();
+        let isRecording = false;
+
+        const btnRecord = document.getElementById('btn-record');
+        const btnPlay = document.getElementById('btn-play');
+        const btnDownload = document.getElementById('btn-download');
+        const statusText = document.getElementById('status-text');
+
+        btnRecord.addEventListener('click', () => {
+            initAudio(); // Ensure context is ready
+            
+            if (!isRecording) {
+                // Start Recording
+                chunks = [];
+                // บันทึกเสียงจาก Destination Node (Synth output)
+                const stream = dest.stream;
+                mediaRecorder = new MediaRecorder(stream);
+
+                mediaRecorder.ondataavailable = (e) => {
+                    chunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    audioBlob = new Blob(chunks, { type: 'audio/webm' });
+                    const audioURL = URL.createObjectURL(audioBlob);
+                    recordedAudio.src = audioURL;
+                    
+                    // เปิดปุ่ม Play และ Download
+                    btnPlay.classList.remove('hidden');
+                    btnDownload.classList.remove('hidden');
+                    btnDownload.href = audioURL;
+                    
+                    statusText.textContent = "บันทึกเสร็จสิ้น พร้อมเล่นหรือดาวน์โหลด";
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                
+                // UI update
+                btnRecord.innerHTML = '<div class="recording-dot"></div>';
+                btnRecord.classList.remove('bg-red-600');
+                btnRecord.classList.add('bg-gray-800');
+                statusText.textContent = "กำลังบันทึกเสียง... (กดปุ่มเดิมเพื่อหยุด)";
+                
+                // ซ่อนปุ่มอื่นขณะอัด
+                btnPlay.classList.add('hidden');
+                btnDownload.classList.add('hidden');
+
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+
+                // UI update
+                btnRecord.innerHTML = '<i class="fas fa-microphone"></i>';
+                btnRecord.classList.add('bg-red-600');
+                btnRecord.classList.remove('bg-gray-800');
+            }
+        });
+
+        // Playback Logic
+        btnPlay.addEventListener('click', () => {
+            if (recordedAudio.src) {
+                if (recordedAudio.paused) {
+                    recordedAudio.play();
+                    btnPlay.innerHTML = '<i class="fas fa-stop"></i>';
+                    statusText.textContent = "กำลังเล่นเสียงที่บันทึก...";
+                } else {
+                    recordedAudio.pause();
+                    recordedAudio.currentTime = 0;
+                    btnPlay.innerHTML = '<i class="fas fa-play"></i>';
+                    statusText.textContent = "หยุดเล่น";
+                }
+            }
+        });
+
+        recordedAudio.onended = () => {
+             btnPlay.innerHTML = '<i class="fas fa-play"></i>';
+             statusText.textContent = "เล่นจบแล้ว";
+        };
+
+    </script>
+</body>
+</html>
