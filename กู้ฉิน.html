@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>กู้ฉินเสมือนจริง (Realistic Virtual Guqin)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;500;700&display=swap');
+
+        :root {
+            --wood-dark: #1a0b05;
+            --wood-light: #3e1e10;
+            --gold: #d4af37;
+            --pearl: #e6e6fa; /* สีมุก */
+            --highlight: #fffae0;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #050505;
+            font-family: 'Sarabun', sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            color: white;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* --- Header & Controls --- */
+        header {
+            background: linear-gradient(to bottom, #111, #1a1a1a);
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+            z-index: 100;
+            border-bottom: 1px solid #333;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: var(--gold);
+            letter-spacing: 1px;
+            text-shadow: 0 0 5px rgba(212, 175, 55, 0.3);
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background: #222;
+            border: 1px solid #555;
+            color: #ccc;
+            padding: 8px 14px;
+            border-radius: 25px;
+            font-family: 'Sarabun', sans-serif;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            outline: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        button:active {
+            transform: scale(0.96);
+        }
+
+        button.active {
+            background: var(--gold);
+            color: #1a0b05;
+            border-color: var(--gold);
+            box-shadow: 0 0 12px rgba(212, 175, 55, 0.4);
+            font-weight: bold;
+        }
+
+        button.recording {
+            background: #d32f2f;
+            border-color: #ff5252;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7); }
+            70% { box-shadow: 0 0 0 8px rgba(211, 47, 47, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); }
+        }
+
+        /* --- Instrument Body --- */
+        .guqin-container {
+            flex: 1;
+            position: relative;
+            /* ลายไม้แบบแลกเกอร์เข้ม (Dark Lacquer) */
+            background: 
+                radial-gradient(circle at 50% 30%, rgba(255,255,255,0.05) 0%, transparent 60%),
+                linear-gradient(90deg, #0a0302 0%, #220d06 15%, #2d1208 50%, #220d06 85%, #0a0302 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-evenly;
+            padding: 20px 0;
+            box-shadow: inset 0 0 80px rgba(0,0,0,1);
+            perspective: 1000px;
+            overflow: hidden;
+        }
+
+        /* Texture Overlay */
+        .guqin-container::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+            pointer-events: none;
+            mix-blend-mode: overlay;
+        }
+
+        /* Bridge (Yueshan) Decoration on the right */
+        .bridge {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 35px;
+            background: linear-gradient(to right, #1a0500, #000);
+            box-shadow: -2px 0 10px rgba(0,0,0,0.8);
+            z-index: 5;
+            border-left: 1px solid rgba(255,255,255,0.05);
+        }
+
+        /* Hui (Dots) - Mother of Pearl Style */
+        .hui-markers {
+            position: absolute;
+            top: 0; bottom: 0; left: 50%; width: 92%; /* ลดความกว้างเพื่อไม่ให้ทับ Bridge */
+            transform: translateX(-53%); /* Shift slightly left */
+            display: flex;
+            flex-direction: row;
+            justify-content: space-evenly;
+            align-items: center;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .hui {
+            width: 8px;
+            height: 8px;
+            background: radial-gradient(circle at 30% 30%, #fff, #a0a0a0);
+            border-radius: 50%;
+            box-shadow: 0 0 2px rgba(255,255,255,0.8), 0 1px 3px rgba(0,0,0,0.8);
+            opacity: 0.9;
+        }
+        
+        .hui.main {
+            width: 14px;
+            height: 14px;
+            background: radial-gradient(circle at 30% 30%, #fff, #c0c0c0);
+            box-shadow: 0 0 4px rgba(255,255,255,0.9), 0 2px 5px rgba(0,0,0,0.8);
+        }
+
+        /* --- Strings --- */
+        .string-container {
+            position: relative;
+            width: 100%;
+            height: 12%; 
+            display: flex;
+            align-items: center;
+            justify-content: flex-start; /* Align left to accommodate bridge */
+            padding-left: 20px; 
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .string {
+            width: 96%; /* เหลือที่ให้ Bridge */
+            height: 2px;
+            /* สายพันเกลียว (Wound String Texture) */
+            background: repeating-linear-gradient(90deg, 
+                #ddd, #ddd 1px, 
+                #bbb 2px, #bbb 3px
+            );
+            box-shadow: 0 4px 6px rgba(0,0,0,0.9);
+            position: relative;
+            transition: transform 0.05s;
+            border-radius: 2px;
+        }
+
+        /* Realistic String Thickness & Texture adjustments */
+        .string[data-index="0"] { height: 6px; background: repeating-linear-gradient(90deg, #999, #999 1px, #777 2px, #777 3px); } 
+        .string[data-index="1"] { height: 5.5px; background: repeating-linear-gradient(90deg, #aaa, #aaa 1px, #888 2px, #888 3px); }
+        .string[data-index="2"] { height: 5px; background: repeating-linear-gradient(90deg, #bbb, #bbb 1px, #999 2px, #999 3px); }
+        .string[data-index="3"] { height: 4.5px; }
+        .string[data-index="4"] { height: 4px; }
+        .string[data-index="5"] { height: 3.5px; }
+        .string[data-index="6"] { height: 3px; opacity: 0.95; } 
+
+        .string.vibrating {
+            animation: vibrate 0.15s ease-in-out infinite;
+        }
+        
+        @keyframes vibrate {
+            0% { transform: translateY(0); }
+            25% { transform: translateY(-2px); }
+            50% { transform: translateY(0); }
+            75% { transform: translateY(2px); }
+            100% { transform: translateY(0); }
+        }
+
+        /* Note Labels */
+        .note-label {
+            position: absolute;
+            left: 20px; /* ย้ายมาซ้าย */
+            color: rgba(255,255,255,0.6);
+            font-size: 0.8rem;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            background: rgba(0,0,0,0.5);
+            padding: 2px 8px;
+            border-radius: 10px;
+            text-shadow: 0 1px 2px black;
+        }
+
+        .show-notes .note-label {
+            opacity: 1;
+        }
+
+        /* Visual Feedback */
+        .touch-feedback {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,250,224,0.6) 0%, transparent 70%);
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            animation: ripple 0.4s ease-out forwards;
+            z-index: 20;
+        }
+
+        @keyframes ripple {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; }
+        }
+
+        /* Overlay */
+        #start-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(10, 5, 2, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            text-align: center;
+            padding: 20px;
+            backdrop-filter: blur(5px);
+        }
+
+        #start-btn {
+            margin-top: 30px;
+            padding: 15px 50px;
+            font-size: 1.2rem;
+            border: 1px solid var(--gold);
+            background: rgba(212, 175, 55, 0.1);
+            color: var(--gold);
+            border-radius: 50px;
+            letter-spacing: 1px;
+        }
+
+        #start-btn:active {
+            background: var(--gold);
+            color: black;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="start-overlay">
+        <h1 style="font-size: 2.5rem; margin-bottom: 5px; color: var(--gold);">古琴</h1>
+        <h2 style="font-size: 1.5rem; margin: 0; font-weight: 300; color: #ccc;">Guqin Simulator</h2>
+        <p style="color: #888; margin-top: 10px; font-size: 0.9rem;">แนะนำให้ใช้หูฟังเพื่อเสียงที่สมจริง</p>
+        <button id="start-btn">แตะเพื่อเริ่ม (Start)</button>
+    </div>
+
+    <header>
+        <h1>Virtual Guqin</h1>
+        <div class="controls">
+            <button id="toggle-notes">
+                <span>🎵</span> โน้ต
+            </button>
+            <button id="record-btn">
+                <span>🔴</span> <span id="rec-text">อัดเสียง</span>
+            </button>
+            <button id="download-btn" disabled style="opacity: 0.4;">
+                <span>⬇️</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="guqin-container" id="guqin-board">
+        <div class="bridge"></div> <!-- Decoration -->
+        
+        <div class="hui-markers">
+             <div class="hui"></div><div class="hui"></div><div class="hui"></div><div class="hui"></div>
+             <div class="hui"></div><div class="hui"></div><div class="hui main"></div>
+             <div class="hui"></div><div class="hui"></div><div class="hui"></div><div class="hui"></div>
+             <div class="hui"></div><div class="hui"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- Tuning & Audio Config ---
+        // Pentatonic Scale: C D F G A C D
+        const TUNING = [
+            { note: "C2", freq: 65.41, name: "Kung (宮)" },
+            { note: "D2", freq: 73.42, name: "Shang (商)" },
+            { note: "F2", freq: 87.31, name: "Chiao (角)" },
+            { note: "G2", freq: 98.00, name: "Chih (徵)" },
+            { note: "A2", freq: 110.00, name: "Yu (羽)" },
+            { note: "C3", freq: 130.81, name: "Wen (文)" },
+            { note: "D3", freq: 146.83, name: "Wu (武)" }
+        ];
+
+        let audioCtx;
+        let masterGain;
+        let reverbNode;
+        let mediaRecorder;
+        let recordedChunks = [];
+        let destNode;
+        let isRecording = false;
+
+        const board = document.getElementById('guqin-board');
+
+        // --- Init Audio ---
+        async function initAudio() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.6; // ลดความดังรวมลงเล็กน้อยเพื่อป้องกัน Distortion เมื่อเล่นหลายสาย
+                
+                // High Quality Reverb
+                reverbNode = audioCtx.createConvolver();
+                reverbNode.buffer = await createReverbBuffer(audioCtx);
+                
+                // Compressor for stability
+                const compressor = audioCtx.createDynamicsCompressor();
+                compressor.threshold.setValueAtTime(-10, audioCtx.currentTime);
+                compressor.knee.setValueAtTime(40, audioCtx.currentTime);
+                compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+                compressor.attack.setValueAtTime(0, audioCtx.currentTime);
+                compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+
+                // Routing: Master -> Reverb -> Compressor -> Destination
+                //          Master -> Compressor -> Destination (Dry)
+                masterGain.connect(reverbNode);
+                reverbNode.connect(compressor);
+                masterGain.connect(compressor);
+                compressor.connect(audioCtx.destination);
+
+                // Recording setup
+                destNode = audioCtx.createMediaStreamDestination();
+                compressor.connect(destNode);
+
+                document.getElementById('start-overlay').style.opacity = '0';
+                setTimeout(() => document.getElementById('start-overlay').style.display = 'none', 500);
+            } catch (e) {
+                console.error("Audio Init Failed", e);
+                alert("Audio Init Failed. Please tap again.");
+            }
+        }
+
+        async function createReverbBuffer(ctx) {
+            // สร้าง Impulse Response แบบ High Decay (3.5s)
+            const length = 3.5 * ctx.sampleRate;
+            const decay = 3.0;
+            const buffer = ctx.createBuffer(2, length, ctx.sampleRate);
+            
+            for (let c = 0; c < 2; c++) {
+                const data = buffer.getChannelData(c);
+                for (let i = 0; i < length; i++) {
+                    // noise * exponential decay
+                    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+                }
+            }
+            return buffer;
+        }
+
+        // --- Sound Generation ---
+        function playString(index) {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const t = audioCtx.currentTime;
+            const freq = TUNING[index].freq;
+
+            // Micro-detuning for realism (randomly +/- 0.5 cents)
+            const detune = (Math.random() - 0.5) * 2; 
+
+            // 1. Fundamental Tone (Sawtooth for richness)
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, t);
+            osc.detune.setValueAtTime(detune, t);
+
+            // 2. Body Resonance Filter (Lowpass)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.Q.value = 0.5;
+            // Dynamic Filtering: Bright attack -> Warm sustain
+            filter.frequency.setValueAtTime(2500, t);
+            filter.frequency.exponentialRampToValueAtTime(150, t + 2.5);
+
+            // 3. Amplitude Envelope
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(1.0, t + 0.02); // Quick attack
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 5.0); // Very long release
+
+            // 4. "Zheng" Noise (Finger/String friction scratch - Subtle)
+            const noiseOsc = audioCtx.createOscillator();
+            noiseOsc.type = 'triangle';
+            noiseOsc.frequency.setValueAtTime(freq * 2.01, t); // Slight harmonic mismatch
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0, t);
+            noiseGain.gain.linearRampToValueAtTime(0.15, t + 0.01);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+
+            // Connect graph
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(masterGain);
+
+            noiseOsc.connect(noiseGain);
+            noiseGain.connect(masterGain);
+
+            // Life cycle
+            osc.start(t);
+            osc.stop(t + 5.0);
+            noiseOsc.start(t);
+            noiseOsc.stop(t + 0.5);
+
+            // Cleanup nodes automatically by GC, but stop is essential
+            
+            animateString(index);
+        }
+
+        // --- Visuals ---
+        function createStrings() {
+            TUNING.forEach((data, index) => {
+                const container = document.createElement('div');
+                container.className = 'string-container';
+                container.dataset.index = index;
+
+                const stringDiv = document.createElement('div');
+                stringDiv.className = 'string';
+                stringDiv.dataset.index = index;
+
+                const label = document.createElement('div');
+                label.className = 'note-label';
+                label.innerText = data.name;
+
+                container.appendChild(label);
+                container.appendChild(stringDiv);
+                board.appendChild(container);
+
+                // Mouse interaction (Fallback)
+                container.addEventListener('mousedown', (e) => {
+                    playString(index);
+                    createTouchRipple(e.clientX, e.clientY);
+                });
+            });
+        }
+
+        function animateString(index) {
+            const str = document.querySelectorAll('.string')[index];
+            str.classList.remove('vibrating');
+            void str.offsetWidth;
+            str.classList.add('vibrating');
+            setTimeout(() => str.classList.remove('vibrating'), 1000);
+        }
+
+        function createTouchRipple(x, y) {
+            const ripple = document.createElement('div');
+            ripple.className = 'touch-feedback';
+            ripple.style.left = x + 'px';
+            ripple.style.top = y + 'px';
+            document.body.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 500);
+        }
+
+        // --- Multitouch & Strumming Logic ---
+        // Using a Map to track which finger is currently on which string
+        // to prevent repeated triggering while holding, but allow strumming
+        
+        board.addEventListener('touchstart', handleTouch, { passive: false });
+        board.addEventListener('touchmove', handleTouch, { passive: false });
+        // touchend not needed for logic reset as we track by movement
+
+        function handleTouch(e) {
+            e.preventDefault();
+            const touches = e.changedTouches;
+
+            for (let i = 0; i < touches.length; i++) {
+                const touch = touches[i];
+                const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                
+                if (element) {
+                    const container = element.closest('.string-container');
+                    if (container) {
+                        const index = parseInt(container.dataset.index);
+                        const touchId = touch.identifier;
+                        
+                        // Check if this specific touch just entered this string
+                        // We store the last played string index on the DOM element of the touch? 
+                        // Actually easier: store 'lastTouchId' on the container like before, 
+                        // but logic needs to be robust for multiple fingers.
+                        
+                        // Logic: A string plays if a Touch ID matches it, AND that Touch ID wasn't matching it in the previous frame.
+                        // Implemented via dataset.lastTouch check
+                        
+                        if (container.dataset.lastActiveTouch !== String(touchId)) {
+                            playString(index);
+                            createTouchRipple(touch.clientX, touch.clientY);
+                            container.dataset.lastActiveTouch = touchId;
+                            
+                            // Clear the flag after a short delay so you can tap again quickly
+                            setTimeout(() => {
+                                if(container.dataset.lastActiveTouch === String(touchId)) {
+                                     container.dataset.lastActiveTouch = '';
+                                }
+                            }, 150);
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- Controls ---
+        document.getElementById('start-btn').addEventListener('click', initAudio);
+
+        document.getElementById('toggle-notes').addEventListener('click', function() {
+            board.classList.toggle('show-notes');
+            this.classList.toggle('active');
+        });
+
+        // Record
+        const recBtn = document.getElementById('record-btn');
+        const dlBtn = document.getElementById('download-btn');
+        
+        recBtn.addEventListener('click', () => {
+            if (!audioCtx) initAudio();
+            
+            if (!isRecording) {
+                // Start
+                recordedChunks = [];
+                const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/ogg";
+                mediaRecorder = new MediaRecorder(destNode.stream, { mimeType });
+                
+                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: mimeType });
+                    const url = URL.createObjectURL(blob);
+                    dlBtn.disabled = false;
+                    dlBtn.style.opacity = 1;
+                    dlBtn.onclick = () => {
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `guqin-jam-${Date.now()}.webm`;
+                        a.click();
+                    };
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recBtn.classList.add('recording');
+                document.getElementById('rec-text').innerText = "00:00";
+                
+                // Simple timer visualization could go here
+                
+            } else {
+                // Stop
+                mediaRecorder.stop();
+                isRecording = false;
+                recBtn.classList.remove('recording');
+                document.getElementById('rec-text').innerText = "อัดเสียง";
+            }
+        });
+
+        createStrings();
+
+    </script>
+</body>
+</html>
