@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เครื่องดนตรีจีนเสมือนจริง: ผีผา</title>
+    <style>
+        :root {
+            --bg-color: #2c0e0e;
+            --wood-dark: #3e1e14;
+            --wood-light: #8b4513;
+            --gold: #ffd700;
+            --red: #c92a2a;
+            --string-color: #e0e0e0;
+        }
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(circle at center, #4a1919 0%, #1a0505 100%);
+            color: var(--gold);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+            user-select: none;
+        }
+
+        h1 {
+            margin-top: 20px;
+            text-shadow: 2px 2px 4px black;
+            font-weight: 300;
+            letter-spacing: 2px;
+            text-align: center;
+        }
+
+        /* --- UI Controls --- */
+        .controls-top {
+            display: flex;
+            gap: 15px;
+            margin: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            background: linear-gradient(to bottom, #d4af37, #b8860b);
+            border: 2px solid #5c4010;
+            color: #2c0e0e;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            transition: transform 0.1s, filter 0.2s;
+        }
+
+        button:active {
+            transform: translateY(2px);
+        }
+
+        button:disabled {
+            background: #555;
+            color: #888;
+            cursor: not-allowed;
+            border-color: #333;
+        }
+
+        .recorder-panel {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid var(--gold);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .status-led {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #444;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .status-led.recording {
+            background-color: #ff0000;
+            box-shadow: 0 0 10px #ff0000;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* --- Instrument Stage --- */
+        .stage {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: 500px;
+            display: flex;
+            justify-content: center;
+            perspective: 1000px;
+            margin-top: 20px;
+        }
+
+        .instrument-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .string {
+            width: 2px;
+            height: 100%;
+            background: linear-gradient(90deg, #fff, #bbb, #fff);
+            box-shadow: 1px 0 2px rgba(0,0,0,0.5);
+        }
+
+        /* --- Pipa Visuals --- */
+        .pipa-body {
+            width: 200px;
+            height: 400px;
+            background: linear-gradient(135deg, #8b4513, #5a2d0c);
+            border-radius: 50% 50% 40% 40% / 60% 60% 40% 40%;
+            clip-path: ellipse(45% 48% at 50% 50%); /* Pear shape approx */
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+        }
+
+        .pipa-neck {
+            position: absolute;
+            top: -80px;
+            width: 40px;
+            height: 100px;
+            background: #3e1e14;
+            border-radius: 5px 5px 0 0;
+            z-index: 1;
+        }
+
+        .pipa-frets {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            height: 250px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 25px;
+        }
+
+        .fret {
+            width: 60%;
+            height: 4px;
+            background: #e6dcc3; /* Ivory look */
+            border-radius: 2px;
+            box-shadow: 0 2px 2px rgba(0,0,0,0.4);
+        }
+
+        .pipa-strings-container {
+            position: absolute;
+            top: -80px;
+            height: 450px;
+            width: 40px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* --- Note Buttons --- */
+        .notes-area {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+            width: 100%;
+            padding: 0 20px;
+            z-index: 10;
+        }
+
+        .note-btn {
+            width: 50px;
+            height: 80px;
+            background: linear-gradient(180deg, #f5deb3, #d2b48c);
+            border: 1px solid #8b4513;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            padding-bottom: 10px;
+            font-weight: bold;
+            color: #3e1e14;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #5a2d0c;
+            transition: margin-top 0.1s, box-shadow 0.1s, background 0.2s;
+            position: relative;
+        }
+
+        .note-btn span {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-bottom: 2px;
+        }
+
+        .note-btn b {
+            font-size: 16px;
+        }
+
+        .note-btn:active, .note-btn.playing {
+            margin-top: 4px;
+            box-shadow: 0 0 0 #5a2d0c;
+            background: #ffd700;
+        }
+
+        /* Vibrating effect for strings */
+        .vibrating {
+            animation: vibrate 0.1s infinite;
+        }
+
+        @keyframes vibrate {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(1px); }
+            50% { transform: translateX(0); }
+            75% { transform: translateX(-1px); }
+            100% { transform: translateX(0); }
+        }
+        
+        .footer {
+            margin-top: auto;
+            padding: 20px;
+            font-size: 0.8em;
+            color: #aaa;
+        }
+
+        /* Mobile specific adjustments */
+        @media (max-width: 600px) {
+            .pipa-body { transform: scale(0.8); }
+            .note-btn { width: 40px; height: 60px; }
+            h1 { font-size: 1.5em; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>ผีผาจำลอง (Pipa)</h1>
+
+    <div class="recorder-panel">
+        <div id="led" class="status-led"></div>
+        <button id="btn-record" onclick="toggleRecording()">อัดเสียง</button>
+        <button id="btn-play-record" disabled onclick="playRecording()">เล่นเสียงที่อัด</button>
+        <button id="btn-download" disabled onclick="downloadRecording()">ดาวน์โหลด</button>
+    </div>
+
+    <div class="stage">
+        <!-- PIPA LAYOUT -->
+        <div id="pipa-container" class="instrument-container active">
+            <div class="pipa-body">
+                <div class="pipa-neck"></div>
+                <div class="pipa-strings-container">
+                    <div class="string" id="pipa-str-1"></div>
+                    <div class="string" id="pipa-str-2"></div>
+                    <div class="string" id="pipa-str-3"></div>
+                    <div class="string" id="pipa-str-4"></div>
+                </div>
+                <div class="pipa-frets">
+                    <div class="fret"></div><div class="fret"></div><div class="fret"></div><div class="fret"></div>
+                </div>
+            </div>
+
+            <div class="notes-area" id="pipa-keys">
+                <!-- Pentatonic A Major / Chinese Scale -->
+                <button class="note-btn" onmousedown="playPipa(196.00)" ontouchstart="playPipa(196.00);event.preventDefault()"><span>G3</span><b>Sol</b></button>
+                <button class="note-btn" onmousedown="playPipa(220.00)" ontouchstart="playPipa(220.00);event.preventDefault()"><span>A3</span><b>La</b></button>
+                <button class="note-btn" onmousedown="playPipa(246.94)" ontouchstart="playPipa(246.94);event.preventDefault()"><span>B3</span><b>Si</b></button>
+                <button class="note-btn" onmousedown="playPipa(293.66)" ontouchstart="playPipa(293.66);event.preventDefault()"><span>D4</span><b>Re</b></button>
+                <button class="note-btn" onmousedown="playPipa(329.63)" ontouchstart="playPipa(329.63);event.preventDefault()"><span>E4</span><b>Mi</b></button>
+                <button class="note-btn" onmousedown="playPipa(392.00)" ontouchstart="playPipa(392.00);event.preventDefault()"><span>G4</span><b>Sol</b></button>
+                <button class="note-btn" onmousedown="playPipa(440.00)" ontouchstart="playPipa(440.00);event.preventDefault()"><span>A4</span><b>La</b></button>
+                <button class="note-btn" onmousedown="playPipa(587.33)" ontouchstart="playPipa(587.33);event.preventDefault()"><span>D5</span><b>Re</b></button>
+            </div>
+            <p style="color: #aaa; font-size: 0.9em; margin-top: 10px;">กดเพื่อดีด (Tap to pluck)</p>
+        </div>
+    </div>
+
+    <div class="footer">
+        สร้างเสียงด้วย Web Audio API | ไม่ใช้ไฟล์เสียงภายนอก
+    </div>
+
+    <script>
+        // --- Audio Context Setup ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        let masterGain;
+        let recorderDestination;
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob;
+        let audioUrl;
+        let recordedAudio = new Audio();
+
+        // Initialize Audio Engine
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.4; // Master volume
+                
+                // Create Compressor to prevent clipping
+                const compressor = audioCtx.createDynamicsCompressor();
+                compressor.threshold.value = -10;
+                compressor.knee.value = 40;
+                compressor.ratio.value = 12;
+                compressor.attack.value = 0;
+                compressor.release.value = 0.25;
+
+                // Setup Reverb (Impulse Response) - Simple synthetic reverb
+                const reverb = audioCtx.createConvolver();
+                reverb.buffer = impulseResponse(2, 2, false); // 2 seconds reverb
+                
+                // Route: Instruments -> Reverb -> Master -> Compressor -> Destination
+                masterGain.connect(compressor);
+                compressor.connect(audioCtx.destination);
+                
+                // For Recording
+                recorderDestination = audioCtx.createMediaStreamDestination();
+                compressor.connect(recorderDestination); // Connect output to recorder too
+
+                // Wet/Dry mix for reverb (Aux send style)
+                const reverbGain = audioCtx.createGain();
+                reverbGain.gain.value = 0.3; // Reverb level
+                masterGain.connect(reverbGain);
+                reverbGain.connect(reverb);
+                reverb.connect(compressor);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Simple Impulse Response Generator for Reverb
+        function impulseResponse(duration, decay, reverse) {
+            const sampleRate = audioCtx.sampleRate;
+            const length = sampleRate * duration;
+            const impulse = audioCtx.createBuffer(2, length, sampleRate);
+            const left = impulse.getChannelData(0);
+            const right = impulse.getChannelData(1);
+
+            for (let i = 0; i < length; i++) {
+                const n = reverse ? length - i : i;
+                left[i] = (Math.random() * 2 - 1) * Math.pow(1 - n / length, decay);
+                right[i] = (Math.random() * 2 - 1) * Math.pow(1 - n / length, decay);
+            }
+            return impulse;
+        }
+
+        // --- Recording Logic ---
+        let isRecording = false;
+
+        function toggleRecording() {
+            initAudio();
+            const btn = document.getElementById('btn-record');
+            const led = document.getElementById('led');
+            const playBtn = document.getElementById('btn-play-record');
+            const dlBtn = document.getElementById('btn-download');
+
+            if (!isRecording) {
+                // Start Recording
+                audioChunks = [];
+                mediaRecorder = new MediaRecorder(recorderDestination.stream);
+                
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    audioUrl = URL.createObjectURL(audioBlob);
+                    recordedAudio.src = audioUrl;
+                    playBtn.disabled = false;
+                    dlBtn.disabled = false;
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                btn.textContent = "หยุดอัด";
+                btn.style.background = "#ff4444";
+                led.classList.add('recording');
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                btn.textContent = "อัดเสียง";
+                btn.style.background = ""; // Reset
+                led.classList.remove('recording');
+            }
+        }
+
+        function playRecording() {
+            recordedAudio.play();
+        }
+
+        function downloadRecording() {
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = audioUrl;
+            a.download = 'chinese_instrument_recording.webm';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(audioUrl); 
+            }, 100);
+        }
+
+        // --- Instrument Synthesis Logic ---
+
+        // PIPA (Plucked String)
+        // Needs Triangle/Sine Mix + Sharp Attack + Short Decay
+        function playPipa(freq) {
+            initAudio();
+            const t = audioCtx.currentTime;
+
+            // 1. Oscillator Mix
+            const osc1 = audioCtx.createOscillator();
+            osc1.type = 'triangle';
+            osc1.frequency.value = freq;
+
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'sine';
+            osc2.frequency.value = freq * 2; // Octave overtone for brightness
+
+            // 2. Filter (Pluck tone)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(3000, t);
+            filter.frequency.exponentialRampToValueAtTime(500, t + 0.3); // Damping string
+
+            // 3. Envelope
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0, t);
+            gainNode.gain.linearRampToValueAtTime(1, t + 0.01); // Instant attack
+            gainNode.gain.exponentialRampToValueAtTime(0.001, t + 2); // Decay
+
+            // Connections
+            osc1.connect(filter);
+            osc2.connect(filter); // Mix in
+            filter.connect(gainNode);
+            gainNode.connect(masterGain);
+
+            osc1.start(t);
+            osc2.start(t);
+            osc1.stop(t + 2);
+            osc2.stop(t + 2);
+
+            // Visuals
+            const strIdx = Math.floor(Math.random() * 4) + 1;
+            const str = document.getElementById(`pipa-str-${strIdx}`);
+            str.classList.remove('vibrating');
+            void str.offsetWidth; // trigger reflow
+            str.classList.add('vibrating');
+            
+            highlightButton();
+            setTimeout(unhighlightButtons, 200);
+        }
+
+        // --- UI Logic ---
+
+        function highlightButton() {
+            // Simple visual feedback
+        }
+        
+        function unhighlightButtons() {
+            // Cleanup visual states
+        }
+
+        // Keyboard mapping (Optional for desktop playability)
+        const keyMap = {
+            'a': 0, 's': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5, 'j': 6, 'k': 7
+        };
+
+        document.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            const btns = document.querySelectorAll(`#pipa-keys .note-btn`);
+            
+            if (keyMap.hasOwnProperty(e.key) && btns[keyMap[e.key]]) {
+                const btn = btns[keyMap[e.key]];
+                btn.classList.add('playing');
+                // Simulate click logic
+                const freq = parseFloat(btn.getAttribute('onmousedown').match(/\d+(\.\d+)?/)[0]);
+                playPipa(freq);
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+             document.querySelectorAll('.note-btn').forEach(b => b.classList.remove('playing'));
+        });
+
+    </script>
+</body>
+</html>
