@@ -2,8 +2,8 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Realistic Virtual Bass Guitar</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Realistic Virtual Bass Guitar Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap');
@@ -12,29 +12,35 @@
             font-family: 'Prompt', sans-serif;
             background-color: #1a1a1a;
             color: white;
-            overflow: hidden; /* Prevent scrolling on mobile */
-            touch-action: none; /* Disable default touch actions */
+            overflow: hidden;
+            touch-action: none;
             user-select: none;
             -webkit-user-select: none;
         }
 
+        /* --- Fretboard Styles --- */
+        .fretboard-container {
+            perspective: 1000px;
+            overflow-x: auto; /* Allow scrolling on small screens if needed */
+            scrollbar-width: none;
+        }
+        .fretboard-container::-webkit-scrollbar { display: none; }
+
         .fretboard {
-            background: #2a1f1b; /* Dark wood color */
+            background: #2a1f1b;
             background-image: linear-gradient(90deg, rgba(0,0,0,0.3) 0%, rgba(255,255,255,0.05) 50%, rgba(0,0,0,0.3) 100%);
             box-shadow: inset 0 0 20px #000;
             position: relative;
-            perspective: 1000px;
         }
 
-        .string {
+        .string-visual {
             position: relative;
             box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-            transition: transform 0.05s ease;
-            pointer-events: none; /* Let clicks pass through to the fret hitboxes */
+            pointer-events: none;
             z-index: 10;
         }
 
-        /* String Thickness simulation */
+        /* String Thickness */
         .string-e { height: 6px; background: linear-gradient(to bottom, #888, #ccc, #666); }
         .string-a { height: 5px; background: linear-gradient(to bottom, #888, #ccc, #666); }
         .string-d { height: 4px; background: linear-gradient(to bottom, #999, #ddd, #777); }
@@ -54,59 +60,148 @@
             box-shadow: 0 0 5px rgba(255,255,255,0.4);
         }
 
+        /* --- Hitboxes & Interactions --- */
         .note-hitbox {
             position: absolute;
             z-index: 20;
             cursor: pointer;
-            /* Debug mode: uncomment below to see hitboxes */
-            /* border: 1px solid red;  */
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        .note-hitbox:active .string-visual, 
-        .note-hitbox.active .string-visual {
-            animation: vibrate 0.1s infinite;
-            filter: brightness(1.5);
-        }
-        
-        /* Visual cue for pressed note */
+        /* Finger Press Indicator (Blue Circle) */
         .finger-press {
             width: 20px;
             height: 20px;
-            background: rgba(59, 130, 246, 0.6);
+            background: rgba(59, 130, 246, 0.0); /* Transparent by default */
             border-radius: 50%;
             position: absolute;
             pointer-events: none;
             transform: scale(0);
-            transition: transform 0.1s;
-        }
-        
-        .note-hitbox.active .finger-press {
-            transform: scale(1.5);
+            transition: transform 0.1s, background 0.2s;
+            border: 2px solid rgba(59, 130, 246, 0.8);
         }
 
-        /* Note Label Styles */
+        /* Active State (Tap Mode) */
+        .note-hitbox.playing .finger-press {
+            background: rgba(59, 130, 246, 0.8);
+            transform: scale(1.5);
+            opacity: 1;
+        }
+        
+        .note-hitbox.playing .string-visual {
+            animation: vibrate 0.1s infinite;
+            filter: brightness(1.5);
+        }
+
+        /* Locked State (Pick Mode) */
+        .note-hitbox.locked .finger-press {
+            background: rgba(16, 185, 129, 0.8); /* Green for Locked */
+            border-color: #10b981;
+            transform: scale(1.3);
+            opacity: 1;
+        }
+
+        /* --- Note Labels --- */
         .note-label {
             position: absolute;
             color: #fff;
             font-size: 10px;
             font-weight: bold;
             text-shadow: 0 1px 2px black;
-            opacity: 0; /* Hidden by default */
+            opacity: 0;
             transition: opacity 0.3s;
             pointer-events: none;
             z-index: 25;
             background: rgba(0,0,0,0.5);
             padding: 2px 4px;
             border-radius: 4px;
+            top: 5px;
         }
 
         .show-notes .note-label {
             opacity: 1;
         }
 
+        /* --- Pick Zone (Right Hand) --- */
+        .pick-zone {
+            background: #222;
+            border-top: 4px solid #444;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 10px;
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.5);
+        }
+
+        /* Responsive Layout: Landscape vs Portrait */
+        @media (orientation: landscape) {
+            .main-layout { flex-direction: row; }
+            .pick-zone { 
+                flex-direction: column; 
+                width: 140px; 
+                border-top: none; 
+                border-left: 4px solid #444; 
+                height: 100%;
+            }
+            .fretboard-container { flex: 1; height: 100%; display: flex; align-items: center; }
+            .nut { display: block; }
+        }
+
+        @media (orientation: portrait) {
+            .main-layout { flex-direction: column; }
+            .pick-zone { 
+                flex-direction: row; 
+                width: 100%; 
+                height: 140px; 
+            }
+            .fretboard-container { flex: 1; width: 100%; display: flex; flex-direction: column; justify-content: center; }
+            .nut { display: none; /* Hide nut in portrait to save space */ }
+        }
+
+        /* Pick Buttons */
+        .pick-btn {
+            background: linear-gradient(145deg, #333, #222);
+            border: 2px solid #555;
+            border-radius: 12px;
+            color: #aaa;
+            font-weight: bold;
+            text-transform: uppercase;
+            box-shadow: 5px 5px 10px #151515, -5px -5px 10px #353535;
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        .pick-btn:active, .pick-btn.active {
+            background: #444;
+            transform: scale(0.95);
+            border-color: #3b82f6;
+            color: #fff;
+            box-shadow: inset 5px 5px 10px #222, inset -5px -5px 10px #444;
+        }
+
+        .pick-string-line {
+            position: absolute;
+            background: #888;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        /* Portrait: Horizontal lines inside buttons */
+        @media (orientation: portrait) {
+            .pick-btn { width: 22%; height: 80%; flex-direction: column; }
+            .pick-string-line { width: 80%; height: 2px; }
+        }
+        /* Landscape: Vertical lines inside buttons */
+        @media (orientation: landscape) {
+            .pick-btn { width: 80%; height: 22%; flex-direction: row; }
+            .pick-string-line { height: 80%; width: 2px; }
+        }
+
+        /* Animations */
         @keyframes vibrate {
             0% { transform: translateY(0); }
             25% { transform: translateY(1px); }
@@ -118,7 +213,7 @@
         #start-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.85);
+            background: rgba(0,0,0,0.9);
             z-index: 50;
             display: flex;
             justify-content: center;
@@ -127,66 +222,115 @@
         }
     </style>
 </head>
-<body class="h-screen w-screen flex flex-col items-center justify-center">
+<body class="h-screen w-screen overflow-hidden bg-gray-900">
 
-    <!-- Audio Context Start Overlay -->
+    <!-- Audio Start Overlay -->
     <div id="start-overlay">
-        <h1 class="text-4xl font-bold mb-4 text-blue-400">เบสกีตาร์จำลอง (Bass Pro)</h1>
-        <p class="text-gray-300 mb-8 text-center px-4">แตะหน้าจอเพื่อเริ่มใช้งาน<br>รองรับ Multi-touch กดได้หลายนิ้วพร้อมกัน</p>
-        <button id="start-btn" class="px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-full text-xl font-bold shadow-lg transition transform hover:scale-105">
-            เริ่มเล่น (Start)
+        <h1 class="text-4xl font-bold mb-4 text-blue-400 text-center">Bass Pro 2.0</h1>
+        <p class="text-gray-300 mb-8 text-center px-4 max-w-md">
+            จำลองเบสสมจริง รองรับ Multi-touch<br>
+            <span class="text-sm text-gray-400">แนะนำ: ใช้แนวนอนเพื่อประสบการณ์ที่ดีที่สุด</span>
+        </p>
+        <button id="start-btn" class="px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-full text-xl font-bold shadow-lg transition transform hover:scale-105 text-white">
+            แตะเพื่อเริ่ม (Start)
         </button>
     </div>
 
-    <!-- Controls -->
-    <div class="absolute top-4 left-4 z-30 bg-gray-800 p-2 rounded-lg opacity-80 flex flex-col gap-2">
-        <div class="flex items-center gap-2">
-            <span class="text-xs text-gray-400">Vol</span>
-            <input type="range" id="master-volume" min="0" max="1" step="0.1" value="0.7" class="w-24 accent-blue-500">
-        </div>
-        <button id="toggle-notes-btn" class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-white transition">
-            แสดงโน้ต (Show Notes)
-        </button>
-        <button id="record-btn" class="text-xs bg-red-700 hover:bg-red-600 px-2 py-1 rounded text-white transition flex items-center justify-center gap-1">
-            <span>●</span> อัดเสียง (Rec)
-        </button>
-    </div>
-
-    <!-- Main Fretboard Area -->
-    <div class="w-full h-full max-w-7xl flex flex-col justify-center items-center relative p-4">
+    <!-- Main Layout Container -->
+    <div class="main-layout w-full h-full flex">
         
-        <!-- Nut (Top bar) -->
-        <div class="w-8 h-full bg-yellow-100 absolute left-0 z-20 border-r-4 border-gray-400 shadow-xl hidden md:block"></div>
+        <!-- Top/Left Controls -->
+        <div class="absolute top-2 left-2 z-40 flex flex-col gap-2 pointer-events-none">
+            <div class="bg-gray-800/80 p-2 rounded-lg pointer-events-auto backdrop-blur-sm border border-gray-700">
+                <div class="flex items-center justify-between gap-4 mb-2">
+                    <span class="text-xs text-blue-300 font-bold">MODE</span>
+                    <div class="flex bg-gray-900 rounded p-1">
+                        <button id="mode-tap" class="text-[10px] px-2 py-1 rounded bg-blue-600 text-white transition">แตะเล่น (Tap)</button>
+                        <button id="mode-pick" class="text-[10px] px-2 py-1 rounded text-gray-400 hover:text-white transition">ล็อค+ดีด (Pick)</button>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xs text-gray-400">Vol</span>
+                    <input type="range" id="master-volume" min="0" max="1" step="0.1" value="0.7" class="w-20 accent-blue-500 h-1">
+                </div>
 
-        <!-- The Neck -->
-        <div id="fretboard" class="fretboard w-full h-64 md:h-80 rounded-r-xl border-y-8 border-gray-900 flex relative overflow-hidden">
-            <!-- Frets and Strings generated by JS -->
+                <div class="flex gap-1">
+                    <button id="toggle-notes-btn" class="flex-1 text-[10px] bg-gray-700 hover:bg-gray-600 py-1 rounded text-white transition">
+                        แสดงโน้ต
+                    </button>
+                    <button id="record-btn" class="flex-1 text-[10px] bg-red-900/80 hover:bg-red-700 py-1 rounded text-white transition flex items-center justify-center gap-1">
+                        <span>●</span> Rec
+                    </button>
+                </div>
+            </div>
+            
+            <div id="status-msg" class="text-[10px] text-green-400 bg-black/50 px-2 py-1 rounded hidden">
+                บันทึกเสียงแล้ว...
+            </div>
         </div>
 
-        <div class="mt-4 text-gray-500 text-sm">
-            เคล็ดลับ: กดที่ช่องต่างๆ เพื่อเล่นเสียง (แถวบนคือสาย E ต่ำสุด)
+        <!-- Fretboard Section -->
+        <div class="fretboard-container relative bg-gray-900">
+            <!-- Nut (Top bar in landscape) -->
+            <div class="nut w-8 h-64 md:h-80 bg-yellow-100 absolute left-0 z-20 border-r-4 border-gray-400 shadow-xl hidden md:block"></div>
+
+            <!-- The Neck -->
+            <div id="fretboard" class="fretboard w-full h-64 md:h-80 border-y-8 border-gray-900 flex relative">
+                <!-- Javascript will populate this -->
+            </div>
         </div>
+
+        <!-- Pick Zone Section (Right/Bottom) -->
+        <div class="pick-zone z-30 relative">
+            <div class="absolute text-[10px] text-gray-500 top-1 right-2 pointer-events-none uppercase tracking-wider">Pick Area</div>
+            
+            <!-- Pick Buttons (Generated by JS or hardcoded) -->
+            <!-- Note: Order is G D A E from Top to Bottom (Landscape) or Right to Left (Portrait) to match strings -->
+            
+            <div class="pick-btn" data-string="0">
+                <span class="z-10">G</span>
+                <div class="pick-string-line string-g"></div>
+            </div>
+            <div class="pick-btn" data-string="1">
+                <span class="z-10">D</span>
+                <div class="pick-string-line string-d"></div>
+            </div>
+            <div class="pick-btn" data-string="2">
+                <span class="z-10">A</span>
+                <div class="pick-string-line string-a"></div>
+            </div>
+            <div class="pick-btn" data-string="3">
+                <span class="z-10">E</span>
+                <div class="pick-string-line string-e"></div>
+            </div>
+        </div>
+
     </div>
 
     <script>
         // --- Configuration ---
-        const NUM_FRETS = 12; // 0 (Open) + 12 Frets
+        const NUM_FRETS = 12; 
         const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        // Strings: 0=G (Highest), 3=E (Lowest)
         const STRINGS = [
-            { name: 'G', baseFreq: 98.00, css: 'string-g', startNoteIndex: 7 }, // G (Index 7 in C major scale)
-            { name: 'D', baseFreq: 73.42, css: 'string-d', startNoteIndex: 2 }, // D
-            { name: 'A', baseFreq: 55.00, css: 'string-a', startNoteIndex: 9 }, // A
-            { name: 'E', baseFreq: 41.20, css: 'string-e', startNoteIndex: 4 }  // E
+            { name: 'G', baseFreq: 98.00, css: 'string-g', startNoteIndex: 7 }, 
+            { name: 'D', baseFreq: 73.42, css: 'string-d', startNoteIndex: 2 }, 
+            { name: 'A', baseFreq: 55.00, css: 'string-a', startNoteIndex: 9 }, 
+            { name: 'E', baseFreq: 41.20, css: 'string-e', startNoteIndex: 4 }  
         ];
 
-        // --- Audio Engine (Web Audio API) ---
+        // --- State ---
+        let currentMode = 'tap'; // 'tap' or 'pick'
+        // Store locked fret index for each string (0 = Open, -1 = Mute/None, 1..12 = Fret)
+        let lockedFrets = [0, 0, 0, 0]; 
+
+        // --- Audio Engine ---
         let audioCtx;
         let masterGain;
-        
-        // Recording variables
         let mediaRecorder;
         let recordedChunks = [];
-        let dest; // MediaStreamDestination
+        let dest;
         let isRecording = false;
 
         function initAudio() {
@@ -197,7 +341,6 @@
             masterGain = audioCtx.createGain();
             masterGain.gain.value = 0.7;
             
-            // Compressor to prevent clipping when playing chords
             const compressor = audioCtx.createDynamicsCompressor();
             compressor.threshold.value = -24;
             compressor.knee.value = 30;
@@ -206,11 +349,9 @@
             compressor.release.value = 0.25;
             
             masterGain.connect(compressor);
-            compressor.connect(audioCtx.destination); // Connect to speakers
-
-            // Setup Recording Destination
+            compressor.connect(audioCtx.destination);
             dest = audioCtx.createMediaStreamDestination();
-            compressor.connect(dest); // Connect to recorder as well
+            compressor.connect(dest);
         }
 
         function playNote(frequency) {
@@ -218,83 +359,62 @@
             if (audioCtx.state === 'suspended') audioCtx.resume();
 
             const t = audioCtx.currentTime;
-            
-            // Oscillator (The Source)
             const osc = audioCtx.createOscillator();
-            // Mix of Triangle and Sawtooth makes a good bass sound
-            // We'll use sawtooth filtered down
             osc.type = 'sawtooth'; 
             osc.frequency.setValueAtTime(frequency, t);
 
-            // Filter (Tone Control - making it sound like a plucked string)
             const filter = audioCtx.createBiquadFilter();
             filter.type = 'lowpass';
-            filter.Q.value = 1; // Resonance
-            
-            // Filter Envelope (Wah effect on pluck)
-            filter.frequency.setValueAtTime(400, t); 
-            filter.frequency.exponentialRampToValueAtTime(2000, t + 0.05); // Attack
-            filter.frequency.exponentialRampToValueAtTime(100, t + 2); // Decay
+            filter.Q.value = 1; 
+            filter.frequency.setValueAtTime(300, t); 
+            filter.frequency.exponentialRampToValueAtTime(2500, t + 0.05); // Slap attack
+            filter.frequency.exponentialRampToValueAtTime(100, t + 2);
 
-            // Gain (Volume Envelope)
             const gainNode = audioCtx.createGain();
             gainNode.gain.setValueAtTime(0, t);
-            gainNode.gain.linearRampToValueAtTime(1.0, t + 0.02); // Fast attack
-            gainNode.gain.exponentialRampToValueAtTime(0.001, t + 1.5); // Long release (sustain)
+            gainNode.gain.linearRampToValueAtTime(1.0, t + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, t + 2.0);
 
-            // Connect graph
             osc.connect(filter);
             filter.connect(gainNode);
             gainNode.connect(masterGain);
 
             osc.start(t);
-            osc.stop(t + 2);
+            osc.stop(t + 2.1);
 
-            // Cleanup
             setTimeout(() => {
-                osc.disconnect();
-                filter.disconnect();
-                gainNode.disconnect();
-            }, 2000);
+                osc.disconnect(); filter.disconnect(); gainNode.disconnect();
+            }, 2100);
         }
 
         // --- UI Generation ---
         const fretboard = document.getElementById('fretboard');
 
         function generateFretboard() {
-            const fretWidths = [];
-            // Calculate decreasing fret width
-            for(let i=0; i<=NUM_FRETS; i++) {
-                fretWidths.push(100 / (NUM_FRETS + 1)); 
-            }
-
-            // Create Fret Lines (Vertical)
+            fretboard.innerHTML = ''; // Clear existing
             let currentLeft = 0;
+            
             for (let i = 0; i <= NUM_FRETS; i++) {
-                // Determine fret spacing (approximate logarithmic spacing)
-                const widthPercent = 14 * Math.pow(0.94, i); 
+                // Logarithmic spacing
+                const widthPercent = 13 * Math.pow(0.943, i); 
                 
                 const fretDiv = document.createElement('div');
                 fretDiv.className = 'absolute top-0 bottom-0 border-r border-gray-600 flex flex-col justify-center';
                 fretDiv.style.left = `${currentLeft}%`;
                 fretDiv.style.width = `${widthPercent}%`;
                 
-                // Add fret wire visually (except for open string area 0)
                 if (i > 0) {
                     const wire = document.createElement('div');
                     wire.className = 'fret-line absolute right-0 top-0 bottom-0';
                     fretDiv.appendChild(wire);
                 }
 
-                // Add Fret Markers (Dots)
                 if ([3, 5, 7, 9, 12].includes(i)) {
                     const dot = document.createElement('div');
                     dot.className = 'fret-marker w-4 h-4 absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2';
                     if (i === 12) {
-                        // Double dot for 12th fret
                         const dot2 = dot.cloneNode();
-                        dot.style.top = '35%';
-                        dot2.style.top = '65%';
+                        dot.style.top = '35%'; dot2.style.top = '65%';
                         fretDiv.appendChild(dot2);
                     }
                     fretDiv.appendChild(dot);
@@ -302,31 +422,25 @@
 
                 fretboard.appendChild(fretDiv);
                 
-                // --- Create Strings & Hitboxes for this fret ---
                 STRINGS.forEach((str, stringIndex) => {
                     const noteFreq = str.baseFreq * Math.pow(2, i / 12);
-                    
-                    // Calculate Note Name
                     const noteIndex = (str.startNoteIndex + i) % 12;
                     const noteName = NOTE_NAMES[noteIndex];
 
                     const hitbox = document.createElement('div');
-                    hitbox.className = 'note-hitbox w-full hover:bg-white/5 active:bg-white/10 transition-colors';
+                    hitbox.className = 'note-hitbox w-full hover:bg-white/5 transition-colors';
                     hitbox.style.height = `${100 / STRINGS.length}%`;
-                    hitbox.style.top = `${(STRINGS.length - 1 - stringIndex) * (100 / STRINGS.length)}%`; // Reverse visual order for standard view (E at bottom physically, top visually)
+                    hitbox.style.top = `${(STRINGS.length - 1 - stringIndex) * (100 / STRINGS.length)}%`; 
                     hitbox.dataset.freq = noteFreq;
-                    hitbox.dataset.id = `s${stringIndex}-f${i}`;
+                    hitbox.dataset.string = stringIndex;
+                    hitbox.dataset.fret = i;
 
-                    // Visual String inside hitbox
                     const stringVis = document.createElement('div');
                     stringVis.className = `string-visual w-full ${str.css}`;
-                    // Middle of the hitbox
                     
-                    // Visual touch indicator
                     const touchIndicator = document.createElement('div');
                     touchIndicator.className = 'finger-press';
 
-                    // Create Note Label
                     const label = document.createElement('span');
                     label.className = 'note-label';
                     label.innerText = noteName;
@@ -339,154 +453,188 @@
 
                 currentLeft += widthPercent;
             }
+            
+            // Adjust fretboard total width for scrolling if needed
+            if (window.innerWidth < 600) {
+               fretboard.style.width = '150%';
+            } else {
+               fretboard.style.width = '100%';
+            }
         }
 
-        // --- Interaction Handling ---
-        
-        function handleInteraction(e) {
-            e.preventDefault(); // Stop mouse/touch default behavior
-            
-            // Normalize input to array of points
-            let points = [];
-            if (e.type.startsWith('touch')) {
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    points.push(e.changedTouches[i]);
-                }
-            } else {
-                points.push(e);
-            }
+        // --- Interaction Logic ---
 
-            points.forEach(p => {
-                // Find element under cursor/finger
-                const element = document.elementFromPoint(p.clientX, p.clientY);
-                if (element && element.closest('.note-hitbox')) {
-                    const hitbox = element.closest('.note-hitbox');
-                    triggerNote(hitbox);
+        function updateLockedVisuals() {
+            // Remove all locked classes first
+            document.querySelectorAll('.note-hitbox.locked').forEach(el => el.classList.remove('locked'));
+            
+            // Add locked class based on state
+            lockedFrets.forEach((fretIndex, stringIndex) => {
+                if (fretIndex > 0) { // 0 is open, don't highlight fret 0 (virtual)
+                    const selector = `.note-hitbox[data-string="${stringIndex}"][data-fret="${fretIndex}"]`;
+                    const el = document.querySelector(selector);
+                    if (el) el.classList.add('locked');
                 }
             });
         }
 
-        // Prevent rapid re-triggering of the exact same note while holding, 
-        // but allow re-triggering if tapping repeatedly
-        const activeNotes = new Set();
+        function handleFretboardTouch(e) {
+            e.preventDefault();
+            const touches = e.changedTouches || [e];
+            
+            for (let i = 0; i < touches.length; i++) {
+                const p = touches[i];
+                const element = document.elementFromPoint(p.clientX, p.clientY);
+                const hitbox = element?.closest('.note-hitbox');
 
-        function triggerNote(hitbox) {
-            // Visual feedback
-            hitbox.classList.add('active');
-            setTimeout(() => hitbox.classList.remove('active'), 150);
+                if (hitbox) {
+                    const stringIdx = parseInt(hitbox.dataset.string);
+                    const fretIdx = parseInt(hitbox.dataset.fret);
+                    const freq = parseFloat(hitbox.dataset.freq);
 
-            // Audio
-            const freq = parseFloat(hitbox.dataset.freq);
+                    if (currentMode === 'tap') {
+                        // Tap Mode: Play immediately
+                        playNote(freq);
+                        hitbox.classList.add('playing');
+                        setTimeout(() => hitbox.classList.remove('playing'), 150);
+                    } else {
+                        // Pick Mode: Lock/Unlock Fret
+                        if (lockedFrets[stringIdx] === fretIdx) {
+                            lockedFrets[stringIdx] = 0; // Toggle off (return to Open)
+                        } else {
+                            lockedFrets[stringIdx] = fretIdx; // Lock new fret
+                        }
+                        updateLockedVisuals();
+                    }
+                }
+            }
+        }
+
+        function handlePick(stringIdx) {
+            const fretIdx = lockedFrets[stringIdx];
+            // Calculate frequency: Base * 2^(fret/12)
+            const base = STRINGS[stringIdx].baseFreq;
+            const freq = base * Math.pow(2, fretIdx / 12);
+            
             playNote(freq);
+
+            // Animate Pick Button
+            const btn = document.querySelector(`.pick-btn[data-string="${stringIndex}"]`);
+            if (btn) {
+                btn.classList.add('active');
+                setTimeout(() => btn.classList.remove('active'), 100);
+            }
+
+            // Visual feedback on fretboard if locked
+            if (fretIdx > 0) {
+                const noteEl = document.querySelector(`.note-hitbox[data-string="${stringIdx}"][data-fret="${fretIdx}"]`);
+                if (noteEl) {
+                    noteEl.classList.add('playing');
+                    setTimeout(() => noteEl.classList.remove('playing'), 150);
+                }
+            } else {
+                // Flash the Nut or Open area (optional)
+            }
         }
 
         // --- Event Listeners ---
 
-        // Mouse
-        fretboard.addEventListener('mousedown', (e) => {
-            if(e.button === 0) handleInteraction(e);
+        // Fretboard
+        fretboard.addEventListener('mousedown', (e) => { if(e.button===0) handleFretboardTouch(e); });
+        fretboard.addEventListener('touchstart', handleFretboardTouch, { passive: false });
+
+        // Pick Buttons
+        document.querySelectorAll('.pick-btn').forEach(btn => {
+            const trigger = (e) => {
+                e.preventDefault();
+                const sIdx = parseInt(btn.dataset.string);
+                handlePick(sIdx);
+            };
+            btn.addEventListener('touchstart', trigger, {passive:false});
+            btn.addEventListener('mousedown', trigger);
         });
 
-        // Touch (Multi-touch support)
-        fretboard.addEventListener('touchstart', handleInteraction, { passive: false });
+        // Mode Switching
+        const btnTap = document.getElementById('mode-tap');
+        const btnPick = document.getElementById('mode-pick');
         
-        // Optional: Slide support (experimental)
-        fretboard.addEventListener('touchmove', (e) => {
-             // For slides, we might want to be careful not to trigger every millisecond
-             // This basic implementation allows sliding
-             // handleInteraction(e); 
-        }, { passive: false });
-
-        // Volume Control
-        document.getElementById('master-volume').addEventListener('input', (e) => {
-            if (masterGain) {
-                masterGain.gain.value = parseFloat(e.target.value);
+        function setMode(mode) {
+            currentMode = mode;
+            if (mode === 'tap') {
+                btnTap.classList.replace('text-gray-400', 'text-white');
+                btnTap.classList.add('bg-blue-600');
+                btnPick.classList.remove('bg-green-600', 'text-white');
+                btnPick.classList.add('text-gray-400');
+                // Clear locks
+                lockedFrets = [0,0,0,0];
+                updateLockedVisuals();
+            } else {
+                btnPick.classList.replace('text-gray-400', 'text-white');
+                btnPick.classList.add('bg-green-600');
+                btnTap.classList.remove('bg-blue-600', 'text-white');
+                btnTap.classList.add('text-gray-400');
             }
+        }
+
+        btnTap.addEventListener('click', () => setMode('tap'));
+        btnPick.addEventListener('click', () => setMode('pick'));
+
+        // Controls
+        document.getElementById('master-volume').addEventListener('input', (e) => {
+            if (masterGain) masterGain.gain.value = parseFloat(e.target.value);
         });
 
-        // Toggle Notes Button
         document.getElementById('toggle-notes-btn').addEventListener('click', (e) => {
             fretboard.classList.toggle('show-notes');
-            const btn = e.target;
-            if (fretboard.classList.contains('show-notes')) {
-                btn.innerText = 'ซ่อนโน้ต (Hide Notes)';
-                btn.classList.add('bg-blue-600');
-                btn.classList.remove('bg-gray-700');
-            } else {
-                btn.innerText = 'แสดงโน้ต (Show Notes)';
-                btn.classList.remove('bg-blue-600');
-                btn.classList.add('bg-gray-700');
-            }
+            e.target.classList.toggle('bg-blue-600');
         });
 
-        // Recording Logic
+        // Recording
         const recordBtn = document.getElementById('record-btn');
         recordBtn.addEventListener('click', () => {
             if (!audioCtx) initAudio();
-            
             if (!isRecording) {
-                // START Recording
                 recordedChunks = [];
-                // Use the MediaStreamDestination stream we created in initAudio
                 try {
                     mediaRecorder = new MediaRecorder(dest.stream);
-                } catch (err) {
-                    alert("เบราว์เซอร์นี้อาจไม่รองรับการบันทึกเสียง");
-                    return;
-                }
+                } catch (err) { alert("Recording not supported"); return; }
                 
-                mediaRecorder.ondataavailable = (evt) => {
-                    if (evt.data.byteLength > 0) {
-                        recordedChunks.push(evt.data);
-                    }
-                };
-
+                mediaRecorder.ondataavailable = (evt) => { if (evt.data.byteLength > 0) recordedChunks.push(evt.data); };
                 mediaRecorder.onstop = () => {
-                    // Create blob and download link
                     const blob = new Blob(recordedChunks, { type: 'audio/webm' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    a.download = `bass-solo-${new Date().getTime()}.webm`;
-                    document.body.appendChild(a);
-                    a.click();
+                    a.style.display = 'none'; a.href = url; a.download = `bass-jam-${Date.now()}.webm`;
+                    document.body.appendChild(a); a.click();
+                    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
                     
-                    // Cleanup
-                    setTimeout(() => {
-                        document.body.removeChild(a);
-                        window.URL.revokeObjectURL(url);
-                    }, 100);
+                    const msg = document.getElementById('status-msg');
+                    msg.classList.remove('hidden');
+                    setTimeout(() => msg.classList.add('hidden'), 3000);
                 };
 
                 mediaRecorder.start();
                 isRecording = true;
-                
-                // Update UI
-                recordBtn.innerHTML = '<span>■</span> หยุด (Stop)';
-                recordBtn.classList.remove('bg-red-700', 'hover:bg-red-600');
-                recordBtn.classList.add('bg-gray-500', 'hover:bg-gray-400', 'animate-pulse');
+                recordBtn.innerHTML = '<span>■</span> Stop';
+                recordBtn.classList.add('animate-pulse', 'bg-red-600');
             } else {
-                // STOP Recording
                 mediaRecorder.stop();
                 isRecording = false;
-                
-                // Update UI
-                recordBtn.innerHTML = '<span>●</span> อัดเสียง (Rec)';
-                recordBtn.classList.add('bg-red-700', 'hover:bg-red-600');
-                recordBtn.classList.remove('bg-gray-500', 'hover:bg-gray-400', 'animate-pulse');
+                recordBtn.innerHTML = '<span>●</span> Rec';
+                recordBtn.classList.remove('animate-pulse', 'bg-red-600');
             }
         });
 
-        // Initialization
+        // Init
         document.getElementById('start-btn').addEventListener('click', () => {
             initAudio();
-            generateFretboard(); // Generate UI
+            generateFretboard();
             document.getElementById('start-overlay').style.display = 'none';
         });
 
-        // Initial setup call (creates structure but waits for click to init audio)
-        // We defer generation slightly to ensure layout is ready
+        // Resize handler for responsive fretboard
+        window.addEventListener('resize', generateFretboard);
+
     </script>
 </body>
 </html>
