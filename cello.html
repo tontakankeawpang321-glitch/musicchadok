@@ -2,8 +2,8 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Realistic Cello Simulator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Stable Cello Simulator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap');
@@ -14,12 +14,14 @@
             color: #eee;
             overflow: hidden;
             user-select: none;
+            -webkit-user-select: none; /* Safari */
+            touch-action: none; /* Prevent scroll on mobile */
         }
 
         /* Wood Texture for Cello Body */
         .cello-body {
-            background: linear-gradient(to right, #3e1e12, #5c2e1a, #8a4b28, #5c2e1a, #3e1e12);
-            box-shadow: inset 0 0 100px #000;
+            background: linear-gradient(to right, #2a150d, #5c2e1a, #8a4b28, #5c2e1a, #2a150d);
+            box-shadow: inset 0 0 120px #000;
             position: relative;
         }
 
@@ -32,146 +34,133 @@
             justify-content: center;
             align-items: center;
             cursor: pointer;
-            transition: background 0.1s;
+            transition: background 0.05s;
+            touch-action: none;
         }
 
         .string-container:hover {
-            background-color: rgba(255, 255, 255, 0.05);
+            background-color: rgba(255, 255, 255, 0.03);
         }
 
         .cello-string {
-            width: 4px; /* Base thickness */
+            width: 4px;
             height: 100%;
-            background: linear-gradient(90deg, #888, #fff, #888);
-            box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+            background: linear-gradient(90deg, #666, #e0e0e0, #666);
+            box-shadow: 3px 0 6px rgba(0,0,0,0.6);
             position: absolute;
             z-index: 10;
             pointer-events: none;
         }
 
-        /* Thickness variations for strings */
-        .string-c .cello-string { width: 8px; }
-        .string-g .cello-string { width: 6px; }
+        /* Thickness variations */
+        .string-c .cello-string { width: 9px; }
+        .string-g .cello-string { width: 7px; }
         .string-d .cello-string { width: 5px; }
         .string-a .cello-string { width: 3px; }
 
-        /* Finger positions (Frets visual aid - though cello is fretless) */
         .fret-line {
             position: absolute;
             width: 100%;
-            height: 2px;
-            background-color: rgba(0,0,0,0.3);
+            height: 1px;
+            background-color: rgba(255,255,255,0.05);
             pointer-events: none;
         }
 
         /* Vibrating Animation */
         @keyframes vibrate {
             0% { transform: translateX(0); }
-            25% { transform: translateX(1.5px); }
-            50% { transform: translateX(-1.5px); }
-            75% { transform: translateX(1.5px); }
+            20% { transform: translateX(2px); }
+            40% { transform: translateX(-2px); }
+            60% { transform: translateX(1px); }
+            80% { transform: translateX(-1px); }
             100% { transform: translateX(0); }
         }
 
         .vibrating .cello-string {
-            animation: vibrate 0.1s infinite;
+            animation: vibrate 0.08s infinite linear;
         }
 
         .active-note {
-            background: radial-gradient(circle, rgba(255,215,0,0.4) 0%, rgba(255,215,0,0) 70%);
+            background: radial-gradient(circle, rgba(255, 180, 0, 0.3) 0%, rgba(0,0,0,0) 80%);
         }
 
         /* Controls */
         .control-panel {
-            background: rgba(0, 0, 0, 0.8);
-            border-top: 2px solid #8a4b28;
+            background: rgba(10, 10, 10, 0.95);
+            border-top: 3px solid #5c2e1a;
         }
         
         .key-label {
             position: absolute;
-            bottom: 20px;
-            font-size: 0.8rem;
-            color: rgba(255,255,255,0.3);
+            bottom: 15px;
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.2);
             pointer-events: none;
-            transition: color 0.2s;
+            font-family: monospace;
         }
 
         .note-name {
             position: absolute;
-            top: 20px;
+            top: 25px;
             font-weight: bold;
             color: #ffd700;
             opacity: 0;
             transform: scale(0.8);
-            transition: all 0.2s ease-out;
+            transition: transform 0.1s, opacity 0.1s;
             text-shadow: 0 2px 4px black;
             pointer-events: none;
         }
         
-        /* Show notes on active/hover */
-        .string-container:active .note-name, 
         .string-container.active-key .note-name {
             opacity: 1;
-            transform: scale(1.2);
+            transform: scale(1.3);
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
         }
 
-        /* Global Show Notes Mode */
+        /* Show Notes Mode */
         .show-notes-mode .note-name {
-            opacity: 1 !important;
+            opacity: 0.7;
             transform: scale(1);
-            color: rgba(255, 255, 255, 0.9);
         }
         
         .show-notes-mode .active-key .note-name {
-            color: #ffd700;
+            opacity: 1;
             transform: scale(1.3);
-        }
-
-        .show-notes-mode .key-label {
-            color: rgba(255,255,255,0.6);
+            color: #fff;
         }
 
     </style>
 </head>
-<body class="h-screen w-screen flex flex-col">
+<body class="h-screen w-screen flex flex-col overflow-hidden">
 
     <!-- Header -->
-    <header class="bg-black text-white p-3 flex flex-wrap justify-between items-center shadow-lg z-20 gap-2">
-        <div>
-            <h1 class="text-xl md:text-2xl font-bold text-amber-500 flex items-center gap-2">
-                🎻 Cello Simulator 
-                <span class="text-xs font-normal text-gray-500 border border-gray-700 rounded px-1 hidden sm:inline-block">Polyphonic</span>
-            </h1>
+    <header class="bg-black/90 backdrop-blur text-white p-2 flex justify-between items-center shadow-lg z-50 border-b border-gray-800 shrink-0">
+        <div class="flex items-center gap-2 overflow-hidden">
+            <h1 class="text-lg md:text-xl font-bold text-amber-600 whitespace-nowrap">🎻 Cello Pro</h1>
+            <div id="statusIndicator" class="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_5px_red]"></div>
         </div>
         
-        <div class="flex items-center gap-2 md:gap-4 flex-wrap">
-            <!-- Toggle Notes Button -->
-            <button id="toggleNotesBtn" class="bg-gray-700 hover:bg-gray-600 text-white text-sm px-3 py-1.5 rounded border border-gray-600 transition flex items-center gap-1">
-                <span>👁️</span> <span id="toggleText">แสดงโน้ต</span>
+        <div class="flex items-center gap-2">
+            <button id="toggleNotesBtn" class="bg-gray-800 hover:bg-gray-700 text-xs px-2 py-1.5 rounded border border-gray-700 transition">
+                👁️ โน้ต
             </button>
 
-            <!-- Recording Button -->
-            <button id="recordBtn" class="bg-gray-700 hover:bg-gray-600 text-white text-sm px-3 py-1.5 rounded border border-gray-600 transition flex items-center gap-1">
-                <span>🔴</span> <span id="recordText">บันทึกเสียง</span>
+            <button id="recordBtn" class="bg-gray-800 hover:bg-gray-700 text-xs px-2 py-1.5 rounded border border-gray-700 transition flex items-center gap-1">
+                🔴 <span class="hidden sm:inline">Rec</span>
             </button>
 
-            <div class="h-6 w-px bg-gray-700 hidden sm:block"></div>
-
-            <div class="flex items-center gap-2">
-                <span class="text-xs md:text-sm text-gray-400">Vol:</span>
-                <input type="range" id="volume" min="0" max="1" step="0.01" value="0.7" class="accent-amber-500 w-20 md:w-24">
-            </div>
+            <div class="h-4 w-px bg-gray-700 mx-1"></div>
             
-            <button id="startAudio" class="bg-amber-700 hover:bg-amber-600 text-white text-sm px-4 py-2 rounded shadow transition animate-pulse font-bold">
-                🔊 เปิดเสียง (Start)
+            <button id="startAudio" class="bg-amber-800 hover:bg-amber-700 text-white text-xs px-3 py-1.5 rounded shadow transition font-bold whitespace-nowrap">
+                🔊 เปิดใช้งาน
             </button>
         </div>
     </header>
 
-    <!-- Cello Neck/Fingerboard Area -->
-    <main class="flex-grow flex cello-body relative" id="fingerboard">
-        <!-- Generates Fret Lines for visual reference -->
-        <div class="absolute inset-0 flex flex-col justify-evenly opacity-20 pointer-events-none">
+    <!-- Fingerboard -->
+    <main class="flex-grow flex cello-body relative touch-none select-none" id="fingerboard">
+        <!-- Visual Frets -->
+        <div class="absolute inset-0 flex flex-col justify-evenly opacity-10 pointer-events-none">
             <div class="fret-line"></div>
             <div class="fret-line"></div>
             <div class="fret-line"></div>
@@ -179,418 +168,363 @@
             <div class="fret-line"></div>
         </div>
 
-        <!-- String C (Low) -->
-        <div class="flex-1 string-container string-c border-r border-black/20" data-string="C2">
+        <!-- String C -->
+        <div class="flex-1 string-container string-c border-r border-black/30" data-string="C2">
             <div class="cello-string"></div>
-            <!-- Notes created via JS -->
         </div>
 
         <!-- String G -->
-        <div class="flex-1 string-container string-g border-r border-black/20" data-string="G2">
+        <div class="flex-1 string-container string-g border-r border-black/30" data-string="G2">
             <div class="cello-string"></div>
         </div>
 
         <!-- String D -->
-        <div class="flex-1 string-container string-d border-r border-black/20" data-string="D3">
+        <div class="flex-1 string-container string-d border-r border-black/30" data-string="D3">
             <div class="cello-string"></div>
         </div>
 
-        <!-- String A (High) -->
+        <!-- String A -->
         <div class="flex-1 string-container string-a" data-string="A3">
             <div class="cello-string"></div>
         </div>
     </main>
 
-    <!-- Instructions / Legend -->
-    <footer class="control-panel p-2 md:p-4 text-center text-xs md:text-sm text-gray-300 grid grid-cols-4 gap-1 md:gap-2 select-none">
-        <div class="bg-black/20 rounded p-1">
-            <span class="block text-amber-500 font-bold">สาย C</span>
-            <span class="text-gray-500">Z...M</span>
-        </div>
-        <div class="bg-black/20 rounded p-1">
-            <span class="block text-amber-500 font-bold">สาย G</span>
-            <span class="text-gray-500">A...J</span>
-        </div>
-        <div class="bg-black/20 rounded p-1">
-            <span class="block text-amber-500 font-bold">สาย D</span>
-            <span class="text-gray-500">Q...U</span>
-        </div>
-        <div class="bg-black/20 rounded p-1">
-            <span class="block text-amber-500 font-bold">สาย A</span>
-            <span class="text-gray-500">1...7</span>
-        </div>
+    <!-- Footer Keys -->
+    <footer class="control-panel p-2 text-center text-[10px] sm:text-xs text-gray-400 grid grid-cols-4 gap-1 shrink-0">
+        <div><span class="text-amber-600 font-bold block">String C</span>Z-M</div>
+        <div><span class="text-amber-600 font-bold block">String G</span>A-J</div>
+        <div><span class="text-amber-600 font-bold block">String D</span>Q-U</div>
+        <div><span class="text-amber-600 font-bold block">String A</span>1-7</div>
     </footer>
 
     <script>
-        // --- Audio Engine ---
+        // --- Core Audio Engine (Optimized for Stability) ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
-        const volumeControl = document.getElementById('volume');
-        const startBtn = document.getElementById('startAudio');
         let masterGain;
+        let limiter;
         let isAudioStarted = false;
         
-        // Recorder Variables
+        // Recorder
         let mediaRecorder;
         let recordedChunks = [];
         let audioDestination;
+        let isRecording = false;
 
-        // Note frequencies (Just Intonation/Equal Temperament mix for demo)
-        // Base Frequencies: C2=65.41, G2=98.00, D3=146.83, A3=220.00
-        const stringBaseFreqs = {
-            'C2': 65.41,
-            'G2': 98.00,
-            'D3': 146.83,
-            'A3': 220.00
-        };
-
-        // Keyboard mapping: [Key, Semitones from open string, Note Name]
+        // Configuration
+        const stringBaseFreqs = { 'C2': 65.41, 'G2': 98.00, 'D3': 146.83, 'A3': 220.00 };
+        
+        // Key Map
         const keyMap = {
-            // String C (Bottom Row)
-            'z': { string: 'C2', semitone: 0, note: 'C2' },
-            'x': { string: 'C2', semitone: 2, note: 'D2' },
-            'c': { string: 'C2', semitone: 4, note: 'E2' },
-            'v': { string: 'C2', semitone: 5, note: 'F2' },
-            'b': { string: 'C2', semitone: 7, note: 'G2' },
-            'n': { string: 'C2', semitone: 9, note: 'A2' },
-            'm': { string: 'C2', semitone: 11, note: 'B2' },
-
-            // String G (Middle Row)
-            'a': { string: 'G2', semitone: 0, note: 'G2' },
-            's': { string: 'G2', semitone: 2, note: 'A2' },
-            'd': { string: 'G2', semitone: 4, note: 'B2' },
-            'f': { string: 'G2', semitone: 5, note: 'C3' },
-            'g': { string: 'G2', semitone: 7, note: 'D3' },
-            'h': { string: 'G2', semitone: 9, note: 'E3' },
-            'j': { string: 'G2', semitone: 11, note: 'F#3' },
-
-            // String D (Top Row)
-            'q': { string: 'D3', semitone: 0, note: 'D3' },
-            'w': { string: 'D3', semitone: 2, note: 'E3' },
-            'e': { string: 'D3', semitone: 4, note: 'F#3' },
-            'r': { string: 'D3', semitone: 5, note: 'G3' },
-            't': { string: 'D3', semitone: 7, note: 'A3' },
-            'y': { string: 'D3', semitone: 9, note: 'B3' },
-            'u': { string: 'D3', semitone: 11, note: 'C#4' },
-
-             // String A (Number Row)
-            '1': { string: 'A3', semitone: 0, note: 'A3' },
-            '2': { string: 'A3', semitone: 2, note: 'B3' },
-            '3': { string: 'A3', semitone: 4, note: 'C#4' },
-            '4': { string: 'A3', semitone: 5, note: 'D4' },
-            '5': { string: 'A3', semitone: 7, note: 'E4' },
-            '6': { string: 'A3', semitone: 9, note: 'F#4' },
-            '7': { string: 'A3', semitone: 11, note: 'G#4' }
+            'z': { s: 'C2', st: 0, n: 'C2' }, 'x': { s: 'C2', st: 2, n: 'D2' }, 'c': { s: 'C2', st: 4, n: 'E2' }, 'v': { s: 'C2', st: 5, n: 'F2' }, 'b': { s: 'C2', st: 7, n: 'G2' }, 'n': { s: 'C2', st: 9, n: 'A2' }, 'm': { s: 'C2', st: 11, n: 'B2' },
+            'a': { s: 'G2', st: 0, n: 'G2' }, 's': { s: 'G2', st: 2, n: 'A2' }, 'd': { s: 'G2', st: 4, n: 'B2' }, 'f': { s: 'G2', st: 5, n: 'C3' }, 'g': { s: 'G2', st: 7, n: 'D3' }, 'h': { s: 'G2', st: 9, n: 'E3' }, 'j': { s: 'G2', st: 11, n: 'F#3' },
+            'q': { s: 'D3', st: 0, n: 'D3' }, 'w': { s: 'D3', st: 2, n: 'E3' }, 'e': { s: 'D3', st: 4, n: 'F#3' }, 'r': { s: 'D3', st: 5, n: 'G3' }, 't': { s: 'D3', st: 7, n: 'A3' }, 'y': { s: 'D3', st: 9, n: 'B3' }, 'u': { s: 'D3', st: 11, n: 'C#4' },
+            '1': { s: 'A3', st: 0, n: 'A3' }, '2': { s: 'A3', st: 2, n: 'B3' }, '3': { s: 'A3', st: 4, n: 'C#4' }, '4': { s: 'A3', st: 5, n: 'D4' }, '5': { s: 'A3', st: 7, n: 'E4' }, '6': { s: 'A3', st: 9, n: 'F#4' }, '7': { s: 'A3', st: 11, n: 'G#4' }
         };
 
-        // Active notes registry to handle polyphony and key releases
-        const activeOscillators = {};
+        // Track active voices to prevent overlap on same key
+        const activeVoices = new Map();
 
-        function initAudio() {
+        async function initAudio() {
             if (isAudioStarted) return;
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            audioCtx = new AudioContext();
             
-            masterGain = audioCtx.createGain();
-            masterGain.gain.value = volumeControl.value;
-            masterGain.connect(audioCtx.destination);
-            
-            // Setup Recording Destination
-            audioDestination = audioCtx.createMediaStreamDestination();
-            masterGain.connect(audioDestination);
-            
-            // Setup MediaRecorder
             try {
-                mediaRecorder = new MediaRecorder(audioDestination.stream);
+                audioCtx = new AudioContext({ latencyHint: 'interactive' });
                 
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        recordedChunks.push(event.data);
-                    }
-                };
+                // Limiter to prevent distortion when many notes play
+                limiter = audioCtx.createDynamicsCompressor();
+                limiter.threshold.value = -10;
+                limiter.knee.value = 40;
+                limiter.ratio.value = 12;
+                limiter.attack.value = 0;
+                limiter.release.value = 0.25;
+
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.6;
+
+                // Routing: Source -> Master -> Limiter -> Destination
+                masterGain.connect(limiter);
+                limiter.connect(audioCtx.destination);
+
+                // Recording Setup
+                audioDestination = audioCtx.createMediaStreamDestination();
+                limiter.connect(audioDestination);
+
+                isAudioStarted = true;
                 
-                mediaRecorder.onstop = () => {
-                    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
-                    const url = URL.createObjectURL(blob);
-                    
-                    // Auto-download
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    a.download = `cello_recording_${new Date().toISOString().slice(0,19).replace(/:/g,"-")}.webm`;
-                    document.body.appendChild(a);
-                    a.click();
-                    
-                    // Cleanup
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                    recordedChunks = [];
-                };
-            } catch (err) {
-                console.error("MediaRecorder not supported or error:", err);
+                // UI Update
+                const btn = document.getElementById('startAudio');
+                btn.classList.replace('bg-amber-800', 'bg-green-700');
+                btn.classList.replace('hover:bg-amber-700', 'hover:bg-green-600');
+                btn.innerText = "✓ พร้อมเล่น";
+                
+                const status = document.getElementById('statusIndicator');
+                status.classList.replace('bg-red-500', 'bg-green-500');
+                status.classList.replace('shadow-[0_0_5px_red]', 'shadow-[0_0_5px_green]');
+
+                // Fix IOS/Chrome audio suspension
+                if (audioCtx.state === 'suspended') {
+                    await audioCtx.resume();
+                }
+
+            } catch (e) {
+                console.error("Audio Init Failed", e);
+                alert("ไม่สามารถเปิดระบบเสียงได้");
             }
-
-            isAudioStarted = true;
-            startBtn.classList.remove('animate-pulse', 'bg-amber-700');
-            startBtn.classList.add('bg-green-700');
-            startBtn.innerHTML = "✓ พร้อมเล่น (Ready)";
         }
 
-        // Calculate frequency based on semitones
-        function getFrequency(baseFreq, semitones) {
-            return baseFreq * Math.pow(2, semitones / 12);
+        function getFreq(base, semi) {
+            return base * Math.pow(2, semi / 12);
         }
 
-        function playSound(keyId, stringName, semitones) {
+        function playNote(keyId) {
             if (!isAudioStarted) initAudio();
-            if (activeOscillators[keyId]) return; // Prevent re-triggering while holding
+            // Resume context if browser suspended it
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
-            const baseFreq = stringBaseFreqs[stringName];
-            const freq = getFrequency(baseFreq, semitones);
+            const data = keyMap[keyId];
+            if (!data) return;
+            
+            // If already playing this key, don't restart (prevents phasing artifacts)
+            if (activeVoices.has(keyId)) return;
+
             const now = audioCtx.currentTime;
+            const freq = getFreq(stringBaseFreqs[data.s], data.st);
 
-            // 1. Oscillator (Sawtooth for bow friction string sound)
-            const osc = audioCtx.createOscillator();
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(freq, now);
+            // --- Synth Architecture ---
+            // Osc1: Sawtooth (Body)
+            const osc1 = audioCtx.createOscillator();
+            osc1.type = 'sawtooth';
+            osc1.frequency.setValueAtTime(freq, now);
 
-            // 2. Second Oscillator for richness (slightly detuned)
+            // Osc2: Sawtooth (Detuned for richness)
             const osc2 = audioCtx.createOscillator();
             osc2.type = 'sawtooth';
             osc2.frequency.setValueAtTime(freq, now);
-            osc2.detune.value = 8; // Slight detune for warmth
+            osc2.detune.value = 12; // Cello ensemble effect
 
-            // 3. Lowpass Filter (To simulate wooden body resonance)
+            // Filter (Lowpass for wood resonance)
             const filter = audioCtx.createBiquadFilter();
             filter.type = 'lowpass';
-            // Dynamic filter based on pitch (brighter for higher notes)
-            filter.frequency.setValueAtTime(freq * 8, now); 
-            filter.Q.value = 2;
+            // Key tracking: higher notes = brighter filter
+            const filterFreq = Math.min(freq * 6, 8000); 
+            filter.frequency.setValueAtTime(filterFreq, now);
+            filter.Q.value = 1.5;
 
-            // 4. Gain (Envelope: Attack, Decay, Sustain, Release)
-            const gainNode = audioCtx.createGain();
-            gainNode.gain.setValueAtTime(0, now);
-            // Slower attack for low strings, faster for high
-            const attackTime = stringName === 'C2' ? 0.15 : 0.08;
-            gainNode.gain.linearRampToValueAtTime(0.8, now + attackTime); 
-            gainNode.gain.linearRampToValueAtTime(0.6, now + attackTime + 0.2); // Decay to sustain
+            // VCA (Voltage Controlled Amplifier)
+            const amp = audioCtx.createGain();
+            amp.gain.setValueAtTime(0, now);
+            
+            // Attack: Slightly slower for low strings
+            const attack = data.s === 'C2' ? 0.08 : 0.04;
+            amp.gain.linearRampToValueAtTime(0.8, now + attack);
+            amp.gain.exponentialRampToValueAtTime(0.6, now + attack + 0.2); // Decay
 
-            // 5. Vibrato (LFO) - Adds realism
+            // Vibrato (LFO)
             const lfo = audioCtx.createOscillator();
-            lfo.type = 'sine';
-            lfo.frequency.value = 5.5; // Vibrato speed
-            const lfoGain = audioCtx.createGain();
-            lfoGain.gain.value = 4.0; // Vibrato depth
-            lfo.connect(lfoGain);
-            lfoGain.connect(osc.frequency);
-            lfoGain.connect(osc2.frequency);
+            lfo.frequency.value = 5.5;
+            const lfoAmp = audioCtx.createGain();
+            lfoAmp.gain.value = 4; // Vibrato depth
+            lfo.connect(lfoAmp);
+            lfoAmp.connect(osc1.frequency);
+            lfoAmp.connect(osc2.frequency);
 
             // Connections
-            osc.connect(filter);
+            osc1.connect(filter);
             osc2.connect(filter);
-            filter.connect(gainNode);
-            gainNode.connect(masterGain);
+            filter.connect(amp);
+            amp.connect(masterGain);
 
             // Start
-            osc.start(now);
+            osc1.start(now);
             osc2.start(now);
             lfo.start(now);
 
-            // Store nodes to stop them later
-            activeOscillators[keyId] = { osc, osc2, lfo, gainNode, filter };
+            // Register Voice
+            activeVoices.set(keyId, { 
+                osc1, osc2, lfo, amp, 
+                string: data.s,
+                dom: data.domElement 
+            });
 
-            // UI Feedback
-            animateString(stringName, true);
-        }
-
-        function stopSound(keyId, stringName) {
-            if (!activeOscillators[keyId]) return;
-
-            const { osc, osc2, lfo, gainNode } = activeOscillators[keyId];
-            const now = audioCtx.currentTime;
-            const releaseTime = 0.4; // Long release for resonance
-
-            // Release envelope
-            gainNode.gain.cancelScheduledValues(now);
-            gainNode.gain.setValueAtTime(gainNode.gain.value, now);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, now + releaseTime);
-
-            // Stop oscillators after release
-            osc.stop(now + releaseTime);
-            osc2.stop(now + releaseTime);
-            lfo.stop(now + releaseTime);
-
-            // Clean up memory
-            setTimeout(() => {
-                delete activeOscillators[keyId];
-            }, releaseTime * 1000 + 100);
-
-            // UI Feedback
-            animateString(stringName, false);
-        }
-
-        // --- UI Logic ---
-
-        function animateString(stringName, isPlaying) {
-            const stringClass = `.string-${stringName.charAt(0).toLowerCase()}`;
-            const element = document.querySelector(stringClass);
-            if (element) {
-                if (isPlaying) {
-                    element.classList.add('vibrating', 'active-note');
-                } else {
-                    // Only stop vibrating if NO notes on this string are playing
-                    // Simple approximation: check if any key for this string is pressed?
-                    // For now, we just remove it to keep UI responsive
-                    element.classList.remove('vibrating', 'active-note');
-                }
+            // Visuals
+            if (data.domElement) {
+                data.domElement.classList.add('active-key');
+                animateString(data.s, true);
             }
         }
 
-        function createVisualMarkers() {
-            // Add clickable zones for mouse users
-            Object.keys(keyMap).forEach(key => {
-                const data = keyMap[key];
-                const stringClass = `.string-${data.string.charAt(0).toLowerCase()}`;
-                const container = document.querySelector(stringClass);
-                
-                const noteDiv = document.createElement('div');
-                noteDiv.className = 'w-full flex items-center justify-center border-b border-white/5 hover:bg-white/10 transition relative';
-                noteDiv.style.flex = '1';
-                noteDiv.id = `key-${key}`;
-                
-                // Visual label (Key)
-                const label = document.createElement('span');
-                label.className = 'key-label';
-                label.innerText = key.toUpperCase();
-                
-                // Note Name
-                const noteName = document.createElement('span');
-                noteName.className = 'note-name';
-                noteName.innerText = data.note;
+        function stopNote(keyId) {
+            const voice = activeVoices.get(keyId);
+            if (!voice) return;
 
-                noteDiv.appendChild(noteName);
-                noteDiv.appendChild(label);
+            const now = audioCtx.currentTime;
+            const release = 0.35; // Natural resonance tail
 
-                // Mouse/Touch Events for this specific note area
-                const triggerPlay = (e) => {
-                    e.preventDefault(); 
-                    playSound(key, data.string, data.semitone);
-                    noteDiv.classList.add('active-key', 'bg-white/20');
-                };
+            // Smooth Release
+            voice.amp.gain.cancelScheduledValues(now);
+            voice.amp.gain.setValueAtTime(voice.amp.gain.value, now);
+            voice.amp.gain.exponentialRampToValueAtTime(0.001, now + release);
+
+            // Stop oscillators slightly later
+            voice.osc1.stop(now + release);
+            voice.osc2.stop(now + release);
+            voice.lfo.stop(now + release);
+
+            // Garbage Collection from map immediately
+            activeVoices.delete(keyId);
+
+            // Visuals
+            if (voice.dom) {
+                voice.dom.classList.remove('active-key');
+            }
+            
+            // Check if string should stop vibrating (if no other notes on this string are active)
+            // Simplified: just check if any active voice uses this string
+            let stringStillActive = false;
+            for (let v of activeVoices.values()) {
+                if (v.string === voice.string) {
+                    stringStillActive = true;
+                    break;
+                }
+            }
+            if (!stringStillActive) {
+                animateString(voice.string, false);
+            }
+        }
+
+        function animateString(stringName, isActive) {
+            const el = document.querySelector(`.string-${stringName.charAt(0).toLowerCase()} .cello-string`);
+            if (el) {
+                if (isActive) el.parentElement.classList.add('vibrating');
+                else el.parentElement.classList.remove('vibrating');
+            }
+        }
+
+        // --- UI & Interaction ---
+
+        function createKeys() {
+            Object.keys(keyMap).forEach(k => {
+                const data = keyMap[k];
+                const container = document.querySelector(`.string-${data.s.charAt(0).toLowerCase()}`);
                 
-                const triggerStop = (e) => {
-                    if(e) e.preventDefault();
-                    stopSound(key, data.string);
-                    noteDiv.classList.remove('active-key', 'bg-white/20');
-                };
+                const div = document.createElement('div');
+                div.className = 'w-full flex-1 border-b border-white/5 hover:bg-white/10 transition-colors relative flex justify-center items-center';
+                
+                div.innerHTML = `
+                    <span class="note-name">${data.n}</span>
+                    <span class="key-label">${k.toUpperCase()}</span>
+                `;
 
-                noteDiv.addEventListener('mousedown', triggerPlay);
-                noteDiv.addEventListener('mouseup', triggerStop);
-                noteDiv.addEventListener('mouseleave', () => {
-                    if (activeOscillators[key]) triggerStop();
+                // Link DOM
+                data.domElement = div;
+
+                // Mouse Events
+                div.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    playNote(k);
+                });
+                div.addEventListener('mouseenter', (e) => {
+                    if (e.buttons === 1) playNote(k); // Drag to play
+                });
+                div.addEventListener('mouseleave', () => stopNote(k));
+                div.addEventListener('mouseup', () => stopNote(k));
+
+                // Touch Events (Stable)
+                div.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    playNote(k);
+                }, {passive: false});
+                
+                div.addEventListener('touchend', (e) => {
+                    e.preventDefault(); // Prevents mouse emulation
+                    stopNote(k);
                 });
 
-                // Touch support
-                noteDiv.addEventListener('touchstart', triggerPlay, {passive: false});
-                noteDiv.addEventListener('touchend', triggerStop);
-
-                // Link visual div to key press
-                data.domElement = noteDiv;
-                
-                container.appendChild(noteDiv);
+                container.appendChild(div);
             });
         }
 
-        // --- Features ---
-        
-        // Toggle Notes Visibility
-        const toggleNotesBtn = document.getElementById('toggleNotesBtn');
-        const toggleText = document.getElementById('toggleText');
-        let notesVisible = false;
+        // --- Setup ---
+        createKeys();
 
-        toggleNotesBtn.addEventListener('click', () => {
-            notesVisible = !notesVisible;
-            document.getElementById('fingerboard').classList.toggle('show-notes-mode');
-            
-            if (notesVisible) {
-                toggleNotesBtn.classList.remove('bg-gray-700', 'text-white');
-                toggleNotesBtn.classList.add('bg-amber-500', 'text-black', 'border-amber-600');
-                toggleText.innerText = "ซ่อนโน้ต";
-            } else {
-                toggleNotesBtn.classList.add('bg-gray-700', 'text-white');
-                toggleNotesBtn.classList.remove('bg-amber-500', 'text-black', 'border-amber-600');
-                toggleText.innerText = "แสดงโน้ต";
-            }
+        // Keyboard Handler
+        window.addEventListener('keydown', e => {
+            if (e.repeat || e.ctrlKey || e.metaKey) return;
+            const k = e.key.toLowerCase();
+            if (keyMap[k]) playNote(k);
         });
 
-        // Recording Logic
+        window.addEventListener('keyup', e => {
+            const k = e.key.toLowerCase();
+            if (keyMap[k]) stopNote(k);
+        });
+
+        // Global Safety (Stop sounds if window loses focus or mouse release outside)
+        window.addEventListener('blur', () => {
+            activeVoices.forEach((v, k) => stopNote(k));
+        });
+        window.addEventListener('mouseup', () => {
+            activeVoices.forEach((v, k) => stopNote(k));
+        });
+
+        // --- Features ---
+        document.getElementById('startAudio').addEventListener('click', initAudio);
+
+        // Toggle Notes
+        let showNotes = false;
+        document.getElementById('toggleNotesBtn').addEventListener('click', function() {
+            showNotes = !showNotes;
+            document.getElementById('fingerboard').classList.toggle('show-notes-mode');
+            this.classList.toggle('bg-amber-600');
+            this.classList.toggle('text-white');
+        });
+
+        // Recording
         const recordBtn = document.getElementById('recordBtn');
-        const recordText = document.getElementById('recordText');
-        let isRecording = false;
-
         recordBtn.addEventListener('click', () => {
-            if (!isAudioStarted) {
-                alert("กรุณากดปุ่ม '🔊 เปิดเสียง' ก่อนทำการบันทึก");
-                return;
-            }
-
-            if (!mediaRecorder) {
-                alert("เบราว์เซอร์นี้ไม่รองรับการบันทึกเสียง");
-                return;
-            }
-
+            if (!isAudioStarted) { alert("กรุณากดเปิดใช้งานเสียงก่อน"); return; }
+            
             if (!isRecording) {
-                // Start Recording
-                recordedChunks = [];
-                mediaRecorder.start();
-                isRecording = true;
-                
-                // UI Update
-                recordBtn.classList.remove('bg-gray-700', 'hover:bg-gray-600');
-                recordBtn.classList.add('bg-red-600', 'hover:bg-red-700', 'animate-pulse');
-                recordText.innerText = "หยุดบันทึก (Stop)";
+                // Start
+                try {
+                    mediaRecorder = new MediaRecorder(audioDestination.stream);
+                    recordedChunks = [];
+                    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+                    mediaRecorder.onstop = saveRecording;
+                    mediaRecorder.start();
+                    
+                    isRecording = true;
+                    recordBtn.innerHTML = "⏹ หยุด";
+                    recordBtn.classList.replace('bg-gray-800', 'bg-red-600');
+                    recordBtn.classList.add('animate-pulse');
+                } catch(e) {
+                    alert("อุปกรณ์ไม่รองรับการบันทึก");
+                }
             } else {
-                // Stop Recording
+                // Stop
                 mediaRecorder.stop();
                 isRecording = false;
-                
-                // UI Update
-                recordBtn.classList.add('bg-gray-700', 'hover:bg-gray-600');
-                recordBtn.classList.remove('bg-red-600', 'hover:bg-red-700', 'animate-pulse');
-                recordText.innerText = "บันทึกเสียง";
+                recordBtn.innerHTML = "🔴 Rec";
+                recordBtn.classList.replace('bg-red-600', 'bg-gray-800');
+                recordBtn.classList.remove('animate-pulse');
             }
         });
 
-        // --- Event Listeners ---
-
-        startBtn.addEventListener('click', initAudio);
-
-        volumeControl.addEventListener('input', (e) => {
-            if (masterGain) {
-                masterGain.gain.value = e.target.value;
-            }
-        });
-
-        window.addEventListener('keydown', (e) => {
-            if (e.repeat) return;
-            const key = e.key.toLowerCase();
-            if (keyMap[key]) {
-                const data = keyMap[key];
-                playSound(key, data.string, data.semitone);
-                if (data.domElement) data.domElement.classList.add('active-key', 'bg-white/20');
-            }
-        });
-
-        window.addEventListener('keyup', (e) => {
-            const key = e.key.toLowerCase();
-            if (keyMap[key]) {
-                const data = keyMap[key];
-                stopSound(key, data.string);
-                if (data.domElement) data.domElement.classList.remove('active-key', 'bg-white/20');
-            }
-        });
-
-        // Initialize UI
-        createVisualMarkers();
+        function saveRecording() {
+            const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `cello_jam_${Date.now()}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+        }
 
     </script>
 </body>
