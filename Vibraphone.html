@@ -16,6 +16,7 @@
             touch-action: none; /* Crucial for multitouch gaming */
             user-select: none;
             -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         /* Metallic Bar Styling */
@@ -31,6 +32,7 @@
             font-size: 0.8rem;
             color: rgba(0,0,0,0.6);
             font-weight: bold;
+            touch-action: none; /* Disables browser gestures on keys */
         }
 
         .bar-natural {
@@ -163,6 +165,7 @@
     let motorEnabled = false;
     let motorSpeed = 3; // Hz
     let masterGain;
+    let compressor;
     let dest; // For recording
     let mediaRecorder;
     let recordedChunks = [];
@@ -210,16 +213,27 @@
     function initAudio() {
         if (!audioCtx) {
             const AudioContext = window.AudioContext || window.webkitAudioContext;
-            audioCtx = new AudioContext();
-            masterGain = audioCtx.createGain();
-            masterGain.gain.value = 0.8;
+            // latencyHint: 'interactive' tells the browser to prefer low latency over battery life
+            audioCtx = new AudioContext({ latencyHint: 'interactive' });
             
-            // Connect to speakers
-            masterGain.connect(audioCtx.destination);
+            // Compressor limits high volume peaks when multiple notes are played
+            compressor = audioCtx.createDynamicsCompressor();
+            compressor.threshold.value = -10;
+            compressor.knee.value = 40;
+            compressor.ratio.value = 12;
+            compressor.attack.value = 0;
+            compressor.release.value = 0.25;
+
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.7; // Slightly lower master to allow headroom
+            
+            // Chain: Master -> Compressor -> Destination
+            masterGain.connect(compressor);
+            compressor.connect(audioCtx.destination);
 
             // Connect to Recorder Destination
             dest = audioCtx.createMediaStreamDestination();
-            masterGain.connect(dest);
+            compressor.connect(dest);
         }
         if (audioCtx.state === 'suspended') {
             audioCtx.resume();
@@ -266,9 +280,11 @@
                 btn.style.height = `${55 - (naturalIndex * 1.5)}%`; // Tapering
             }
 
-            // Events
+            // Events - Improved for Stability
             const triggerNote = (e) => {
-                e.preventDefault(); // Prevent scroll
+                // Prevent default behavior to stop scrolling, zooming, and text selection
+                if(e.cancelable) e.preventDefault();
+                
                 initAudio();
                 playNote(noteData.freq);
                 
@@ -281,8 +297,11 @@
                 }, 150);
             };
 
-            btn.addEventListener('mousedown', triggerNote);
+            // Use 'pointerdown' for better cross-device support (mouse, touch, pen)
+            // But we also keep touchstart as a fallback or for specific mobile optimizations
+            // 'touchstart' is often faster than 'pointerdown' on some Androids
             btn.addEventListener('touchstart', triggerNote, { passive: false });
+            btn.addEventListener('mousedown', triggerNote);
 
             container.appendChild(btn);
         });
@@ -330,15 +349,16 @@
             const lfoGain = audioCtx.createGain();
             lfoGain.gain.value = 0.6; // Depth of tremolo (0 to 1)
 
-            // Connect LFO to modulate the gain of the tremolo node
-            // The math: Gain = 1 + (SinWave * Depth)
-            // But WebAudio param connection sums values. 
-            // So we connect LFO to tremoloGain.gain (which is AudioParam)
-            
             lfo.connect(lfoGain);
             lfoGain.connect(tremoloGain.gain);
             lfo.start(now);
             lfo.stop(now + 2.5);
+            
+            // Clean up LFO
+            setTimeout(() => {
+                lfo.disconnect();
+                lfoGain.disconnect();
+            }, 3000);
         }
 
         // 5. Connections
