@@ -193,7 +193,7 @@
     <div id="start-overlay" onclick="startApp()">
         <div class="text-6xl mb-4">🥁</div>
         <h2 class="text-2xl font-bold mb-2">กลองแขกจำลอง</h2>
-        <p class="mb-6 opacity-80">แตะเพื่อเริ่มใช้งาน (เสียง HD)</p>
+        <p class="mb-6 opacity-80">แตะเพื่อเริ่มใช้งาน (เสียงดังพิเศษ)</p>
         <div class="animate-bounce bg-[#e6d5b8] text-[#2c1e12] px-6 py-2 rounded-full font-bold shadow-lg cursor-pointer">
             เริ่มเลย
         </div>
@@ -204,7 +204,6 @@
         let audioCtx;
         let masterGain;
         let compressor;
-        let reverbNode;
         let dest; 
         let mediaRecorder;
         let recordedChunks = [];
@@ -216,37 +215,21 @@
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 audioCtx = new AudioContext();
                 
-                // 1. Dynamics Compressor (To make it loud and punchy without clipping)
+                // 1. Dynamics Compressor (Hard Limiter mode for MAX VOLUME)
                 compressor = audioCtx.createDynamicsCompressor();
-                compressor.threshold.value = -20;
-                compressor.knee.value = 30;
-                compressor.ratio.value = 12;
-                compressor.attack.value = 0.003;
-                compressor.release.value = 0.25;
+                compressor.threshold.value = -10; // High threshold
+                compressor.knee.value = 0; // Hard knee
+                compressor.ratio.value = 20; // High ratio (Limiting)
+                compressor.attack.value = 0.001; // Fast attack
+                compressor.release.value = 0.1;
 
-                // 2. Master Gain
+                // 2. Master Gain (Boosted)
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 1.0; // Max volume
+                masterGain.gain.value = 1.8; // Boost volume significantly (compressor prevents clipping)
 
-                // 3. Reverb (Convolver) - Adds resonance
-                reverbNode = audioCtx.createConvolver();
-                reverbNode.buffer = createImpulseResponse(2.0, 2.0); // 2 seconds reverb
-
-                // 4. Dry/Wet Mix for Reverb
-                const dryNode = audioCtx.createGain();
-                dryNode.gain.value = 0.7; // Original sound
-                const wetNode = audioCtx.createGain();
-                wetNode.gain.value = 0.3; // Reverb sound
-
-                // Routing: Source -> [Dry + Wet(Reverb)] -> Compressor -> Destination
-                // We connect Sources to 'masterGain' in playSound, so:
-                masterGain.connect(dryNode);
-                masterGain.connect(reverbNode);
-                reverbNode.connect(wetNode);
-
-                dryNode.connect(compressor);
-                wetNode.connect(compressor);
-
+                // Routing: Source -> MasterGain -> Compressor -> Destination (Dry & Loud)
+                // Removed Reverb for direct punchy sound
+                masterGain.connect(compressor);
                 compressor.connect(audioCtx.destination);
 
                 // Setup Recording Stream (From compressor output)
@@ -256,22 +239,6 @@
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
-        }
-
-        // Generate Artificial Reverb Impulse Response
-        function createImpulseResponse(duration, decay) {
-            const length = audioCtx.sampleRate * duration;
-            const impulse = audioCtx.createBuffer(2, length, audioCtx.sampleRate);
-            const left = impulse.getChannelData(0);
-            const right = impulse.getChannelData(1);
-
-            for (let i = 0; i < length; i++) {
-                // Exponential decay noise
-                const n = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
-                left[i] = n;
-                right[i] = n;
-            }
-            return impulse;
         }
 
         // Generate Noise Buffer for "Snap" sound
@@ -293,19 +260,13 @@
 
             const t = audioCtx.currentTime;
 
-            // Oscillator 1: The Main Body (Sine)
+            // --- OSCILLATOR SETUP ---
             const osc1 = audioCtx.createOscillator();
             const osc1Gain = audioCtx.createGain();
             osc1.connect(osc1Gain);
             osc1Gain.connect(masterGain);
 
-            // Oscillator 2: The Harmonic Overtone (Triangle) - Adds richness
-            const osc2 = audioCtx.createOscillator();
-            const osc2Gain = audioCtx.createGain();
-            osc2.connect(osc2Gain);
-            osc2Gain.connect(masterGain);
-
-            // Noise: The Slap/Hit
+            // Noise setup (Impact)
             const noise = audioCtx.createBufferSource();
             noise.buffer = noiseBuffer;
             const noiseFilter = audioCtx.createBiquadFilter();
@@ -314,61 +275,84 @@
             noiseFilter.connect(noiseGain);
             noiseGain.connect(masterGain);
 
+            // FM Synthesis for "Ting" (Rim)
+            // Carrier -> Modulator logic is implemented by connecting osc to freq param
+            
             if (type === 'center') {
-                // "JO" or "TOM" - Deep, Resonant
-                const baseFreq = 130 * pitchMultiplier;
+                // "JO" or "TOM" - Punchy, Deep, No Ring
+                // To make it realistic: Fast pitch drop + Solid low end
                 
-                // Osc 1 (Body)
+                const baseFreq = 90 * pitchMultiplier;
+                
+                // Body (Sine wave)
                 osc1.type = 'sine';
-                osc1.frequency.setValueAtTime(baseFreq, t);
-                osc1.frequency.exponentialRampToValueAtTime(baseFreq * 0.6, t + 0.2); // Pitch drop tension
+                osc1.frequency.setValueAtTime(baseFreq * 1.5, t); // Start higher
+                osc1.frequency.exponentialRampToValueAtTime(baseFreq, t + 0.1); // Drop faster (Drier pitch)
+                
                 osc1Gain.gain.setValueAtTime(0, t);
-                osc1Gain.gain.linearRampToValueAtTime(1.5, t + 0.005); // Loud Attack
-                osc1Gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5); // Sustain
+                // ปรับเพิ่มความดัง (Boost gain) และลดหางเสียงให้สั้นลง (Dry decay)
+                osc1Gain.gain.linearRampToValueAtTime(3.5, t + 0.005); // Snap start louder
+                osc1Gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25); // Short/Dry decay (was 0.5)
 
-                // Osc 2 (Harmonic)
-                osc2.type = 'triangle';
-                osc2.frequency.setValueAtTime(baseFreq * 2.02, t); // Slightly detuned harmonic
-                osc2Gain.gain.setValueAtTime(0, t);
-                osc2Gain.gain.linearRampToValueAtTime(0.3, t + 0.005);
-                osc2Gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
-
-                // Noise (Impact) - Muffled
+                // Impact Click (Low-passed Noise)
                 noiseFilter.type = 'lowpass';
-                noiseFilter.frequency.setValueAtTime(800, t);
-                noiseGain.gain.setValueAtTime(0.5, t);
-                noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+                noiseFilter.frequency.setValueAtTime(1000, t);
+                // ปรับเพิ่มเสียงกระแทก
+                noiseGain.gain.setValueAtTime(2.5, t);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05); // Very short click
+
+                // Secondary Oscillator for Thickness
+                const subOsc = audioCtx.createOscillator();
+                const subGain = audioCtx.createGain();
+                subOsc.type = 'triangle';
+                subOsc.frequency.setValueAtTime(baseFreq * 0.5, t); // Sub-bass
+                subOsc.connect(subGain);
+                subGain.connect(masterGain);
+                // ปรับเพิ่มเสียงเบส และทำให้กระชับขึ้น
+                subGain.gain.setValueAtTime(1.5, t);
+                subGain.gain.exponentialRampToValueAtTime(0.01, t + 0.2); // Tight sub bass
+                subOsc.start(t);
+                subOsc.stop(t + 0.5);
 
             } else if (type === 'rim') {
-                // "TING" or "JA" - Sharp, High, Metallic
-                const baseFreq = 250 * pitchMultiplier;
+                // "TING" or "JA" - Metallic, High, Sharp
+                // Using FM Synthesis for bell-like tone
+                
+                const baseFreq = 380 * pitchMultiplier;
 
-                // Osc 1 (Tone)
+                // Carrier (The sound we hear)
                 osc1.type = 'sine';
                 osc1.frequency.setValueAtTime(baseFreq, t);
-                osc1.frequency.exponentialRampToValueAtTime(baseFreq * 0.9, t + 0.1);
+                
+                // Modulator (Vibrates the pitch of the carrier to make it metallic)
+                const modOsc = audioCtx.createOscillator();
+                const modGain = audioCtx.createGain();
+                modOsc.type = 'square'; // Aggressive modulation
+                modOsc.frequency.setValueAtTime(baseFreq * 2.4, t); // Ratio for metallic sound
+                
+                modGain.gain.setValueAtTime(300, t); // Modulation depth
+                modGain.gain.exponentialRampToValueAtTime(1, t + 0.2); // Modulation fades out
+                
+                modOsc.connect(modGain);
+                modGain.connect(osc1.frequency); // Connect to carrier frequency
+                
+                modOsc.start(t);
+                modOsc.stop(t + 0.4);
+
+                // Amplitude Envelope
                 osc1Gain.gain.setValueAtTime(0, t);
                 osc1Gain.gain.linearRampToValueAtTime(0.8, t + 0.002);
-                osc1Gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15); // Short decay
+                osc1Gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3); // Ringing decay
 
-                // Osc 2 (Ring) - Very high harmonic
-                osc2.type = 'square'; // Metallic texture
-                osc2.frequency.setValueAtTime(baseFreq * 2.5, t);
-                osc2Gain.gain.setValueAtTime(0, t);
-                osc2Gain.gain.linearRampToValueAtTime(0.1, t + 0.002);
-                osc2Gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
-
-                // Noise (Snap) - Bright and Loud
+                // Snap (High-passed Noise) - Loud!
                 noiseFilter.type = 'highpass';
-                noiseFilter.frequency.setValueAtTime(2000, t);
-                noiseGain.gain.setValueAtTime(1.2, t); // Boost gain
-                noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+                noiseFilter.frequency.setValueAtTime(3000, t);
+                noiseGain.gain.setValueAtTime(1.5, t); // Boost snap
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05); // Short snap
             }
 
             osc1.start(t);
             osc1.stop(t + 0.6);
-            osc2.start(t);
-            osc2.stop(t + 0.6);
             noise.start(t);
             noise.stop(t + 0.6);
         }
@@ -412,7 +396,7 @@
             const centerZoneRadius = radius * 0.45; // 45% is center zone
 
             const drumType = element.dataset.drum;
-            const pitchMod = drumType === 'female' ? 1.35 : 1.0; // Adjusted pitch ratio
+            const pitchMod = drumType === 'female' ? 1.3 : 1.0; // Adjusted pitch ratio
 
             if (dist < centerZoneRadius) {
                 // Center Hit (Low/Deep)
