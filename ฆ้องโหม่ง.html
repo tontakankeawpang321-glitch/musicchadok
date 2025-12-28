@@ -3,20 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>โหม่งไทยจำลอง - Thai Mong Simulator</title>
+    <title>โหม่งไทย (สูตรสะบัดชัย) - Black & Yellow</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
 
         :root {
-            --bg-color: #0a0a0a;
-            --wood-color: #3e2723;
-            --gold-light: #fdd835;
-            --gold-dark: #fbc02d;
-            --black-metal-1: #4a4a4a;
-            --black-metal-2: #2b2b2b;
-            --black-metal-3: #1a1a1a;
-            --black-metal-4: #050505;
-            --text-color: #e0e0e0;
+            --bg-color: #000000;
+            --primary-yellow: #ffeb3b;
+            --dark-yellow: #fbc02d;
+            --accent-yellow: #fff176;
+            --black-surface: #121212;
+            --text-color: #fffde7;
         }
 
         * {
@@ -30,7 +27,7 @@
             margin: 0;
             padding: 0;
             background-color: var(--bg-color);
-            background-image: radial-gradient(circle at center, #1f1f1f 0%, #000000 100%);
+            background-image: radial-gradient(circle at center, #212121 0%, #000000 100%);
             height: 100vh;
             height: 100dvh;
             width: 100vw;
@@ -46,8 +43,8 @@
             flex: 0 0 auto;
             text-align: center;
             padding: 15px;
-            background: rgba(20, 20, 20, 0.8);
-            border-bottom: 1px solid #333;
+            background: rgba(20, 20, 20, 0.9);
+            border-bottom: 2px solid var(--dark-yellow);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -58,8 +55,10 @@
         h1 {
             margin: 0;
             font-size: 1.4rem;
-            color: #d4af37; /* Metallic Gold Text */
-            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            color: var(--primary-yellow);
+            text-shadow: 0 0 10px rgba(255, 235, 59, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         /* Controls Area */
@@ -69,9 +68,9 @@
         }
 
         .btn {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid #555;
-            color: #ccc;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid var(--dark-yellow);
+            color: var(--primary-yellow);
             padding: 8px 12px;
             border-radius: 20px;
             font-size: 0.9rem;
@@ -86,20 +85,22 @@
 
         .btn:active {
             transform: scale(0.95);
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(253, 216, 53, 0.2);
+            box-shadow: 0 0 10px var(--dark-yellow);
         }
 
         .btn.recording {
             background: #b71c1c;
             color: white;
-            border-color: #d32f2f;
-            animation: pulse 1.5s infinite;
+            border-color: #ff5252;
+            animation: pulse-red 1.5s infinite;
         }
 
         .btn.playing {
-            background: #2e7d32;
-            color: white;
-            border-color: #4caf50;
+            background: #fbc02d;
+            color: black;
+            border-color: #ffeb3b;
+            font-weight: bold;
         }
 
         /* Gong Container - Centered Single Item */
@@ -112,7 +113,7 @@
             perspective: 1000px;
         }
 
-        /* The Gong Instrument (Mong Style - Realistic Black) */
+        /* The Gong Instrument (Black Body) */
         .gong {
             position: relative;
             width: 70vmin; 
@@ -121,83 +122,78 @@
             max-height: 500px;
             
             border-radius: 50%;
-            /* Realistic Black Metal Gradient */
+            /* Black Metal Look */
             background: radial-gradient(circle at 30% 30%, 
-                var(--black-metal-1) 0%, 
-                var(--black-metal-2) 20%, 
-                var(--black-metal-3) 50%, 
-                var(--black-metal-4) 85%, 
+                #484848 0%, 
+                #212121 40%, 
+                #121212 70%, 
                 #000000 100%);
             
             box-shadow: 
-                0 25px 50px rgba(0,0,0,0.8),
-                inset 0 0 60px rgba(0,0,0,0.9);
+                0 30px 60px rgba(0,0,0,0.9),
+                inset 0 0 50px rgba(0,0,0,1);
             
             display: flex;
             justify-content: center;
             align-items: center;
             cursor: pointer;
-            transition: transform 0.05s ease-out;
+            transition: transform 0.08s cubic-bezier(0.25, 0.46, 0.45, 0.94);
             -webkit-touch-callout: none;
             
-            /* Dark Rim */
-            border: 2px solid #111;
+            /* Yellow/Gold Rim */
+            border: 4px solid var(--dark-yellow);
         }
 
-        /* Gong Nipple (The Boss) - Dark Gold/Bronze */
+        /* Gong Nipple (The Boss) - Yellow Gold */
         .gong::after {
             content: '';
             position: absolute;
             width: 25%;
             height: 25%;
-            /* Darker Gold/Antique Bronze look */
+            /* Bright Yellow Gradient */
             background: radial-gradient(circle at 30% 30%, 
-                #a1887f 0%, 
-                #5d4037 40%, 
-                #3e2723 100%);
+                #ffff72 0%, 
+                #ffeb3b 50%, 
+                #fbc02d 100%);
             border-radius: 50%;
             box-shadow: 
-                0 5px 15px rgba(0,0,0,0.7),
-                inset 0 2px 4px rgba(255,255,255,0.1);
+                0 5px 20px rgba(0,0,0,0.8),
+                inset 0 2px 5px rgba(255,255,255,0.4);
             z-index: 2;
         }
 
-        /* Gong Texture - Scratches/Imperfections */
+        /* Texture - Scratches */
         .gong::before {
             content: '';
             position: absolute;
-            top: 4%;
-            left: 4%;
-            right: 4%;
-            bottom: 4%;
+            top: 2%;
+            left: 2%;
+            right: 2%;
+            bottom: 2%;
             border-radius: 50%;
-            border: 1px solid rgba(255,255,255,0.03);
             background: repeating-radial-gradient(
                 transparent 0,
-                transparent 4px,
-                rgba(255,255,255,0.01) 5px,
-                transparent 6px
+                transparent 8px,
+                rgba(255,255,255,0.03) 9px,
+                transparent 12px
             );
+            opacity: 0.4;
             z-index: 1;
             pointer-events: none;
         }
 
         .gong:active, .gong.active {
-            transform: scale(0.97);
-        }
-
-        .gong.active::after {
-            background: radial-gradient(circle at 30% 30%, #bcaaa4 0%, #6d4c41 40%, #3e2723 100%);
+            transform: scale(0.96);
         }
 
         /* Note Label */
         .note-label {
             position: absolute;
             z-index: 3;
-            color: #8d6e63; /* Darker text to blend with black gong */
-            font-weight: 700;
+            color: var(--primary-yellow); 
+            font-weight: 800;
             font-size: 3rem;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+            text-shadow: 0 2px 4px rgba(0,0,0,1);
             opacity: 0;
             transition: opacity 0.3s;
             pointer-events: none;
@@ -205,17 +201,17 @@
         }
 
         .show-notes .note-label {
-            opacity: 0.6;
+            opacity: 1;
         }
 
-        /* Subtle Ripple */
+        /* Ripple - Yellow */
         @keyframes ripple {
-            0% { box-shadow: 0 0 0 0 rgba(100, 100, 100, 0.2); }
-            100% { box-shadow: 0 0 0 30px rgba(100, 100, 100, 0); }
+            0% { box-shadow: 0 0 0 0 rgba(255, 235, 59, 0.6); }
+            100% { box-shadow: 0 0 0 50px rgba(255, 235, 59, 0); }
         }
 
         .gong.active {
-            animation: ripple 0.3s ease-out;
+            animation: ripple 0.5s ease-out;
         }
 
         /* Footer / Status */
@@ -224,14 +220,16 @@
             text-align: center;
             padding: 15px;
             font-size: 0.9rem;
-            color: #666;
-            background: rgba(0,0,0,0.5);
+            color: #777;
+            background: rgba(0,0,0,0.8);
+            font-style: italic;
+            border-top: 1px solid #333;
         }
 
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(183, 28, 28, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(183, 28, 28, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(183, 28, 28, 0); }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(211, 47, 47, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); }
         }
 
         #downloadLink { display: none; }
@@ -241,7 +239,7 @@
 <body>
 
     <header>
-        <h1>โหม่ง (Mong)</h1>
+        <h1>โหม่ง (สูตรสะบัดชัย)</h1>
         <div class="controls">
             <button class="btn" id="toggleNotesBtn">
                 <span>👁️</span> ชื่อ
@@ -262,16 +260,14 @@
         <!-- Single Gong generated by JS -->
     </div>
 
-    <div class="status-bar" id="statusBar">แตะที่โหม่งเพื่อตี</div>
+    <div class="status-bar" id="statusBar">แตะเพื่อตีโหม่ง</div>
     <a id="downloadLink"></a>
 
     <script>
-        // --- Web Audio API Context ---
+        // --- Audio Engine ---
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
         let masterGain;
-        let delayEffect;
-        let delayGain;
         let destination;
         let recorder;
         let audioChunks = [];
@@ -279,34 +275,15 @@
         let isRecording = false;
         let audioUrl;
 
-        // Pitch: G#3 ~207Hz (Slightly higher to cut through reverb better)
-        const mongNote = { note: "โหม่ง", pitch: 207.65, id: 1 };
+        // Mong Note Display
+        const mongNote = { note: "โหม่ง", id: 1 };
 
         function initAudio() {
             if (!audioCtx) {
                 audioCtx = new AudioContext();
-                
-                // Master Gain
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 0.9; 
-
-                // --- Echo/Reverb Section (New) ---
-                // Simulating a large hall/temple reflection
-                delayEffect = audioCtx.createDelay();
-                delayEffect.delayTime.value = 0.35; // 350ms delay for "Mong... ng" effect
+                masterGain.gain.value = 1.0; 
                 
-                delayGain = audioCtx.createGain();
-                delayGain.gain.value = 0.4; // Feedback amount (Echo strength)
-
-                // Route: Input -> Delay -> Gain -> Delay (Loop)
-                delayEffect.connect(delayGain);
-                delayGain.connect(delayEffect);
-                
-                // Route: Delay -> Master
-                delayEffect.connect(masterGain);
-                delayGain.connect(masterGain);
-
-                // Recording Destination
                 destination = audioCtx.createMediaStreamDestination();
                 masterGain.connect(audioCtx.destination);
                 masterGain.connect(destination);
@@ -318,121 +295,45 @@
             }
         }
 
-        // --- Realistic Mong with Echo ---
-        function playGongSound(frequency) {
+        // --- Sabat Chai Gong Synthesis Logic (Adapted) ---
+        // สูตรต้นฉบับจาก Sabat Chai: freqs [220, 280, 600], decays [1.5, 1.0, 0.4]
+        // ปรับปรุง: เพิ่ม Decay ให้ยาวขึ้นเพื่อให้กังวานสมกับเป็นเครื่องเดี่ยว
+        function playGongSound() {
             if (!audioCtx) initAudio();
-
             const t = audioCtx.currentTime;
+            const velocity = 1.0;
+
+            // Frequencies from Sabat Chai Code
+            const freqs = [220, 280, 600]; 
             
-            // 1. Fundamental (The Core)
-            const osc1 = audioCtx.createOscillator();
-            const gain1 = audioCtx.createGain();
-            osc1.type = 'sine';
-            osc1.frequency.setValueAtTime(frequency, t);
+            // Scaled Decays for Resonance (x3 longer than drum context)
+            const decays = [4.5, 3.0, 1.2]; 
             
-            // Envelope: Long sustain for Mong
-            gain1.gain.setValueAtTime(0, t);
-            gain1.gain.linearRampToValueAtTime(1.0, t + 0.03); 
-            gain1.gain.exponentialRampToValueAtTime(0.01, t + 4.5); 
+            // Scaled Amps for Loudness
+            const amps = [1.0, 0.5, 0.2]; 
 
-            // 2. Inharmonic Overtone (The "Metal" Texture)
-            // Slightly off from 1.5 ratio to create metallic realism without fast wobbling
-            const osc2 = audioCtx.createOscillator();
-            const gain2 = audioCtx.createGain();
-            osc2.type = 'sine'; // Sine is cleaner than triangle for this echo mix
-            osc2.frequency.setValueAtTime(frequency * 1.58, t); // Just slightly off-perfect 5th
-            
-            gain2.gain.setValueAtTime(0, t);
-            gain2.gain.linearRampToValueAtTime(0.5, t + 0.03);
-            gain2.gain.exponentialRampToValueAtTime(0.001, t + 3.0);
+            freqs.forEach((f, i) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                osc.frequency.value = f;
+                
+                // Envelope
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(velocity * amps[i], t + 0.02); // Attack
+                gain.gain.exponentialRampToValueAtTime(0.001, t + decays[i]); // Decay
 
-            // 3. High Resonance (The "Ping")
-            const osc3 = audioCtx.createOscillator();
-            const gain3 = audioCtx.createGain();
-            osc3.type = 'triangle'; 
-            osc3.frequency.setValueAtTime(frequency * 3.1, t); 
-            
-            gain3.gain.setValueAtTime(0, t);
-            gain3.gain.linearRampToValueAtTime(0.1, t + 0.01); // Subtle
-            gain3.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
-
-            // 4. Sub-Bass (Body feel)
-            const subOsc = audioCtx.createOscillator();
-            const subGain = audioCtx.createGain();
-            subOsc.type = 'sine';
-            subOsc.frequency.setValueAtTime(frequency * 0.5, t); // Octave down
-            
-            subGain.gain.setValueAtTime(0, t);
-            subGain.gain.linearRampToValueAtTime(0.6, t + 0.05);
-            subGain.gain.exponentialRampToValueAtTime(0.001, t + 4.0);
-
-            // 5. Soft Impact (Padded Mallet)
-            const bufferSize = audioCtx.sampleRate * 0.03; 
-            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                data[i] = (Math.random() * 2 - 1) * 0.5;
-            }
-            const noise = audioCtx.createBufferSource();
-            noise.buffer = buffer;
-            const noiseGain = audioCtx.createGain();
-            
-            // Lowpass the impact for "Thud" not "Click"
-            const noiseFilter = audioCtx.createBiquadFilter();
-            noiseFilter.type = 'lowpass';
-            noiseFilter.frequency.value = 600; 
-
-            noiseGain.gain.setValueAtTime(0.8, t);
-            noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
-
-            // Main Filter - Dynamic
-            const filter = audioCtx.createBiquadFilter();
-            filter.type = 'lowpass';
-            filter.frequency.setValueAtTime(800, t); 
-            filter.frequency.exponentialRampToValueAtTime(200, t + 3.0); 
-
-            // Connect Oscillators to Filter
-            osc1.connect(gain1);
-            osc2.connect(gain2);
-            osc3.connect(gain3);
-            subOsc.connect(subGain);
-            noise.connect(noiseFilter);
-            noiseFilter.connect(noiseGain);
-
-            gain1.connect(filter);
-            gain2.connect(filter);
-            gain3.connect(filter);
-            subGain.connect(filter);
-            noiseGain.connect(filter);
-
-            // Connect Filter to Master AND Echo
-            filter.connect(masterGain);
-            
-            // Send signal to Echo (Delay Effect)
-            const echoSend = audioCtx.createGain();
-            echoSend.gain.value = 0.5; // How much signal goes to echo
-            filter.connect(echoSend);
-            echoSend.connect(delayEffect);
-
-            // Start
-            osc1.start(t);
-            osc2.start(t);
-            osc3.start(t);
-            subOsc.start(t);
-            noise.start(t);
-
-            // Stop
-            osc1.stop(t + 5);
-            osc2.stop(t + 5);
-            osc3.stop(t + 5);
-            subOsc.stop(t + 5);
-            noise.stop(t + 0.1);
+                osc.connect(gain);
+                gain.connect(masterGain);
+                
+                osc.start(t);
+                osc.stop(t + decays[i]);
+            });
         }
 
         // --- UI Generation ---
         const container = document.getElementById('gongContainer');
         
-        // Create Single Gong
         const gong = document.createElement('div');
         gong.className = 'gong';
         
@@ -443,12 +344,12 @@
         gong.appendChild(label);
         container.appendChild(gong);
 
-        // Touch interaction
+        // --- Interaction ---
         const hit = (e) => {
             if(e.type === 'touchstart') e.preventDefault();
             
             initAudio();
-            playGongSound(mongNote.pitch);
+            playGongSound();
             
             // Visual feedback
             gong.classList.remove('active');
@@ -459,14 +360,13 @@
         gong.addEventListener('mousedown', hit);
         gong.addEventListener('touchstart', hit, {passive: false});
 
-        // --- Controls Logic ---
-
+        // --- Controls Logic (Standard) ---
         const toggleNotesBtn = document.getElementById('toggleNotesBtn');
         toggleNotesBtn.addEventListener('click', () => {
             container.classList.toggle('show-notes');
             toggleNotesBtn.style.background = container.classList.contains('show-notes') 
-                ? 'rgba(255, 255, 255, 0.2)' 
-                : 'rgba(255, 255, 255, 0.05)';
+                ? 'rgba(255, 235, 59, 0.3)' 
+                : 'rgba(0, 0, 0, 0.6)';
         });
 
         const recordBtn = document.getElementById('recordBtn');
@@ -476,7 +376,6 @@
 
         recordBtn.addEventListener('click', () => {
             initAudio();
-            
             if (!isRecording) {
                 audioChunks = [];
                 if (!window.MediaRecorder) {
@@ -487,7 +386,6 @@
                 if (!MediaRecorder.isTypeSupported('audio/webm')) {
                     options = { mimeType: 'audio/mp4' };
                 }
-
                 recorder = new MediaRecorder(destination.stream, options);
                 recorder.ondataavailable = e => audioChunks.push(e.data);
                 recorder.onstop = e => {
@@ -495,11 +393,9 @@
                     audioUrl = URL.createObjectURL(audioBlob);
                     playBtn.disabled = false;
                     downloadBtn.style.display = 'flex';
-                    
                     downloadLink.href = audioUrl;
-                    downloadLink.download = 'thai_mong_sound_echo.webm';
+                    downloadLink.download = 'mong_sabat_chai.webm';
                 };
-
                 recorder.start();
                 isRecording = true;
                 recordBtn.classList.add('recording');
@@ -521,7 +417,6 @@
             const audio = new Audio(audioUrl);
             playBtn.classList.add('playing');
             playBtn.innerHTML = "<span>🔊</span> เล่น...";
-            
             audio.onended = () => {
                 playBtn.classList.remove('playing');
                 playBtn.innerHTML = "<span>▶️</span> เล่น";
