@@ -190,6 +190,7 @@
         // --- AUDIO ENGINE (Web Audio API) ---
         let audioCtx;
         let masterGain;
+        let compressor; // เพิ่ม Compressor
         let mediaDest;
         let mediaRecorder;
         let audioChunks = [];
@@ -202,73 +203,148 @@
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 audioCtx = new AudioContext();
                 
-                // Master Volume
-                masterGain = audioCtx.createGain();
-                masterGain.gain.value = 0.8;
-                masterGain.connect(audioCtx.destination);
+                // --- 1. DYNAMICS COMPRESSOR (ตัวช่วยบีบอัดเสียงให้แน่นและดัง) ---
+                compressor = audioCtx.createDynamicsCompressor();
+                // Threshold: เริ่มบีบอัดเมื่อเสียงดังเกิน -12dB
+                compressor.threshold.setValueAtTime(-12, audioCtx.currentTime);
+                // Knee: ความนุ่มนวลของการบีบอัด
+                compressor.knee.setValueAtTime(30, audioCtx.currentTime);
+                // Ratio: อัตราส่วนการบีบอัด (12:1 คือบีบหนักเพื่อให้เสียงแน่น)
+                compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+                // Attack: จับเสียงเร็วมาก (0.003s) เพื่อกันเสียงพีค
+                compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+                // Release: คืนค่าปกติเร็วปานกลาง
+                compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
 
-                // Setup Recording Destination
+                compressor.connect(audioCtx.destination);
+
+                // --- 2. MASTER GAIN ---
+                masterGain = audioCtx.createGain();
+                // ดัน Gain ให้สูงขึ้นเพราะมี Compressor คุมอยู่ (Max Volume)
+                masterGain.gain.value = 1.2; 
+                masterGain.connect(compressor);
+
+                // Setup Recording Destination (ต่อจาก Compressor เพื่อให้เสียงที่อัดผ่านการปรุงแต่งแล้ว)
                 mediaDest = audioCtx.createMediaStreamDestination();
-                masterGain.connect(mediaDest);
+                compressor.connect(mediaDest);
             }
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
         }
 
-        // ฟังก์ชันสร้างเสียงกลองชาตรี (Physical Modeling Synthesis)
+        // ฟังก์ชันสร้าง Noise Buffer (ใช้ซ้ำได้)
+        function createNoiseBuffer(duration) {
+            const bufferSize = audioCtx.sampleRate * duration;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            return buffer;
+        }
+
+        // ฟังก์ชันสร้างเสียงกลองชาตรี (Physical Modeling Synthesis - Advanced)
         function synthesizeDrum(type) {
             initAudio();
             const t = audioCtx.currentTime;
 
-            // Parameters ตามชนิดกลอง
-            // ตัวผู้ (Low): ตูม~ 200Hz, Decay ยาวกว่า
-            // ตัวเมีย (High): ติง! 350Hz, Decay สั้น, Attack คม
-            const params = type === 'low' 
-                ? { freq: 180, decay: 0.35, punch: 150 } 
-                : { freq: 380, decay: 0.25, punch: 200 };
+            if (type === 'low') {
+                // === กลองตัวผู้ (DA GU / TUAM) - เน้น Sub-bass และ Impact ===
+                
+                // Layer 1: Sub-bass (เสียงทุ้มลึกของหนังกลอง)
+                const subOsc = audioCtx.createOscillator();
+                const subGain = audioCtx.createGain();
+                subOsc.frequency.setValueAtTime(60, t); // เริ่มที่ 60Hz
+                subOsc.frequency.exponentialRampToValueAtTime(30, t + 0.4); // Drop ลงต่ำ
+                
+                subGain.gain.setValueAtTime(1.0, t);
+                subGain.gain.exponentialRampToValueAtTime(0.01, t + 0.4); // Decay ยาวหน่อย
 
-            // 1. Oscillator หลัก (เสียงหนังกลอง)
-            const osc = audioCtx.createOscillator();
-            const oscGain = audioCtx.createGain();
-            
-            osc.type = 'sine';
-            // Pitch Envelope (เสียง "ปุ๊ง" ตอนเริ่ม)
-            osc.frequency.setValueAtTime(params.freq + params.punch, t);
-            osc.frequency.exponentialRampToValueAtTime(params.freq, t + 0.05);
-            
-            // Amplitude Envelope
-            oscGain.gain.setValueAtTime(0, t);
-            oscGain.gain.linearRampToValueAtTime(1, t + 0.01); // Attack
-            oscGain.gain.exponentialRampToValueAtTime(0.01, t + params.decay); // Decay
+                subOsc.connect(subGain);
+                subGain.connect(masterGain);
+                subOsc.start(t);
+                subOsc.stop(t + 0.5);
 
-            osc.connect(oscGain);
-            oscGain.connect(masterGain);
-            osc.start(t);
-            osc.stop(t + params.decay + 0.1);
+                // Layer 2: Main Body Tone (เสียงเนื้อหลัก)
+                const osc = audioCtx.createOscillator();
+                const oscGain = audioCtx.createGain();
+                osc.frequency.setValueAtTime(160, t);
+                osc.frequency.exponentialRampToValueAtTime(80, t + 0.3); // Pitch envelope
+                
+                oscGain.gain.setValueAtTime(0, t);
+                oscGain.gain.linearRampToValueAtTime(0.8, t + 0.005); // Attack เร็ว
+                oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
 
-            // 2. Noise (เสียงไม้กระทบ + เสียงแกรกของหนัง)
-            const noiseBufferSize = audioCtx.sampleRate * params.decay;
-            const buffer = audioCtx.createBuffer(1, noiseBufferSize, audioCtx.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < noiseBufferSize; i++) {
-                data[i] = Math.random() * 2 - 1;
+                osc.connect(oscGain);
+                oscGain.connect(masterGain);
+                osc.start(t);
+                osc.stop(t + 0.4);
+
+                // Layer 3: Impact Click (เสียงไม้กระทบ - เพิ่มความคม)
+                const clickNode = audioCtx.createBufferSource();
+                clickNode.buffer = createNoiseBuffer(0.05);
+                const clickGain = audioCtx.createGain();
+                const clickFilter = audioCtx.createBiquadFilter();
+                clickFilter.type = 'lowpass';
+                clickFilter.frequency.value = 1500; // ตัดแหลมเกินไปออก
+
+                clickGain.gain.setValueAtTime(0.7, t);
+                clickGain.gain.exponentialRampToValueAtTime(0.01, t + 0.02); // สั้นมาก
+
+                clickNode.connect(clickFilter);
+                clickFilter.connect(clickGain);
+                clickGain.connect(masterGain);
+                clickNode.start(t);
+
+            } else {
+                // === กลองตัวเมีย (TANG GU / TING) - เน้น Wood Resonance ===
+
+                // Layer 1: Main Tone (เสียงหลัก)
+                const osc = audioCtx.createOscillator();
+                const oscGain = audioCtx.createGain();
+                osc.frequency.setValueAtTime(400, t);
+                osc.frequency.exponentialRampToValueAtTime(320, t + 0.25);
+
+                oscGain.gain.setValueAtTime(0, t);
+                oscGain.gain.linearRampToValueAtTime(0.8, t + 0.005);
+                oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.35); // Decay ปานกลาง
+
+                osc.connect(oscGain);
+                oscGain.connect(masterGain);
+                osc.start(t);
+                osc.stop(t + 0.4);
+
+                // Layer 2: Wood Resonance (เสียงก้องในถังไม้ - Harmonic)
+                const resOsc = audioCtx.createOscillator();
+                const resGain = audioCtx.createGain();
+                resOsc.type = 'triangle'; // Triangle wave ให้เสียงที่นุ่มกว่า Sine
+                resOsc.frequency.setValueAtTime(750, t); // ความถี่เสียงก้อง (Harmonic)
+
+                resGain.gain.setValueAtTime(0.2, t);
+                resGain.gain.exponentialRampToValueAtTime(0.01, t + 0.25); // หางเสียงก้อง
+
+                resOsc.connect(resGain);
+                resGain.connect(masterGain);
+                resOsc.start(t);
+                resOsc.stop(t + 0.3);
+
+                // Layer 3: Snap Noise (เสียงหนังตึง)
+                const snapNode = audioCtx.createBufferSource();
+                snapNode.buffer = createNoiseBuffer(0.1);
+                const snapGain = audioCtx.createGain();
+                const snapFilter = audioCtx.createBiquadFilter();
+                snapFilter.type = 'highpass';
+                snapFilter.frequency.value = 2500; // เอาเฉพาะเสียงแหลม
+
+                snapGain.gain.setValueAtTime(0.5, t);
+                snapGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+
+                snapNode.connect(snapFilter);
+                snapFilter.connect(snapGain);
+                snapGain.connect(masterGain);
+                snapNode.start(t);
             }
-
-            const noise = audioCtx.createBufferSource();
-            noise.buffer = buffer;
-            const noiseFilter = audioCtx.createBiquadFilter();
-            noiseFilter.type = 'highpass';
-            noiseFilter.frequency.value = 800;
-            
-            const noiseGain = audioCtx.createGain();
-            noiseGain.gain.setValueAtTime(0.8, t);
-            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05); // สั้นมากๆ แค่เสียงกระทบ
-
-            noise.connect(noiseFilter);
-            noiseFilter.connect(noiseGain);
-            noiseGain.connect(masterGain);
-            noise.start(t);
         }
 
         // --- UI & INTERACTION ---
