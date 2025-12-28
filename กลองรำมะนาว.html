@@ -227,6 +227,8 @@
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
         let mainGainNode;
+        let reverbNode; // เพิ่มตัวแปร Reverb
+        let reverbGainNode; // เพิ่มตัวปรับระดับเสียง Reverb
         let dest; // MediaStreamDestination for recording
         let recorder;
         let chunks = [];
@@ -255,6 +257,18 @@
                 mainGainNode = audioCtx.createGain();
                 mainGainNode.gain.value = 1.0; // Master volume
                 
+                // --- เพิ่มส่วน Reverb (เสียงกังวาล) ---
+                reverbNode = audioCtx.createConvolver();
+                // ปรับ Reverb ให้ยาวขึ้น (Duration 1.5s) เพื่อความกังวาลที่ชัดเจน
+                reverbNode.buffer = createReverbBuffer(1.5, 2.0);
+                
+                reverbGainNode = audioCtx.createGain();
+                reverbGainNode.gain.value = 0.6; // เพิ่มระดับเสียงก้องให้ชัดขึ้น
+
+                reverbNode.connect(reverbGainNode);
+                reverbGainNode.connect(mainGainNode);
+                // ------------------------------------
+
                 // For Recording
                 dest = audioCtx.createMediaStreamDestination();
                 mainGainNode.connect(audioCtx.destination); // Connect to speakers
@@ -265,6 +279,25 @@
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
+        }
+
+        // ฟังก์ชันสร้างเสียงก้อง (Procedural Reverb)
+        function createReverbBuffer(duration, decay) {
+            const sampleRate = audioCtx.sampleRate;
+            const length = sampleRate * duration;
+            const impulse = audioCtx.createBuffer(2, length, sampleRate);
+            const left = impulse.getChannelData(0);
+            const right = impulse.getChannelData(1);
+
+            for (let i = 0; i < length; i++) {
+                // สร้าง noise ที่ค่อยๆ เบาลง
+                const n = i / length;
+                const multiplier = Math.pow(1 - n, decay);
+                const data = (Math.random() * 2 - 1) * multiplier;
+                left[i] = data;
+                right[i] = data;
+            }
+            return impulse;
         }
 
         // --- Sound Synthesis (Physical Modeling Lite) ---
@@ -288,57 +321,86 @@
 
             osc.connect(gain);
             gain.connect(mainGainNode);
+            // ส่งเข้า Reverb ด้วยเล็กน้อยเพื่อความสมจริง
+            const sendGain = audioCtx.createGain();
+            sendGain.gain.value = 0.2;
+            osc.connect(sendGain);
+            sendGain.connect(reverbNode);
 
             osc.start(t);
             osc.stop(t + 0.6);
         }
 
-        // Sound 2: "Ja" / "Ting" (High, Rim hit) - Sharp, short sound
+        // Sound 2: "Ja" / "Ting" (High, Rim hit) - Modified for "Deep Bell Lid" (Fa Rakhang Thum)
         function playHighNote() {
             initAudio();
             const t = audioCtx.currentTime;
 
-            // Tone Oscillator
+            // 1. Fundamental Tone (ตัวเนื้อเสียงทุ้ม)
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
 
-            osc.type = 'triangle'; // Brighter sound
-            osc.frequency.setValueAtTime(400, t);
-            osc.frequency.exponentialRampToValueAtTime(200, t + 0.15);
+            osc.type = 'sine'; // ใช้ Sine เพื่อความนุ่มทุ้ม
+            osc.frequency.setValueAtTime(280, t); // ความถี่ต่ำลง (เดิม 400+) เพื่อให้ทุ้ม
+            // ให้เสียงคงที่สักพักแล้วค่อยตกลงเล็กน้อย (ไม่หักลงเร็วแบบเสียงปัก)
+            osc.frequency.linearRampToValueAtTime(260, t + 0.3); 
 
+            // Envelope - ให้มีความยาวเสียงหน่อย (Sustain) เพื่อให้มีเนื้อเสียงระฆัง
             gain.gain.setValueAtTime(0, t);
-            gain.gain.linearRampToValueAtTime(0.6, t + 0.005);
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+            gain.gain.linearRampToValueAtTime(0.6, t + 0.01); // Attack นุ่มกว่าเสียงปักนิดนึง
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4); // Decay ยาวขึ้น (0.4s) ให้เสียง "ง้่าง..."
 
             osc.connect(gain);
             gain.connect(mainGainNode);
+            
+            // 2. Metallic Overtone (ตัวเสียงกังวาลฝาระฆัง)
+            const metalOsc = audioCtx.createOscillator();
+            const metalGain = audioCtx.createGain();
+            
+            metalOsc.type = 'triangle'; // ให้เสียงแหลมที่มีมิติ
+            // ตั้งความถี่ให้ไม่ลงตัวกับตัวหลัก (Inharmonic) เพื่อให้เกิดเสียงโลหะ
+            metalOsc.frequency.setValueAtTime(420, t); 
+            
+            metalGain.gain.setValueAtTime(0, t);
+            metalGain.gain.linearRampToValueAtTime(0.3, t + 0.01); 
+            metalGain.gain.exponentialRampToValueAtTime(0.01, t + 0.25); // หางเสียงโลหะสั้นกว่าตัวหลัก
 
-            // Noise burst for the "slap" texture
-            const bufferSize = audioCtx.sampleRate * 0.1; // 0.1 seconds
+            metalOsc.connect(metalGain);
+            metalGain.connect(mainGainNode);
+
+            // --- ส่งเข้า Reverb ---
+            const reverbSend = audioCtx.createGain();
+            reverbSend.gain.value = 0.8; // ส่งเข้า Reverb เยอะเพื่อให้กังวาล
+            gain.connect(reverbSend);
+            metalGain.connect(reverbSend);
+            reverbSend.connect(reverbNode);
+
+            // Impact Noise (เสียงกระทบไม้เบาๆ เพื่อให้รู้จังหวะเริ่ม)
+            const bufferSize = audioCtx.sampleRate * 0.05; 
             const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
             const data = buffer.getChannelData(0);
             for (let i = 0; i < bufferSize; i++) {
                 data[i] = Math.random() * 2 - 1;
             }
-
             const noise = audioCtx.createBufferSource();
             noise.buffer = buffer;
             const noiseGain = audioCtx.createGain();
             
-            // Highpass filter to remove low rumble from noise
             const filter = audioCtx.createBiquadFilter();
-            filter.type = 'highpass';
+            filter.type = 'lowpass'; // กรองเสียงแหลมออก ให้เหลือแต่แรงกระแทกทุ้มๆ
             filter.frequency.value = 1000;
 
-            noiseGain.gain.setValueAtTime(0.4, t);
-            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+            noiseGain.gain.setValueAtTime(0.4, t); 
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.03); 
 
             noise.connect(filter);
             filter.connect(noiseGain);
             noiseGain.connect(mainGainNode);
 
             osc.start(t);
-            osc.stop(t + 0.2);
+            osc.stop(t + 0.5); 
+            metalOsc.start(t);
+            metalOsc.stop(t + 0.5);
             noise.start(t);
         }
 
