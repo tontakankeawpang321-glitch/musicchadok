@@ -262,44 +262,47 @@
                 subOsc.stop(t + 1.0);
             }
 
-            // Synthesize Rim Click (Tak) - ปรับปรุงใหม่: เสียงกลางแต่สั้น (Woody/Tonal)
+            // Synthesize Rim Click (Tak) - ปรับปรุงใหม่: เสียงกลาง-ทุ้ม และสั้น (Deep Woody Click)
             playRim(velocity = 1) {
                 const t = this.ctx.currentTime;
                 
-                // Layer 1: Tonal Wood (เสียงเนื้อไม้)
+                // Layer 1: Deep Wood Body (เนื้อไม้ทุ้ม)
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
                 
-                // ใช้ Triangle wave ให้เสียงมีความนุ่มนวลกว่า Square (ไม่แหลมบาดหู)
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(450, t); // ย่านกลาง
-                osc.frequency.exponentialRampToValueAtTime(350, t + 0.1); 
+                osc.type = 'sine'; // ใช้ Sine เพื่อความทุ้ม นุ่มนวล
+                osc.frequency.setValueAtTime(300, t); // เริ่มที่ย่านกลาง-ต่ำ (Lower Mid)
+                osc.frequency.exponentialRampToValueAtTime(150, t + 0.08); // Pitch Drop เร็วๆ ให้ความรู้สึก "ปุ๊ก"
                 
-                gain.gain.setValueAtTime(velocity * 0.9, t);
-                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.12); // หางสั้นกระชับ
+                gain.gain.setValueAtTime(velocity * 1.0, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.08); // หางเสียงสั้นมาก (Short Decay)
                 
                 osc.connect(gain);
                 gain.connect(this.masterGain);
                 osc.start(t);
-                osc.stop(t + 0.15);
+                osc.stop(t + 0.1);
 
-                // Layer 2: Attack Click (หัวเสียงเล็กน้อย)
+                // Layer 2: Stick Impact (เสียงไม้กระทบ - เพิ่มความชัด)
                 const osc2 = this.ctx.createOscillator();
                 const gain2 = this.ctx.createGain();
-                osc2.type = 'square';
-                osc2.frequency.setValueAtTime(800, t);
-                gain2.gain.setValueAtTime(velocity * 0.2, t);
-                gain2.gain.exponentialRampToValueAtTime(0.01, t + 0.03); // สั้นมาก
                 
+                osc2.type = 'square'; // Square wave สำหรับหัวเสียงที่คม
+                osc2.frequency.setValueAtTime(800, t); // ความถี่สูงกว่าเพื่อเป็น Attack
+                osc2.frequency.exponentialRampToValueAtTime(400, t + 0.02);
+                
+                // Filter ลบความแหลมบาดหูออก ให้เหลือแค่เสียง "แป๊ก" ทุ้มๆ
                 const filter = this.ctx.createBiquadFilter();
                 filter.type = 'lowpass';
-                filter.frequency.value = 2000;
+                filter.frequency.value = 1500;
+
+                gain2.gain.setValueAtTime(velocity * 0.3, t);
+                gain2.gain.exponentialRampToValueAtTime(0.01, t + 0.02); // สั้นสุดๆ
 
                 osc2.connect(filter);
                 filter.connect(gain2);
                 gain2.connect(this.masterGain);
                 osc2.start(t);
-                osc2.stop(t + 0.05);
+                osc2.stop(t + 0.03);
             }
 
             // Synthesize Wood Block (Gup)
