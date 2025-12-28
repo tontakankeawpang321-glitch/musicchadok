@@ -316,7 +316,8 @@
 
             // Envelope
             gain.gain.setValueAtTime(0, t);
-            gain.gain.linearRampToValueAtTime(1, t + 0.01); // Attack
+            // เพิ่มความดังจาก 1.0 เป็น 1.5 เพื่อให้ดังที่สุด
+            gain.gain.linearRampToValueAtTime(1.5, t + 0.01); // Attack
             gain.gain.exponentialRampToValueAtTime(0.01, t + 0.6); // Decay
 
             osc.connect(gain);
@@ -331,77 +332,83 @@
             osc.stop(t + 0.6);
         }
 
-        // Sound 2: "Ja" / "Ting" (High, Rim hit) - Modified for "Deep Bell Lid" (Fa Rakhang Thum)
+        // Sound 2: "Ja" / "Ting" (High, Rim hit) - Modified for "Iron Hit" (More Deep & Resonant)
         function playHighNote() {
             initAudio();
             const t = audioCtx.currentTime;
 
-            // 1. Fundamental Tone (ตัวเนื้อเสียงทุ้ม)
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
+            // --- ส่วนที่ 1: เนื้อเสียงหลัก (FM Synthesis สำหรับเสียงโลหะ) ---
+            const carrier = audioCtx.createOscillator();
+            const modulator = audioCtx.createOscillator();
+            const carrierGain = audioCtx.createGain();
+            const modGain = audioCtx.createGain();
 
-            osc.type = 'sine'; // ใช้ Sine เพื่อความนุ่มทุ้ม
-            osc.frequency.setValueAtTime(280, t); // ความถี่ต่ำลง (เดิม 400+) เพื่อให้ทุ้ม
-            // ให้เสียงคงที่สักพักแล้วค่อยตกลงเล็กน้อย (ไม่หักลงเร็วแบบเสียงปัก)
-            osc.frequency.linearRampToValueAtTime(260, t + 0.3); 
-
-            // Envelope - ให้มีความยาวเสียงหน่อย (Sustain) เพื่อให้มีเนื้อเสียงระฆัง
-            gain.gain.setValueAtTime(0, t);
-            gain.gain.linearRampToValueAtTime(0.6, t + 0.01); // Attack นุ่มกว่าเสียงปักนิดนึง
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4); // Decay ยาวขึ้น (0.4s) ให้เสียง "ง้่าง..."
-
-            osc.connect(gain);
-            gain.connect(mainGainNode);
+            // Carrier: ปรับลดความถี่ลงอีก (จาก 300 เป็น 260) เพื่อให้ทุ้มลึกขึ้นอีก
+            carrier.type = 'triangle'; 
+            carrier.frequency.setValueAtTime(260, t); 
             
-            // 2. Metallic Overtone (ตัวเสียงกังวาลฝาระฆัง)
-            const metalOsc = audioCtx.createOscillator();
-            const metalGain = audioCtx.createGain();
-            
-            metalOsc.type = 'triangle'; // ให้เสียงแหลมที่มีมิติ
-            // ตั้งความถี่ให้ไม่ลงตัวกับตัวหลัก (Inharmonic) เพื่อให้เกิดเสียงโลหะ
-            metalOsc.frequency.setValueAtTime(420, t); 
-            
-            metalGain.gain.setValueAtTime(0, t);
-            metalGain.gain.linearRampToValueAtTime(0.3, t + 0.01); 
-            metalGain.gain.exponentialRampToValueAtTime(0.01, t + 0.25); // หางเสียงโลหะสั้นกว่าตัวหลัก
+            // Modulator: ลดลงตามสัดส่วน (จาก 450 เป็น 390)
+            modulator.type = 'sine';
+            modulator.frequency.setValueAtTime(390, t); 
 
-            metalOsc.connect(metalGain);
-            metalGain.connect(mainGainNode);
+            // ต่อวงจร FM
+            modulator.connect(modGain);
+            modGain.connect(carrier.frequency);
+            carrier.connect(carrierGain);
+            carrierGain.connect(mainGainNode);
 
-            // --- ส่งเข้า Reverb ---
+            // Envelope ของการผสมเสียง
+            modGain.gain.setValueAtTime(1000, t);
+            modGain.gain.exponentialRampToValueAtTime(10, t + 0.3); // เพิ่มเวลาผสมเสียงนิดหน่อย
+            
+            // Envelope ของความดัง (Amplitude)
+            carrierGain.gain.setValueAtTime(0, t);
+            carrierGain.gain.linearRampToValueAtTime(0.6, t + 0.005); 
+            // Decay ยาว (กังวาลเหมือนเดิม)
+            carrierGain.gain.exponentialRampToValueAtTime(0.01, t + 1.8); 
+
+            // --- ส่วนที่ 2: เสียงวิ้งๆ สูงๆ (High Ring) ---
+            const ringOsc = audioCtx.createOscillator();
+            const ringGain = audioCtx.createGain();
+            
+            ringOsc.type = 'sine';
+            // ปรับเสียงวิ้งให้ต่ำลงรับกับความทุ้ม (จาก 1600 เป็น 1400)
+            ringOsc.frequency.setValueAtTime(1400, t); 
+            
+            ringGain.gain.setValueAtTime(0, t);
+            ringGain.gain.linearRampToValueAtTime(0.2, t + 0.01); 
+            ringGain.gain.exponentialRampToValueAtTime(0.001, t + 2.0); // ลากยาววว
+
+            ringOsc.connect(ringGain);
+            ringGain.connect(mainGainNode);
+
+            // --- ส่วนที่ 3: เสียงกระทบ (Click/Thump) ---
+            const clickOsc = audioCtx.createOscillator();
+            const clickGain = audioCtx.createGain();
+            clickOsc.type = 'square';
+            clickOsc.frequency.setValueAtTime(50, t); // ต่ำลงอีกนิด (จาก 60)
+            clickGain.gain.setValueAtTime(0.7, t); 
+            clickGain.gain.exponentialRampToValueAtTime(0.01, t + 0.04);
+
+            clickOsc.connect(clickGain);
+            clickGain.connect(mainGainNode);
+
+            // --- ส่งเข้า Reverb เพื่อความกังวาลสุดๆ ---
             const reverbSend = audioCtx.createGain();
-            reverbSend.gain.value = 0.8; // ส่งเข้า Reverb เยอะเพื่อให้กังวาล
-            gain.connect(reverbSend);
-            metalGain.connect(reverbSend);
+            reverbSend.gain.value = 1.0; // ส่งเต็ม Max
+            carrierGain.connect(reverbSend);
+            ringGain.connect(reverbSend);
             reverbSend.connect(reverbNode);
 
-            // Impact Noise (เสียงกระทบไม้เบาๆ เพื่อให้รู้จังหวะเริ่ม)
-            const bufferSize = audioCtx.sampleRate * 0.05; 
-            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                data[i] = Math.random() * 2 - 1;
-            }
-            const noise = audioCtx.createBufferSource();
-            noise.buffer = buffer;
-            const noiseGain = audioCtx.createGain();
-            
-            const filter = audioCtx.createBiquadFilter();
-            filter.type = 'lowpass'; // กรองเสียงแหลมออก ให้เหลือแต่แรงกระแทกทุ้มๆ
-            filter.frequency.value = 1000;
-
-            noiseGain.gain.setValueAtTime(0.4, t); 
-            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.03); 
-
-            noise.connect(filter);
-            filter.connect(noiseGain);
-            noiseGain.connect(mainGainNode);
-
-            osc.start(t);
-            osc.stop(t + 0.5); 
-            metalOsc.start(t);
-            metalOsc.stop(t + 0.5);
-            noise.start(t);
+            // เริ่มเล่น
+            carrier.start(t);
+            carrier.stop(t + 2.0);
+            modulator.start(t);
+            modulator.stop(t + 2.0);
+            ringOsc.start(t);
+            ringOsc.stop(t + 2.5);
+            clickOsc.start(t);
+            clickOsc.stop(t + 0.05);
         }
 
         // --- Interaction Logic ---
