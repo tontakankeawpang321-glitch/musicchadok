@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Timpani Pro Simulator</title>
+    <title>Timpani Pro Simulator (Hi-Fi)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
 
@@ -20,7 +20,7 @@
             background: #1a1a1a;
             background: radial-gradient(circle, #2c2c2c 0%, #000000 100%);
             height: 100vh;
-            height: 100dvh; /* ใช้ Dynamic Viewport Height เพื่อให้พอดีจอมือถือจริงๆ */
+            height: 100dvh;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -43,10 +43,9 @@
             margin: 0;
             font-size: 1.5rem;
             text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-            color: #d4af37; /* สีทอง */
+            color: #d4af37;
         }
 
-        /* ปุ่มบันทึกเสียง */
         .controls {
             pointer-events: auto;
             margin-top: 10px;
@@ -86,56 +85,58 @@
             opacity: 0.8;
         }
 
-        /* Container สำหรับจัดวางกลอง */
+        /* Container */
         .drum-container {
             display: flex;
             justify-content: center;
-            align-items: center; /* จัดกึ่งกลางแนวตั้ง */
-            align-content: center; /* จัดกึ่งกลางเมื่อมีการขึ้นบรรทัดใหม่ */
+            align-items: center;
+            align-content: center;
             flex-wrap: wrap;
-            gap: 15px; /* ลดระยะห่างเพื่อให้ชิดกันมากขึ้น */
+            gap: 15px;
             width: 100%;
             height: 100%;
             padding: 10px;
             max-width: 1200px;
         }
 
-        /* ตัวกลอง */
+        /* Timpani Styles */
         .timpani {
             position: relative;
             border-radius: 50%;
             cursor: pointer;
             transition: transform 0.05s ease;
             box-shadow: 
-                0 10px 30px rgba(0,0,0,0.8),
-                inset 0 0 20px rgba(0,0,0,0.5);
-            /* ลายทองแดง */
-            background: linear-gradient(135deg, #b87333 0%, #6d4c41 100%);
+                0 15px 35px rgba(0,0,0,0.9),
+                inset 0 0 30px rgba(0,0,0,0.6);
+            background: linear-gradient(135deg, #b87333 0%, #5d4037 100%);
             display: flex;
             justify-content: center;
             align-items: center;
             -webkit-tap-highlight-color: transparent;
         }
 
-        /* เอฟเฟกต์ตอนกด */
         .timpani.active {
             transform: scale(0.96);
         }
 
-        /* หน้ากลอง (Head) */
+        .timpani.active .head {
+            background: radial-gradient(circle at 30% 30%, #fff 0%, #e6e0d4 60%, #c5bba8 100%);
+            filter: brightness(1.05);
+        }
+
         .head {
             width: 92%;
             height: 92%;
             border-radius: 50%;
             background: radial-gradient(circle at 30% 30%, #fdfbf7 0%, #e6e0d4 60%, #c5bba8 100%);
             box-shadow: 
-                inset 0 0 10px rgba(0,0,0,0.2),
-                0 0 5px rgba(0,0,0,0.3);
+                inset 0 0 15px rgba(0,0,0,0.3),
+                0 0 5px rgba(0,0,0,0.2);
             position: relative;
-            pointer-events: none; /* ให้ event ทะลุไปที่ตัวแม่ */
+            pointer-events: none;
+            transition: filter 0.1s;
         }
 
-        /* รายละเอียดขอบกลอง */
         .rim {
             position: absolute;
             top: 0;
@@ -143,56 +144,44 @@
             width: 100%;
             height: 100%;
             border-radius: 50%;
-            border: 8px solid #5d4037;
+            border: 8px solid #3e2723;
             box-shadow: 
-                inset 0 2px 5px rgba(255,255,255,0.3),
-                0 2px 5px rgba(0,0,0,0.5);
+                inset 0 2px 5px rgba(255,255,255,0.2),
+                0 4px 10px rgba(0,0,0,0.6);
             pointer-events: none;
         }
 
-        /* ป้ายบอกโน้ต */
         .label {
             position: absolute;
-            bottom: 15%;
+            bottom: 20%;
             font-weight: bold;
-            color: rgba(0,0,0,0.6);
-            font-size: 1.2rem;
+            color: rgba(62, 39, 35, 0.7);
+            font-size: 1.5rem;
             pointer-events: none;
+            text-shadow: 0 1px 1px rgba(255,255,255,0.5);
         }
 
-        /* ขนาดกลองที่ปรับใหม่ให้ Fit Screen เสมอ */
-        /* ใช้ vmin เพื่ออิงกับด้านที่สั้นที่สุดของหน้าจอ (ไม่ว่าจะตั้งหรือนอน) */
+        /* Fit Screen Sizes */
         .size-32 { width: 40vmin; height: 40vmin; max-width: 280px; max-height: 280px; }
         .size-29 { width: 36vmin; height: 36vmin; max-width: 250px; max-height: 250px; }
         .size-26 { width: 32vmin; height: 32vmin; max-width: 220px; max-height: 220px; }
         .size-23 { width: 28vmin; height: 28vmin; max-width: 200px; max-height: 200px; }
 
-        /* Media Queries สำหรับแนวนอน */
         @media (orientation: landscape) {
-            .drum-container {
-                gap: 20px;
-            }
-            /* ปรับขนาดแนวนอนให้เต็มตาขึ้น */
+            .drum-container { gap: 20px; }
             .size-32 { width: 35vh; height: 35vh; max-width: 350px; max-height: 350px; }
             .size-29 { width: 31vh; height: 31vh; max-width: 310px; max-height: 310px; }
             .size-26 { width: 27vh; height: 27vh; max-width: 270px; max-height: 270px; }
             .size-23 { width: 23vh; height: 23vh; max-width: 230px; max-height: 230px; }
         }
 
-        /* Overlay สำหรับเริ่มเสียง */
         #start-overlay {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.85);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-            transition: opacity 0.5s;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 100; transition: opacity 0.5s;
         }
         
         #start-btn {
@@ -223,49 +212,47 @@
         <div class="controls">
             <button id="record-btn">🔴 บันทึกเสียง</button>
         </div>
-        <p>แตะเพื่อเริ่ม - รองรับ Multi-touch</p>
+        <p>แตะเพื่อเริ่ม - รองรับ Multi-touch - เสียง Hi-Fi</p>
     </header>
 
     <div id="start-overlay">
         <button id="start-btn">แตะเพื่อเริ่มเล่น</button>
-        <p style="margin-top: 20px; color: #ccc;">แนะนำให้ใส่หูฟังเพื่อเสียงที่สมจริง</p>
+        <p style="margin-top: 20px; color: #ccc;">*ใส่หูฟังเพื่อมิติเสียงซ้าย-ขวาที่สมบูรณ์</p>
     </div>
 
     <div class="drum-container">
-        <!-- กลองใบที่ 1: ใหญ่สุด เสียงต่ำสุด (D2) -->
-        <div class="timpani size-32" data-freq="73.42" data-note="D2">
+        <!-- เพิ่ม Pan (ตำแหน่งซ้าย-ขวา) ให้แต่ละใบ -->
+        <!-- Pan: -1 (ซ้ายสุด) ถึง 1 (ขวาสุด) -->
+        <div class="timpani size-32" data-freq="73.42" data-pan="-0.6">
             <div class="rim"></div>
             <div class="head"></div>
-            <div class="label">D</div>
+            <div class="label">D2</div>
         </div>
 
-        <!-- กลองใบที่ 2: (F2) -->
-        <div class="timpani size-29" data-freq="87.31" data-note="F2">
+        <div class="timpani size-29" data-freq="87.31" data-pan="-0.2">
             <div class="rim"></div>
             <div class="head"></div>
-            <div class="label">F</div>
+            <div class="label">F2</div>
         </div>
 
-        <!-- กลองใบที่ 3: (A2) -->
-        <div class="timpani size-26" data-freq="110.00" data-note="A2">
+        <div class="timpani size-26" data-freq="110.00" data-pan="0.2">
             <div class="rim"></div>
             <div class="head"></div>
-            <div class="label">A</div>
+            <div class="label">A2</div>
         </div>
 
-        <!-- กลองใบที่ 4: เล็กสุด เสียงสูงสุด (C3) -->
-        <div class="timpani size-23" data-freq="130.81" data-note="C3">
+        <div class="timpani size-23" data-freq="130.81" data-pan="0.6">
             <div class="rim"></div>
             <div class="head"></div>
-            <div class="label">C</div>
+            <div class="label">C3</div>
         </div>
     </div>
 
     <script>
-        // --- Audio Engine ---
+        // --- Audio Engine (Hi-Fi) ---
         let audioCtx;
-        let masterCompressor = null; // เปลี่ยนเป็น let เพื่อให้เข้าถึงได้ง่าย
-        let mediaStreamDest = null;  // สำหรับส่งเสียงไปบันทึก
+        let masterCompressor = null;
+        let mediaStreamDest = null;
         let mediaRecorder = null;
         let recordedChunks = [];
         let isRecording = false;
@@ -273,25 +260,35 @@
         function initAudio() {
             if (!audioCtx) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
-                audioCtx = new AudioContext();
+                audioCtx = new AudioContext({ latencyHint: 'interactive' });
                 
-                // Master Compressor เพื่อป้องกันเสียงแตกเมื่อตีพร้อมกันหลายใบ
+                // Master Limiter/Compressor (ปรับให้โปร่งใสแต่คุม Peak ได้ดี)
                 const comp = audioCtx.createDynamicsCompressor();
-                comp.threshold.setValueAtTime(-24, audioCtx.currentTime);
-                comp.knee.setValueAtTime(30, audioCtx.currentTime);
+                comp.threshold.setValueAtTime(-8, audioCtx.currentTime); // ยอมให้เสียงดังผ่านได้มากขึ้น
+                comp.knee.setValueAtTime(20, audioCtx.currentTime);
                 comp.ratio.setValueAtTime(12, audioCtx.currentTime);
-                comp.attack.setValueAtTime(0.003, audioCtx.currentTime);
-                comp.release.setValueAtTime(0.25, audioCtx.currentTime);
+                comp.attack.setValueAtTime(0.002, audioCtx.currentTime);
+                comp.release.setValueAtTime(0.3, audioCtx.currentTime);
                 
-                // Route: Compressor -> Destination (ลำโพง)
-                comp.connect(audioCtx.destination);
+                // Booster Gain (Makeup Gain)
+                const makeupGain = audioCtx.createGain();
+                makeupGain.gain.value = 2.0; // เพิ่มความดัง 2 เท่า (ปลอดภัยกว่า 4 เท่า)
+
+                // Master Volume (เผื่อปรับลงถ้ารวมกันแล้วดังเกิน)
+                const masterVol = audioCtx.createGain();
+                masterVol.gain.value = 0.9;
+
+                // Chain
+                comp.connect(makeupGain);
+                makeupGain.connect(masterVol);
+                masterVol.connect(audioCtx.destination);
                 
-                // Route: Compressor -> MediaStreamDestination (ตัวอัดเสียง)
+                // Recording Path
                 const dest = audioCtx.createMediaStreamDestination();
-                comp.connect(dest);
+                masterVol.connect(dest);
                 
-                window.masterCompressor = comp; // เก็บไว้ใช้ในฟังก์ชันเล่นเสียง
-                mediaStreamDest = dest;         // เก็บไว้ใช้ในฟังก์ชันบันทึก
+                window.masterBus = comp; // จุดเชื่อมต่อของเสียงทั้งหมด
+                mediaStreamDest = dest;
             }
             
             if (audioCtx.state === 'suspended') {
@@ -304,53 +301,21 @@
 
         function toggleRecording() {
             if (!audioCtx) initAudio();
-
-            if (isRecording) {
-                stopRecording();
-            } else {
-                startRecording();
-            }
+            if (isRecording) stopRecording();
+            else startRecording();
         }
 
         function startRecording() {
             if (!mediaStreamDest) return;
-            
             recordedChunks = [];
-            // ใช้ mimetype มาตรฐานที่ Browser รองรับ
             const options = { mimeType: 'audio/webm' };
-            
             try {
                 mediaRecorder = new MediaRecorder(mediaStreamDest.stream, options);
             } catch (e) {
-                // Fallback ถ้า audio/webm ไม่รองรับ (เช่น Safari บางเวอร์ชั่น)
-                console.warn('audio/webm not supported, trying default.');
                 mediaRecorder = new MediaRecorder(mediaStreamDest.stream);
             }
-
-            mediaRecorder.ondataavailable = (e) => {
-                if (e.data.size > 0) {
-                    recordedChunks.push(e.data);
-                }
-            };
-
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(recordedChunks, { type: 'audio/webm' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                // ตั้งชื่อไฟล์ตามเวลา
-                const now = new Date();
-                const timestamp = `${now.getHours()}-${now.getMinutes()}-${now.getSeconds()}`;
-                a.download = `timpani-recording-${timestamp}.webm`;
-                document.body.appendChild(a);
-                a.click();
-                setTimeout(() => {
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                }, 100);
-            };
-
+            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+            mediaRecorder.onstop = saveRecording;
             mediaRecorder.start();
             isRecording = true;
             recordBtn.textContent = '⏹ หยุดบันทึก';
@@ -366,156 +331,190 @@
             }
         }
 
+        function saveRecording() {
+            const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            const now = new Date();
+            const ts = `${now.getHours()}-${now.getMinutes()}-${now.getSeconds()}`;
+            a.download = `timpani-hifi-${ts}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+        }
+
         recordBtn.addEventListener('click', toggleRecording);
 
-        // ฟังก์ชันสร้างเสียง Timpani แบบสมจริง (Additive Synthesis)
-        // Timpani มี Harmonics ที่ไม่เป็นจำนวนเต็มเท่า ซึ่งทำให้เสียงเป็นเอกลักษณ์
-        function playTimpaniSound(frequency, velocity = 1.0) {
+        // --- Sound Synthesis (Realistic) ---
+        function playTimpaniSound(frequency, velocity = 1.0, pan = 0) {
             if (!audioCtx) return;
-
             const t = audioCtx.currentTime;
-            const masterGain = audioCtx.createGain();
-            masterGain.connect(window.masterCompressor);
-            
-            // ปรับความดังตามแรงกด (velocity)
-            masterGain.gain.setValueAtTime(0, t);
-            masterGain.gain.linearRampToValueAtTime(velocity, t + 0.005);
-            masterGain.gain.exponentialRampToValueAtTime(0.001, t + 3.0); // หางเสียงยาว
 
-            // Timpani Ratios (Mode ratios for a circular membrane)
-            // 1.0 : Fundamental
-            // 1.5 : Fifth (approx)
-            // 1.98 : Near Octave
-            // 2.44 : Major Third above octave
-            const ratios = [1.0, 1.5, 1.98, 2.44];
-            const gains  = [1.0, 0.6, 0.5,  0.3];
-            const decays = [2.5, 1.5, 1.0,  0.8]; // หางเสียงของแต่ละย่านความถี่ไม่เท่ากัน
+            // สร้าง Channel Strip สำหรับกลองใบนี้
+            const drumBus = audioCtx.createGain();
+            drumBus.gain.value = 1.0;
 
-            ratios.forEach((ratio, index) => {
+            // Panner (ตำแหน่งซ้าย-ขวา)
+            const panner = audioCtx.createStereoPanner();
+            panner.pan.setValueAtTime(pan, t);
+
+            drumBus.connect(panner);
+            panner.connect(window.masterBus);
+
+            // --- 1. Membrane Harmonics (เสียงหน้ากลอง) ---
+            // Timpani มี Harmonics ที่ซับซ้อน (Near-harmonic series)
+            const partials = [
+                // Ratio, Amplitude, DecayScale
+                { r: 1.0,  a: 1.0,  d: 1.0 }, // Fundamental (Pitch หลัก)
+                { r: 1.51, a: 0.5,  d: 0.7 }, // Fifth (แรงแต่สั้นกว่า)
+                { r: 1.99, a: 0.4,  d: 0.6 }, // Octave (เกือบเป๊ะ)
+                { r: 2.44, a: 0.25, d: 0.5 }, // Third above octave
+                { r: 2.9,  a: 0.15, d: 0.4 },
+                { r: 3.4,  a: 0.1,  d: 0.35 }
+            ];
+
+            partials.forEach((p, i) => {
                 const osc = audioCtx.createOscillator();
-                const oscGain = audioCtx.createGain();
+                const gain = audioCtx.createGain();
                 
-                osc.type = index === 0 ? 'sine' : 'triangle'; // ผสม sine กับ triangle เพื่อความหนา
-                
-                // Pitch Envelope: เสียงกลองจะสูงขึ้นนิดหน่อยตอนกระทบแล้วตกลง
-                osc.frequency.setValueAtTime(frequency * ratio * 1.02, t);
-                osc.frequency.exponentialRampToValueAtTime(frequency * ratio, t + 0.1);
+                // Sine wave บริสุทธิ์สำหรับ Fundamental, Triangle ผสมสำหรับ Overtone
+                osc.type = i === 0 ? 'sine' : 'triangle';
 
-                // Gain Envelope ของแต่ละ Harmonic
-                oscGain.gain.setValueAtTime(0, t);
-                oscGain.gain.linearRampToValueAtTime(gains[index], t + 0.01);
-                oscGain.gain.exponentialRampToValueAtTime(0.001, t + decays[index]);
+                // Pitch Envelope: Tension เพิ่มขึ้นตอนถูกตี (เสียงเหินขึ้นเล็กน้อย)
+                // ตีแรง = pitch เพี้ยนเยอะกว่า (สมจริง)
+                const pitchBend = 1.0 + (0.02 * velocity); 
+                osc.frequency.setValueAtTime(frequency * p.r * pitchBend, t);
+                osc.frequency.exponentialRampToValueAtTime(frequency * p.r, t + 0.1);
 
-                // กรองความถี่สูงเกินไปออกเพื่อความนุ่ม
-                if (index > 0) {
+                // Amplitude Envelope
+                // ตีแรง = เสียงดังและหางเสียงยาวขึ้นเล็กน้อย
+                const amp = p.a * velocity;
+                const decay = 2.5 * p.d * (0.8 + 0.2 * velocity);
+
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(amp, t + 0.004); // Attack เร็วมาก
+                gain.gain.exponentialRampToValueAtTime(0.001, t + decay);
+
+                // Filter สำหรับ Overtones (เสียงแหลมจะหายไปเร็วกว่าเสียงทุ้ม)
+                if (i > 0) {
                     const filter = audioCtx.createBiquadFilter();
                     filter.type = 'lowpass';
-                    filter.frequency.value = frequency * 4;
-                    osc.connect(oscGain);
-                    oscGain.connect(filter);
-                    filter.connect(masterGain);
+                    // ตีแรง = เสียงเปิด (Bright)
+                    const cutoff = frequency * (i + 2) * (1 + 2 * velocity);
+                    filter.frequency.setValueAtTime(cutoff, t);
+                    filter.frequency.exponentialRampToValueAtTime(frequency * i, t + 0.5); // Filter ปิดลง
+                    
+                    osc.connect(gain);
+                    gain.connect(filter);
+                    filter.connect(drumBus);
                 } else {
-                    osc.connect(oscGain);
-                    oscGain.connect(masterGain);
+                    osc.connect(gain);
+                    gain.connect(drumBus);
                 }
 
                 osc.start(t);
-                osc.stop(t + 3.5);
+                osc.stop(t + decay + 0.1);
             });
 
-            // Impact Sound (เสียงไม้กระทบหนังกลอง) - Noise Burst
-            const bufferSize = audioCtx.sampleRate * 0.05; // 50ms noise
-            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                data[i] = Math.random() * 2 - 1;
-            }
+            // --- 2. Impact Noise (เสียงไม้กระทบ + Attack) ---
+            const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.1, audioCtx.sampleRate);
+            const data = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < noiseBuffer.length; i++) data[i] = Math.random() * 2 - 1;
 
             const noise = audioCtx.createBufferSource();
-            noise.buffer = buffer;
-            const noiseFilter = audioCtx.createBiquadFilter();
-            noiseFilter.type = 'lowpass';
-            noiseFilter.frequency.value = 800;
+            noise.buffer = noiseBuffer;
             
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'bandpass';
+            noiseFilter.frequency.value = 400 + (velocity * 2000); // ตีแรงเสียงไม้จะแหลมขึ้น
+            noiseFilter.Q.value = 1;
+
             const noiseGain = audioCtx.createGain();
-            noiseGain.gain.setValueAtTime(0.3 * velocity, t);
-            noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+            noiseGain.gain.setValueAtTime(0.6 * velocity, t);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08); // สั้นมาก
 
             noise.connect(noiseFilter);
             noiseFilter.connect(noiseGain);
-            noiseGain.connect(masterGain);
+            noiseGain.connect(drumBus);
             noise.start(t);
+
+            // --- 3. Body Resonance (เสียง "ตุ๊บ" ของตัวถัง) ---
+            const bodyOsc = audioCtx.createOscillator();
+            const bodyGain = audioCtx.createGain();
+            bodyOsc.type = 'sine';
+            bodyOsc.frequency.value = frequency * 0.8; // ต่ำกว่า Fundamental
+            
+            bodyGain.gain.setValueAtTime(0.3 * velocity, t);
+            bodyGain.gain.exponentialRampToValueAtTime(0.001, t + 0.2); // สั้นๆ สร้างแรงกระแทก
+
+            bodyOsc.connect(bodyGain);
+            bodyGain.connect(drumBus);
+            bodyOsc.start(t);
+            bodyOsc.stop(t + 0.3);
 
             // Cleanup
             setTimeout(() => {
-                masterGain.disconnect();
-            }, 3500);
+                drumBus.disconnect();
+            }, 3000);
         }
 
-        // --- UI & Interaction ---
-        
+        // --- Interaction ---
         const drums = document.querySelectorAll('.timpani');
         const startBtn = document.getElementById('start-btn');
         const overlay = document.getElementById('start-overlay');
 
-        // ฟังก์ชันเริ่มแอป (ปลดล็อก AudioContext)
         function startApp() {
             initAudio();
             overlay.style.opacity = '0';
-            setTimeout(() => {
-                overlay.style.display = 'none';
-            }, 500);
+            setTimeout(() => { overlay.style.display = 'none'; }, 500);
         }
 
         startBtn.addEventListener('click', startApp);
         startBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault(); // ป้องกัน double fire
+            e.preventDefault();
             startApp();
         });
 
-        // ฟังก์ชันตีกลอง
-        function hitDrum(element) {
+        function hitDrum(element, touchVelocity = 1.0) {
             if (!audioCtx) return;
-
             const freq = parseFloat(element.dataset.freq);
+            const pan = parseFloat(element.dataset.pan);
             
-            // Visual feedback
+            element.classList.remove('active');
+            void element.offsetWidth; // Trigger reflow
             element.classList.add('active');
-            setTimeout(() => element.classList.remove('active'), 100);
 
-            // Audio trigger
-            // สุ่ม velocity นิดหน่อยเพื่อความเป็นธรรมชาติ
-            const velocity = 0.8 + Math.random() * 0.2;
-            playTimpaniSound(freq, velocity);
+            // เพิ่มความหลากหลายของ Velocity เพื่อความสมจริง (Humanize)
+            // ถ้ามาจากการคลิกเมาส์ touchVelocity จะเป็น 1 เสมอ เราเลยสุ่มเพิ่ม
+            // ถ้ามาจาก touch อาจจะ implement แรงกดได้ในอนาคต (ตอนนี้ใช้สุ่ม)
+            const finalVelocity = Math.min(1.0, touchVelocity * (0.7 + Math.random() * 0.3));
+
+            playTimpaniSound(freq, finalVelocity, pan);
         }
 
-        // Setup Touch Events (รองรับ Multi-touch)
         drums.forEach(drum => {
-            // Touchstart สำหรับมือถือ (ตอบสนองไวสุด)
+            // Multi-touch Support
             drum.addEventListener('touchstart', (e) => {
-                e.preventDefault(); // สำคัญ! ห้าม scroll/zoom
-                // Loop ผ่านทุกนิ้วที่แตะลงมาใหม่
+                e.preventDefault();
                 for (let i = 0; i < e.changedTouches.length; i++) {
                     hitDrum(drum);
                 }
             }, { passive: false });
 
-            // Mousedown สำหรับเมาส์
             drum.addEventListener('mousedown', (e) => {
-                if(e.button === 0) { // คลิกซ้ายเท่านั้น
-                    hitDrum(drum);
-                }
+                if(e.button === 0) hitDrum(drum);
             });
         });
 
-        // Keyboard Support (เผื่อเล่นบนคอม)
+        // Keyboard Support (A,S,D,F)
         window.addEventListener('keydown', (e) => {
             if (e.repeat) return;
-            switch(e.key.toLowerCase()) {
-                case 'a': hitDrum(drums[0]); break;
-                case 's': hitDrum(drums[1]); break;
-                case 'd': hitDrum(drums[2]); break;
-                case 'f': hitDrum(drums[3]); break;
+            const key = e.key.toLowerCase();
+            const map = { 'a': 0, 's': 1, 'd': 2, 'f': 3 };
+            if (map.hasOwnProperty(key)) {
+                hitDrum(drums[map[key]]);
             }
         });
 
