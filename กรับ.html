@@ -205,6 +205,9 @@
         // --- Audio Engine (Web Audio API) ---
         let audioCtx;
         let masterGain;
+        let reverbNode;
+        let reverbGain; // Control reverb level specifically
+        let dryNode;
         let recorderDestination;
         let mediaRecorder;
         let audioChunks = [];
@@ -212,18 +215,60 @@
         let startTime;
         let timerInterval;
 
+        // Create Reverb Buffer (Tiny Room / Short Reflection)
+        function createReverbBuffer(ctx) {
+            // 0.15 seconds - Very short, just enough for "hard object" presence
+            const length = ctx.sampleRate * 0.15; 
+            const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
+            const left = impulse.getChannelData(0);
+            const right = impulse.getChannelData(1);
+            
+            for (let i = 0; i < length; i++) {
+                const n = i / length;
+                // Immediate decay
+                const decay = Math.pow(0.001, n); 
+                left[i] = (Math.random() * 2 - 1) * decay;
+                right[i] = (Math.random() * 2 - 1) * decay;
+            }
+            return impulse;
+        }
+
         // Unlock AudioContext on first user interaction
         function initAudio() {
             if (!audioCtx) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 audioCtx = new AudioContext();
                 
-                // Master Volume
+                // Master Output
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 0.8;
+                masterGain.gain.value = 1.0;
+
+                // Reverb Setup
+                reverbNode = audioCtx.createConvolver();
+                reverbNode.buffer = createReverbBuffer(audioCtx);
+                
+                // Reverb Tone Control (Dampened highs)
+                const reverbFilter = audioCtx.createBiquadFilter();
+                reverbFilter.type = 'lowpass';
+                reverbFilter.frequency.value = 4000; 
+
+                reverbGain = audioCtx.createGain();
+                reverbGain.gain.value = 0.2; // Low reverb mix, keep it dry
+
+                // Dry path
+                dryNode = audioCtx.createGain();
+                dryNode.gain.value = 1.0;
+
+                // Wiring
+                dryNode.connect(masterGain);
+                
+                reverbFilter.connect(reverbNode);
+                reverbNode.connect(reverbGain);
+                reverbGain.connect(masterGain);
+
                 masterGain.connect(audioCtx.destination);
 
-                // Setup Recorder Destination (So we record what is generated)
+                // Setup Recorder Destination
                 recorderDestination = audioCtx.createMediaStreamDestination();
                 masterGain.connect(recorderDestination);
             }
@@ -232,53 +277,71 @@
             }
         }
 
-        // Synthesize Realistic Woodblock Sound (Physics modeling approximation)
+        // Synthesize Short Glass Clink (Bottle hitting bottle)
         function playKrapSound() {
             initAudio();
             const t = audioCtx.currentTime;
 
-            // 1. The Impact (Click) - Short High Frequency burst
+            // Input hub
+            const sourceGain = audioCtx.createGain();
+            sourceGain.gain.value = 1.0;
+            
+            sourceGain.connect(dryNode);
+            sourceGain.connect(reverbNode);
+
+            // Osc 1: The "Clink" Body (Thick Glass)
             const osc1 = audioCtx.createOscillator();
-            const gain1 = audioCtx.createGain();
-            osc1.type = 'triangle'; 
-            osc1.frequency.setValueAtTime(1200, t);
-            osc1.frequency.exponentialRampToValueAtTime(800, t + 0.05); // Pitch drop for thump
+            osc1.type = 'sine';
+            // 1600Hz is lower than crystal, more like a soda bottle
+            const baseFreq = 1600 + (Math.random() * 30); 
+            osc1.frequency.setValueAtTime(baseFreq, t);
             
-            gain1.gain.setValueAtTime(0, t);
-            gain1.gain.linearRampToValueAtTime(1, t + 0.005);
-            gain1.gain.exponentialRampToValueAtTime(0.01, t + 0.08);
+            const env1 = audioCtx.createGain();
+            env1.gain.setValueAtTime(0, t);
+            env1.gain.linearRampToValueAtTime(0.9, t + 0.001); // Instant attack
+            // Very fast decay (0.12s) - This makes it "Short"
+            env1.gain.exponentialRampToValueAtTime(0.001, t + 0.12); 
 
-            osc1.connect(gain1);
-            gain1.connect(masterGain);
-            
+            osc1.connect(env1);
+            env1.connect(sourceGain);
             osc1.start(t);
-            osc1.stop(t + 0.1);
+            osc1.stop(t + 0.15);
 
-            // 2. The Resonance (Wood Body) - Bandpassed Square/Sine
+            // Osc 2: The High Harmonic (The "Ting") - but cut short
             const osc2 = audioCtx.createOscillator();
-            const gain2 = audioCtx.createGain();
-            const filter = audioCtx.createBiquadFilter();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(baseFreq * 1.5, t); 
+            
+            const env2 = audioCtx.createGain();
+            env2.gain.setValueAtTime(0, t);
+            env2.gain.linearRampToValueAtTime(0.4, t + 0.001);
+            env2.gain.exponentialRampToValueAtTime(0.001, t + 0.05); // Super short "tick"
 
-            osc2.type = 'square';
-            // Slight random pitch variation for realism
-            const randomPitch = 850 + (Math.random() * 50); 
-            osc2.frequency.setValueAtTime(randomPitch, t);
-
-            // Wood resonance filter
-            filter.type = 'bandpass';
-            filter.frequency.value = 1400;
-            filter.Q.value = 1.5;
-
-            gain2.gain.setValueAtTime(0, t);
-            gain2.gain.linearRampToValueAtTime(0.6, t + 0.005);
-            gain2.gain.exponentialRampToValueAtTime(0.01, t + 0.15); // Shorter decay for sharp wood
-
-            osc2.connect(filter);
-            filter.connect(gain2);
-            gain2.connect(masterGain);
-
+            osc2.connect(env2);
+            env2.connect(sourceGain);
             osc2.start(t);
-            osc2.stop(t + 0.2);
+            osc2.stop(t + 0.1);
+
+            // Impact (Hard surface contact)
+            const clickOsc = audioCtx.createOscillator();
+            clickOsc.type = 'square';
+            clickOsc.frequency.setValueAtTime(800, t);
+            
+            const clickEnv = audioCtx.createGain();
+            clickEnv.gain.setValueAtTime(0, t);
+            clickEnv.gain.linearRampToValueAtTime(0.3, t + 0.001);
+            clickEnv.gain.exponentialRampToValueAtTime(0.001, t + 0.02); // 20ms click
+
+            // Filter out digital harshness
+            const clickFilter = audioCtx.createBiquadFilter();
+            clickFilter.type = 'lowpass';
+            clickFilter.frequency.value = 3000;
+
+            clickOsc.connect(clickFilter);
+            clickFilter.connect(clickEnv);
+            clickEnv.connect(sourceGain);
+            clickOsc.start(t);
+            clickOsc.stop(t + 0.05);
         }
 
         // --- Visual Logic ---
