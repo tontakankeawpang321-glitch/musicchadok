@@ -3,435 +3,507 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ฆ้องโหม่งจำลอง (Virtual Khong Mong)</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>โหม่งไทยจำลอง - Thai Mong Simulator</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
 
-        body {
-            font-family: 'Sarabun', sans-serif;
-            background-color: #1a0f0a; /* Dark wood color */
-            background-image: repeating-linear-gradient(45deg, #1a0f0a 25%, #2c1810 25%, #2c1810 50%, #1a0f0a 50%, #1a0f0a 75%, #2c1810 75%, #2c1810 100%);
-            background-size: 20px 20px;
-            height: 100vh; /* Fallback */
-            height: 100dvh; /* Dynamic Viewport Height for mobile */
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            user-select: none;
-            -webkit-user-select: none;
-            touch-action: none;
+        :root {
+            --bg-color: #1a0f0a;
+            --wood-color: #3e2723;
+            --gold-light: #fdd835;
+            --gold-dark: #fbc02d;
+            --bronze: #8d6e63;
+            --text-color: #fff8e1;
         }
 
-        /* Gong Styling */
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(circle at center, #2c1e16 0%, #0d0502 100%);
+            height: 100vh;
+            height: 100dvh; /* Mobile viewport fix */
+            width: 100vw;
+            overflow: hidden;
+            font-family: 'Sarabun', sans-serif;
+            display: flex;
+            flex-direction: column;
+            color: var(--text-color);
+        }
+
+        /* Top Bar */
+        header {
+            flex: 0 0 auto;
+            text-align: center;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-bottom: 1px solid #5d4037;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-left: 20px;
+            padding-right: 20px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.4rem;
+            color: var(--gold-light);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        /* Controls Area */
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--gold-dark);
+            color: var(--gold-light);
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-family: 'Sarabun', sans-serif;
+            white-space: nowrap;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+            background: rgba(253, 216, 53, 0.2);
+        }
+
+        .btn.recording {
+            background: #d32f2f;
+            color: white;
+            border-color: #ff5252;
+            animation: pulse 1.5s infinite;
+        }
+
+        .btn.playing {
+            background: #388e3c;
+            color: white;
+        }
+
+        /* Gong Container - Centered Single Item */
         .gong-container {
             flex: 1;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
-            gap: 20px;
-            padding: 10px;
-            position: relative;
+            align-items: center;
+            padding: 20px;
+            perspective: 1000px;
         }
 
-        /* The Rope/String holding the gong */
-        .rope {
-            width: 4px;
-            height: 40px;
-            background: #d4b483;
-            position: absolute;
-            top: -40px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 0;
-        }
-
+        /* The Gong Instrument (Mong Style - Larger) */
         .gong {
             position: relative;
+            /* Responsive Size: fits within 70% of the smallest viewport dimension */
+            width: 70vmin; 
+            height: 70vmin;
+            max-width: 500px;
+            max-height: 500px;
+            
             border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, 
+                #ffd54f 0%, 
+                #fbc02d 20%, 
+                #bf9000 50%, 
+                #7f6000 80%, 
+                #3e2723 100%);
+            box-shadow: 
+                0 20px 40px rgba(0,0,0,0.6),
+                inset 0 0 40px rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
             cursor: pointer;
             transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 
-                0 10px 20px rgba(0,0,0,0.6),
-                inset 0 0 20px rgba(0,0,0,0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10;
-            /* Brass/Gold Gradient */
-            background: radial-gradient(circle at 30% 30%, #ffebcd, #d4af37, #8b4513);
-            border: 4px solid #5c3a21;
+            -webkit-touch-callout: none;
+            
+            /* Add a rim specifically for Mong */
+            border: 4px solid #4e342e;
         }
 
-        /* The Boss (Nipple) of the Gong */
+        /* Gong Nipple (The Boss) - Larger for Mong */
         .gong::after {
             content: '';
-            width: 30%;
-            height: 30%;
-            border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #ffd700, #b8860b);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
             position: absolute;
+            width: 25%;
+            height: 25%;
+            background: radial-gradient(circle at 30% 30%, 
+                #fff59d 0%, 
+                #fdd835 40%, 
+                #f9a825 100%);
+            border-radius: 50%;
+            box-shadow: 
+                0 6px 12px rgba(0,0,0,0.5),
+                inset 0 2px 4px rgba(255,255,255,0.4);
+            z-index: 2;
+        }
+
+        /* Gong Texture */
+        .gong::before {
+            content: '';
+            position: absolute;
+            top: 5%;
+            left: 5%;
+            right: 5%;
+            bottom: 5%;
+            border-radius: 50%;
+            border: 2px solid rgba(0,0,0,0.1);
+            background: repeating-radial-gradient(
+                transparent 0,
+                transparent 15px,
+                rgba(0,0,0,0.08) 16px,
+                rgba(0,0,0,0.08) 18px
+            );
+            z-index: 1;
+            pointer-events: none;
         }
 
         .gong:active, .gong.active {
             transform: scale(0.95);
-            filter: brightness(1.1);
         }
 
-        /* Ripple Animation */
-        @keyframes ripple {
-            0% { transform: scale(1); opacity: 0.8; }
-            100% { transform: scale(1.5); opacity: 0; }
-        }
-        .ripple-effect {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            border: 2px solid rgba(255, 255, 255, 0.5);
-            animation: ripple 0.4s linear;
-            pointer-events: none;
+        .gong.active::after {
+            background: radial-gradient(circle at 30% 30%, #fff 0%, #fdd835 40%, #f9a825 100%);
         }
 
         /* Note Label */
         .note-label {
             position: absolute;
-            color: white;
-            font-size: 1.5rem;
-            font-weight: bold;
-            text-shadow: 0 2px 4px black;
-            z-index: 20;
-            pointer-events: none;
+            z-index: 3;
+            color: #3e2723;
+            font-weight: 800;
+            font-size: 3rem; /* Larger font for single gong */
+            text-shadow: 0 2px 0 rgba(255,255,255,0.4);
             opacity: 0;
             transition: opacity 0.3s;
+            pointer-events: none;
+            margin-top: 15vmin; /* Push text below the nipple */
         }
+
         .show-notes .note-label {
-            opacity: 1;
+            opacity: 0.8;
         }
 
-        /* Size Variations */
-        .gong-l { width: 70vw; height: 70vw; max-width: 280px; max-height: 280px; }
-        .gong-m { width: 60vw; height: 60vw; max-width: 240px; max-height: 240px; }
-        .gong-s { width: 50vw; height: 50vw; max-width: 200px; max-height: 200px; }
+        /* Ripple Effect - Large */
+        @keyframes ripple {
+            0% { box-shadow: 0 0 0 0 rgba(253, 216, 53, 0.7); }
+            100% { box-shadow: 0 0 0 40px rgba(253, 216, 53, 0); }
+        }
 
-        /* Controls Area */
-        .controls {
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(10px);
+        .gong.active {
+            animation: ripple 0.4s ease-out;
+        }
+
+        /* Footer / Status */
+        .status-bar {
+            flex: 0 0 auto;
+            text-align: center;
             padding: 15px;
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            border-top: 1px solid #444;
-            flex-wrap: wrap;
-            gap: 10px;
+            font-size: 1rem;
+            color: #aaa;
+            background: rgba(0,0,0,0.2);
         }
 
-        .btn {
-            background: #333;
-            color: white;
-            border: 1px solid #555;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.2s;
-        }
-        .btn:active { transform: scale(0.95); background: #444; }
-        
-        .btn-record.recording {
-            background: #dc2626;
-            animation: pulse 1.5s infinite;
-        }
-        .btn-play.playing {
-            background: #16a34a;
-        }
-        
+        /* Animations */
         @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+            0% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(211, 47, 47, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); }
         }
 
-        /* Layout adjustment for landscape or large screens */
-        @media (min-width: 768px) or (orientation: landscape) {
-            .gong-container {
-                flex-direction: row;
-            }
-        }
+        /* Download Link hidden */
+        #downloadLink { display: none; }
+
     </style>
 </head>
 <body>
 
-    <!-- Header -->
-    <div class="absolute top-0 w-full text-center py-4 z-10 pointer-events-none">
-        <h1 class="text-yellow-500 text-xl font-bold drop-shadow-md">ฆ้องโหม่งจำลอง</h1>
-        <p class="text-gray-400 text-xs">แตะเพื่อตี</p>
+    <header>
+        <h1>โหม่ง (Mong)</h1>
+        <div class="controls">
+            <button class="btn" id="toggleNotesBtn">
+                <span>👁️</span> ชื่อ
+            </button>
+            <button class="btn" id="recordBtn">
+                <span>🔴</span> อัด
+            </button>
+            <button class="btn" id="playBtn" disabled>
+                <span>▶️</span> เล่น
+            </button>
+             <button class="btn" id="downloadBtn" style="display:none;">
+                <span>⬇️</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="gong-container" id="gongContainer">
+        <!-- Single Gong generated by JS -->
     </div>
 
-    <!-- Instrument Area -->
-    <div class="gong-container" id="gongArea">
-        <!-- Low Gong (Mong) -->
-        <div class="relative flex flex-col items-center">
-            <div class="rope"></div>
-            <div class="gong gong-l" data-note="G2" data-freq="98.00" onpointerdown="hitGong(this, 98.00)">
-                <span class="note-label">โหม่ง (G)</span>
-            </div>
-        </div>
-
-        <!-- Mid Gong (Mung) -->
-        <div class="relative flex flex-col items-center">
-            <div class="rope"></div>
-            <div class="gong gong-m" data-note="C3" data-freq="130.81" onpointerdown="hitGong(this, 130.81)">
-                <span class="note-label">ม่ง (C)</span>
-            </div>
-        </div>
-
-        <!-- High Gong (Ming) -->
-        <div class="relative flex flex-col items-center">
-            <div class="rope"></div>
-            <div class="gong gong-s" data-note="E3" data-freq="164.81" onpointerdown="hitGong(this, 164.81)">
-                <span class="note-label">มิ้ง (E)</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Controls -->
-    <div class="controls">
-        <button class="btn" onclick="toggleNotes()" id="btnNote">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.136.326A1.5 1.5 0 0 1 14 1.78V3h.5A1.5 1.5 0 0 1 16 4.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 13.5v-9a1.5 1.5 0 0 1 1.432-1.499L12.136.326zM5.562 3H13V1.78a.5.5 0 0 0-.621-.484L5.562 3zM1.5 4a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h13a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-13z"/></svg>
-            แสดงโน้ต
-        </button>
-
-        <button class="btn btn-record" onclick="toggleRecord()" id="btnRecord">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 12a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0 1A5 5 0 1 0 8 3a5 5 0 0 0 0 10z"/><path d="M10 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/></svg>
-            อัดเสียง
-        </button>
-
-        <button class="btn btn-play hidden" onclick="playRecording()" id="btnPlay">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/></svg>
-            เล่น
-        </button>
-
-        <button class="btn hidden" onclick="downloadRecording()" id="btnDownload">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
-            โหลด
-        </button>
-    </div>
+    <div class="status-bar" id="statusBar">แตะที่โหม่งเพื่อตี</div>
+    <a id="downloadLink"></a>
 
     <script>
-        // --- Audio Context & Synthesis ---
+        // --- Web Audio API Context ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
         let masterGain;
-        let recorderDestination;
-        let mediaRecorder;
+        let destination;
+        let recorder;
         let audioChunks = [];
-        let recordedBlob;
+        let audioBlob;
         let isRecording = false;
+        let audioUrl;
+
+        // Mong - Single Low Pitch
+        // Approx Pitch: E3 ~165Hz or F3 ~175Hz. Deep and resonant.
+        const mongNote = { note: "โหม่ง", pitch: 164.81, id: 1 };
 
         function initAudio() {
             if (!audioCtx) {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
                 audioCtx = new AudioContext();
-                
-                // Master Gain Node to control overall volume
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 0.8;
+                masterGain.gain.value = 1.0; // Louder for single instrument
+                
+                destination = audioCtx.createMediaStreamDestination();
                 masterGain.connect(audioCtx.destination);
+                masterGain.connect(destination);
 
-                // Setup Recorder Destination
-                recorderDestination = audioCtx.createMediaStreamDestination();
-                masterGain.connect(recorderDestination);
+                document.getElementById('statusBar').innerText = "พร้อมใช้งาน";
             }
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
         }
 
-        function createGongSound(freq) {
-            initAudio();
-            const now = audioCtx.currentTime;
-            const duration = 4.0; // Long decay for gong
+        // --- Realistic Mong Synthesis (Deeper, Longer Decay) ---
+        function playGongSound(frequency) {
+            if (!audioCtx) initAudio();
 
-            // Ratios for metallic inharmonic overtones (characteristic of gongs/bells)
-            const ratios = [1, 1.41, 1.75, 2.3, 3.1, 4.4];
-            const gains = [1.0, 0.6, 0.4, 0.3, 0.2, 0.1];
+            const t = audioCtx.currentTime;
+            
+            // 1. Fundamental (Deep Hum)
+            const osc1 = audioCtx.createOscillator();
+            const gain1 = audioCtx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(frequency, t);
+            
+            gain1.gain.setValueAtTime(0, t);
+            gain1.gain.linearRampToValueAtTime(1.0, t + 0.02); 
+            // Mong has a VERY long decay
+            gain1.gain.exponentialRampToValueAtTime(0.001, t + 4.0); 
 
-            ratios.forEach((ratio, index) => {
-                const osc = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
+            // 2. Low Overtone (The "Gong" body sound)
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.type = 'triangle';
+            osc2.frequency.setValueAtTime(frequency * 1.55, t); // Slightly inharmonic
+            osc2.detune.value = -10;
 
-                // Mix sine and triangle for body + edge
-                osc.type = index === 0 ? 'sine' : 'triangle'; 
-                osc.frequency.value = freq * ratio;
+            gain2.gain.setValueAtTime(0, t);
+            gain2.gain.linearRampToValueAtTime(0.5, t + 0.02);
+            gain2.gain.exponentialRampToValueAtTime(0.001, t + 2.5);
 
-                // Slightly detune higher partials for "shimmer" beat effect
-                if (index > 0) {
-                    osc.detune.value = (Math.random() * 20) - 10; 
-                }
+            // 3. High Shimmer (Impact metal sound)
+            const osc3 = audioCtx.createOscillator();
+            const gain3 = audioCtx.createGain();
+            osc3.type = 'sine';
+            osc3.frequency.setValueAtTime(frequency * 2.8, t);
+            
+            gain3.gain.setValueAtTime(0, t);
+            gain3.gain.linearRampToValueAtTime(0.2, t + 0.01);
+            gain3.gain.exponentialRampToValueAtTime(0.001, t + 0.5); // Short shimmer
 
-                // Envelope
-                gainNode.gain.setValueAtTime(0, now);
-                gainNode.gain.linearRampToValueAtTime(gains[index], now + 0.02); // Fast attack
-                
-                // Exponential decay - deeper tones last longer
-                const decayRate = duration / (index + 1); 
-                gainNode.gain.exponentialRampToValueAtTime(0.001, now + decayRate);
+            // 4. Sub-bass (For speaker feel)
+            const subOsc = audioCtx.createOscillator();
+            const subGain = audioCtx.createGain();
+            subOsc.type = 'sine';
+            subOsc.frequency.setValueAtTime(frequency * 0.5, t);
+            
+            subGain.gain.setValueAtTime(0, t);
+            subGain.gain.linearRampToValueAtTime(0.4, t + 0.05);
+            subGain.gain.exponentialRampToValueAtTime(0.001, t + 3.0);
 
-                osc.connect(gainNode);
-                gainNode.connect(masterGain);
-
-                osc.start(now);
-                osc.stop(now + duration);
-            });
-
-            // Impact noise (The "thud" of the mallet)
-            const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.1, audioCtx.sampleRate);
-            const output = noiseBuffer.getChannelData(0);
-            for (let i = 0; i < noiseBuffer.length; i++) {
-                output[i] = Math.random() * 2 - 1;
+            // 5. Impact Noise (Soft mallet)
+            const bufferSize = audioCtx.sampleRate * 0.08; 
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * 0.5; // Softer noise
             }
             const noise = audioCtx.createBufferSource();
-            noise.buffer = noiseBuffer;
+            noise.buffer = buffer;
             const noiseGain = audioCtx.createGain();
-            
-            // Lowpass filter for thud to make it dull
+            // Lowpass the noise for a "padded mallet" sound
             const noiseFilter = audioCtx.createBiquadFilter();
             noiseFilter.type = 'lowpass';
-            noiseFilter.frequency.value = 200;
+            noiseFilter.frequency.value = 800;
 
-            noiseGain.gain.setValueAtTime(0.5, now);
-            noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+            noiseGain.gain.setValueAtTime(0.5, t);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
 
+            // Master Filter (Darker tone for Mong)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(800, t);
+            filter.frequency.exponentialRampToValueAtTime(400, t + 2);
+
+            // Connect graph
+            osc1.connect(gain1);
+            osc2.connect(gain2);
+            osc3.connect(gain3);
+            subOsc.connect(subGain);
             noise.connect(noiseFilter);
             noiseFilter.connect(noiseGain);
-            noiseGain.connect(masterGain);
-            noise.start(now);
+
+            gain1.connect(filter);
+            gain2.connect(filter);
+            gain3.connect(filter);
+            subGain.connect(filter);
+            noiseGain.connect(filter);
+
+            filter.connect(masterGain);
+
+            // Start
+            osc1.start(t);
+            osc2.start(t);
+            osc3.start(t);
+            subOsc.start(t);
+            noise.start(t);
+
+            // Stop
+            osc1.stop(t + 5);
+            osc2.stop(t + 5);
+            osc3.stop(t + 5);
+            subOsc.stop(t + 5);
+            noise.stop(t + 0.2);
         }
 
-        // --- Interaction Logic ---
+        // --- UI Generation ---
+        const container = document.getElementById('gongContainer');
+        
+        // Create Single Gong
+        const gong = document.createElement('div');
+        gong.className = 'gong';
+        
+        const label = document.createElement('div');
+        label.className = 'note-label';
+        label.innerText = mongNote.note;
+        
+        gong.appendChild(label);
+        container.appendChild(gong);
 
-        function hitGong(element, freq) {
-            // Visual Effect
-            element.classList.add('active');
-            setTimeout(() => element.classList.remove('active'), 100);
-
-            // Create ripple element
-            const ripple = document.createElement('div');
-            ripple.classList.add('ripple-effect');
-            element.appendChild(ripple);
-            setTimeout(() => ripple.remove(), 500);
-
-            // Play Sound
-            createGongSound(freq);
-        }
-
-        function toggleNotes() {
-            document.body.classList.toggle('show-notes');
-            const btn = document.getElementById('btnNote');
-            if(document.body.classList.contains('show-notes')){
-                btn.style.background = '#d97706';
-                btn.style.borderColor = '#d97706';
-            } else {
-                btn.style.background = '#333';
-                btn.style.borderColor = '#555';
-            }
-        }
-
-        // --- Recording Logic ---
-
-        function toggleRecord() {
+        // Touch interaction
+        const hit = (e) => {
+            if(e.type === 'touchstart') e.preventDefault();
+            
             initAudio();
-            const btn = document.getElementById('btnRecord');
-            const btnPlay = document.getElementById('btnPlay');
-            const btnDL = document.getElementById('btnDownload');
+            playGongSound(mongNote.pitch);
+            
+            // Visual feedback
+            gong.classList.remove('active');
+            void gong.offsetWidth;
+            gong.classList.add('active');
+        };
 
+        gong.addEventListener('mousedown', hit);
+        gong.addEventListener('touchstart', hit, {passive: false});
+
+        // --- Controls Logic ---
+
+        const toggleNotesBtn = document.getElementById('toggleNotesBtn');
+        toggleNotesBtn.addEventListener('click', () => {
+            container.classList.toggle('show-notes');
+            toggleNotesBtn.style.background = container.classList.contains('show-notes') 
+                ? 'rgba(253, 216, 53, 0.4)' 
+                : 'rgba(255, 255, 255, 0.1)';
+        });
+
+        const recordBtn = document.getElementById('recordBtn');
+        const playBtn = document.getElementById('playBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const downloadLink = document.getElementById('downloadLink');
+
+        recordBtn.addEventListener('click', () => {
+            initAudio();
+            
             if (!isRecording) {
-                // Start Recording
                 audioChunks = [];
-                // Check browser support for mime types
-                let options = { mimeType: 'audio/webm' };
-                if (!MediaRecorder.isTypeSupported('audio/webm')) {
-                    options = { mimeType: 'audio/mp4' }; // Safari fallback
-                }
-
-                try {
-                    mediaRecorder = new MediaRecorder(recorderDestination.stream, options);
-                } catch (e) {
-                    alert('เบราว์เซอร์ของคุณไม่รองรับการอัดเสียง');
+                if (!window.MediaRecorder) {
+                    alert("อุปกรณ์ไม่รองรับการอัดเสียง");
                     return;
                 }
+                let options = { mimeType: 'audio/webm' };
+                if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                    options = { mimeType: 'audio/mp4' };
+                }
 
-                mediaRecorder.ondataavailable = event => {
-                    audioChunks.push(event.data);
+                recorder = new MediaRecorder(destination.stream, options);
+                recorder.ondataavailable = e => audioChunks.push(e.data);
+                recorder.onstop = e => {
+                    audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    audioUrl = URL.createObjectURL(audioBlob);
+                    playBtn.disabled = false;
+                    downloadBtn.style.display = 'flex';
+                    
+                    downloadLink.href = audioUrl;
+                    downloadLink.download = 'thai_mong_sound.webm';
                 };
 
-                mediaRecorder.onstop = () => {
-                    recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    btnPlay.classList.remove('hidden');
-                    btnDL.classList.remove('hidden');
-                };
-
-                mediaRecorder.start();
+                recorder.start();
                 isRecording = true;
-                btn.classList.add('recording');
-                btn.innerHTML = '<span class="w-3 h-3 bg-white rounded-full animate-pulse"></span> หยุดอัด';
-                btnPlay.classList.add('hidden');
-                btnDL.classList.add('hidden');
-
+                recordBtn.classList.add('recording');
+                recordBtn.innerHTML = "<span>⏹</span> หยุด";
+                playBtn.disabled = true;
+                downloadBtn.style.display = 'none';
+                document.getElementById('statusBar').innerText = "กำลังอัด...";
             } else {
-                // Stop Recording
-                mediaRecorder.stop();
+                recorder.stop();
                 isRecording = false;
-                btn.classList.remove('recording');
-                btn.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 12a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0 1A5 5 0 1 0 8 3a5 5 0 0 0 0 10z"/><path d="M10 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/></svg>
-                    อัดเสียง
-                `;
+                recordBtn.classList.remove('recording');
+                recordBtn.innerHTML = "<span>🔴</span> อัด";
+                document.getElementById('statusBar').innerText = "เสร็จสิ้น";
             }
-        }
+        });
 
-        function playRecording() {
-            if (!recordedBlob) return;
-            const audioUrl = URL.createObjectURL(recordedBlob);
+        playBtn.addEventListener('click', () => {
+            if (!audioUrl) return;
             const audio = new Audio(audioUrl);
-            const btn = document.getElementById('btnPlay');
+            playBtn.classList.add('playing');
+            playBtn.innerHTML = "<span>🔊</span> เล่น...";
             
-            btn.classList.add('playing');
-            btn.innerHTML = 'กำลังเล่น...';
-            
-            audio.play();
             audio.onended = () => {
-                btn.classList.remove('playing');
-                btn.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/></svg>
-                    เล่น
-                `;
+                playBtn.classList.remove('playing');
+                playBtn.innerHTML = "<span>▶️</span> เล่น";
             };
-        }
+            audio.play();
+        });
 
-        function downloadRecording() {
-            if (!recordedBlob) return;
-            const url = URL.createObjectURL(recordedBlob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = 'khong-mong-recording.webm';
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-        }
+        downloadBtn.addEventListener('click', () => {
+            downloadLink.click();
+        });
 
-        // Prevent context menu on long press
-        window.oncontextmenu = function(event) {
-            event.preventDefault();
-            event.stopPropagation();
-            return false;
-        };
+        document.addEventListener('gesturestart', function(e) {
+            e.preventDefault();
+        });
+
     </script>
 </body>
 </html>
