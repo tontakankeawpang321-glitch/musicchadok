@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Concert Bass Drum จำลอง + บันทึกเสียง</title>
+    <title>Concert Bass Drum - Deep Roar</title>
     <style>
         /* รีเซ็ตค่าพื้นฐาน */
         * {
@@ -17,8 +17,8 @@
             padding: 0;
             width: 100vw;
             height: 100vh;
-            background: #1a1a1a;
-            background-image: radial-gradient(circle at center, #2a2a2a 0%, #000000 100%);
+            background: #050505;
+            background-image: radial-gradient(circle at center, #1f1f1f 0%, #000000 100%);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -66,21 +66,22 @@
             width: 100%;
             height: 100%;
             border-radius: 50%;
-            background: linear-gradient(145deg, #8b4513, #5c2e0a);
+            background: linear-gradient(145deg, #3e1e05, #1a0d02);
             box-shadow: 
-                0 10px 30px rgba(0,0,0,0.8),
-                inset 0 2px 5px rgba(255,255,255,0.2);
+                0 10px 50px rgba(0,0,0,1.0),
+                inset 0 2px 5px rgba(255,255,255,0.1);
             z-index: 1;
+            border: 2px solid #111;
         }
 
         /* น็อตยึดหน้ากลอง (ตกแต่ง) */
         .lug {
             position: absolute;
-            width: 12px;
-            height: 12px;
-            background: silver;
+            width: 14px;
+            height: 14px;
+            background: radial-gradient(circle at 30% 30%, #ddd, #666);
             border-radius: 50%;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.8);
             z-index: 3;
         }
 
@@ -90,9 +91,9 @@
             width: 92%;
             height: 92%;
             border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #fdfdfd, #e0e0e0 60%, #d1d1d1 100%);
+            background: radial-gradient(circle at 30% 30%, #f0f0f0, #d0d0d0 60%, #b0b0b0 100%);
             z-index: 2;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.2);
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.4);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -106,26 +107,27 @@
             font-family: serif;
             letter-spacing: 2px;
             pointer-events: none;
+            text-shadow: 0 1px 1px rgba(255,255,255,0.3);
         }
 
         /* เอฟเฟกต์ตอนตี */
         .drum-container:active, .drum-container.hit {
-            transform: scale(0.96);
+            transform: scale(0.95);
         }
         
         .ripple {
             position: absolute;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.2);
             transform: scale(0);
-            animation: ripple-anim 0.4s linear;
+            animation: ripple-anim 0.5s ease-out;
             pointer-events: none;
             z-index: 4;
         }
 
         @keyframes ripple-anim {
             to {
-                transform: scale(2.5);
+                transform: scale(3.0);
                 opacity: 0;
             }
         }
@@ -139,9 +141,9 @@
         }
 
         .record-btn {
-            background: #333;
+            background: #222;
             color: white;
-            border: 1px solid #555;
+            border: 1px solid #444;
             padding: 10px 20px;
             border-radius: 25px;
             font-size: 1rem;
@@ -151,11 +153,11 @@
             gap: 8px;
             transition: all 0.3s;
             outline: none;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
         }
 
         .record-btn:hover {
-            background: #444;
+            background: #333;
         }
 
         .record-btn .dot {
@@ -168,9 +170,9 @@
 
         /* สถานะกำลังบันทึก */
         .record-btn.recording {
-            background: #ff4444;
+            background: #a00;
             color: white;
-            border-color: #ff4444;
+            border-color: #f00;
             animation: pulse-red 2s infinite;
         }
 
@@ -181,9 +183,9 @@
         }
 
         @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(255, 68, 68, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
+            0% { box-shadow: 0 0 0 0 rgba(170, 0, 0, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(170, 0, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(170, 0, 0, 0); }
         }
 
         .status-text {
@@ -204,7 +206,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.9);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -213,16 +215,18 @@
         }
         
         #start-btn {
-            padding: 15px 40px;
-            font-size: 1.2rem;
-            background: #d4a017;
+            padding: 20px 50px;
+            font-size: 1.3rem;
+            background: linear-gradient(135deg, #d4a017, #b8860b);
             color: #000;
             border: none;
-            border-radius: 30px;
+            border-radius: 40px;
             cursor: pointer;
             font-weight: bold;
-            box-shadow: 0 0 20px rgba(212, 160, 23, 0.5);
+            box-shadow: 0 0 25px rgba(212, 160, 23, 0.4);
             transition: transform 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         #start-btn:active {
@@ -243,8 +247,8 @@
 <body>
 
     <div class="info">
-        <h1>Concert Bass Drum</h1>
-        <p>แตะตรงกลางเพื่อตี | กด Spacebar บนคอมพิวเตอร์</p>
+        <h1>Concert Bass Drum (Deep Roar)</h1>
+        <p>ตีรัวๆ เพื่อสะสมพลังเสียงให้กระหึ่ม</p>
     </div>
 
     <div id="drum" class="drum-container">
@@ -270,45 +274,104 @@
     <script>
         // --- Audio Context & Recording Setup ---
         let audioCtx;
-        let masterGain; // ตัวคุมเสียงรวม (ส่งออกลำโพง + ตัวอัดเสียง)
-        let mediaDest;  // ปลายทางสำหรับส่งเสียงไปอัด (MediaStreamDestination)
+        let masterBus; // Main mixing bus
+        let compressor;
+        let convolver; // สำหรับ Reverb
+        let reverbGain; // ปรับความดัง Reverb
+        let mediaDest;  
         let mediaRecorder;
         let audioChunks = [];
         let isRecording = false;
 
-        // Concert Bass Drum Sound Synthesis
+        // ฟังก์ชันสร้าง Impulse Response (Hall Reverb) - ขยายให้กว้างและยาวขึ้น
+        function createHallReverbBuffer(context) {
+            const duration = 4.5; // ยาวขึ้นเพื่อให้เสียงสะสมกัน (Wall of sound)
+            const rate = context.sampleRate;
+            const length = rate * duration;
+            const buffer = context.createBuffer(2, length, rate);
+            const left = buffer.getChannelData(0);
+            const right = buffer.getChannelData(1);
+
+            for (let i = 0; i < length; i++) {
+                const t = i / rate;
+                // Decay ช้าลง เพื่อให้เสียงอื้ออึงนานขึ้น
+                const decay = Math.pow(1 - (i / length), 1.5); 
+                
+                left[i] = (Math.random() * 2 - 1) * decay;
+                right[i] = (Math.random() * 2 - 1) * decay;
+            }
+            return buffer;
+        }
+
+        // Concert Bass Drum Sound Synthesis (Deep & Building Up)
         function playBassDrum(velocity = 1.0) {
             if (!audioCtx) return;
 
             const t = audioCtx.currentTime;
             
-            // 1. The Body (Sine Wave) - เสียงทุ้มหลัก
-            const osc = audioCtx.createOscillator();
-            const oscGain = audioCtx.createGain();
-            
-            osc.type = 'sine';
-            // Pitch Envelope
-            osc.frequency.setValueAtTime(120, t); 
-            osc.frequency.exponentialRampToValueAtTime(45, t + 0.1); 
-            
-            // Amplitude Envelope
-            oscGain.gain.setValueAtTime(0, t);
-            oscGain.gain.linearRampToValueAtTime(1.0 * velocity, t + 0.005); 
-            oscGain.gain.exponentialRampToValueAtTime(0.01, t + 1.8); 
+            // Mix Bus สำหรับเสียงนี้
+            const sourceBus = audioCtx.createGain();
+            sourceBus.gain.value = 1.0;
+            sourceBus.connect(masterBus);
+            sourceBus.connect(reverbGain);
 
-            // เชื่อมต่อเข้ากับ masterGain แทน destination โดยตรง
-            osc.connect(oscGain);
-            oscGain.connect(masterGain); 
+            // --- LAYER 1: Fundamental (Deep Thud - ทุ้มลึก) ---
+            const fundOsc = audioCtx.createOscillator();
+            const fundGain = audioCtx.createGain();
+            fundOsc.type = 'sine';
+            // ปรับ Pitch ให้ต่ำลงอีก (80Hz -> 30Hz) เพื่อความทุ้ม
+            fundOsc.frequency.setValueAtTime(80, t); 
+            fundOsc.frequency.exponentialRampToValueAtTime(30, t + 0.2); 
             
-            osc.start(t);
-            osc.stop(t + 2.0);
+            fundGain.gain.setValueAtTime(0, t);
+            fundGain.gain.linearRampToValueAtTime(1.0 * velocity, t + 0.01);
+            // ลากหางยาวขึ้น (3.5 วินาที) เพื่อให้ตีรัวๆ แล้วเสียงสะสมกัน
+            fundGain.gain.exponentialRampToValueAtTime(0.01, t + 3.5);
+            
+            fundOsc.connect(fundGain);
+            fundGain.connect(sourceBus);
+            fundOsc.start(t);
+            fundOsc.stop(t + 4.0);
 
-            // 2. The Attack (Click/Thud) - เสียงกระทบหัวไม้
-            const bufferSize = audioCtx.sampleRate * 0.05;
+            // --- LAYER 2: Sub-Low (Earthquake - เบสเดินพื้น) ---
+            const subOsc = audioCtx.createOscillator();
+            const subGain = audioCtx.createGain();
+            subOsc.type = 'sine';
+            subOsc.frequency.value = 25; // ต่ำมาก จนรู้สึกสั่นมากกว่าได้ยิน
+            
+            subGain.gain.setValueAtTime(0, t);
+            subGain.gain.linearRampToValueAtTime(1.0 * velocity, t + 0.1); // เข้าช้ากว่านิดนึง
+            // หางยาวมาก (5.0 วินาที) นี่คือหัวใจของ "ดังขึ้นเรื่อยๆ"
+            subGain.gain.exponentialRampToValueAtTime(0.01, t + 5.0); 
+            
+            subOsc.connect(subGain);
+            subGain.connect(sourceBus);
+            subOsc.start(t);
+            subOsc.stop(t + 5.5);
+
+            // --- LAYER 3: Harmonics (Resonance - ความกังวาล) ---
+            const harm1Osc = audioCtx.createOscillator();
+            const harm1Gain = audioCtx.createGain();
+            harm1Osc.type = 'sine';
+            harm1Osc.frequency.setValueAtTime(120, t); 
+            harm1Osc.frequency.exponentialRampToValueAtTime(70, t + 0.3); 
+            
+            harm1Gain.gain.setValueAtTime(0, t);
+            harm1Gain.gain.linearRampToValueAtTime(0.3 * velocity, t + 0.02);
+            harm1Gain.gain.exponentialRampToValueAtTime(0.01, t + 2.0);
+            
+            harm1Osc.connect(harm1Gain);
+            harm1Gain.connect(sourceBus);
+            harm1Osc.start(t);
+            harm1Osc.stop(t + 2.5);
+
+            // --- LAYER 4: Impact Noise (Attack - หัวไม้กระทบ) ---
+            // ปรับให้มีความคมแต่ทุ้ม (Thuddy Attack)
+            const bufferSize = audioCtx.sampleRate * 0.1;
             const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
             const data = buffer.getChannelData(0);
             for (let i = 0; i < bufferSize; i++) {
-                data[i] = Math.random() * 2 - 1;
+                data[i] = (Math.random() * 2 - 1);
             }
 
             const noise = audioCtx.createBufferSource();
@@ -316,18 +379,22 @@
             
             const noiseFilter = audioCtx.createBiquadFilter();
             noiseFilter.type = 'lowpass';
-            noiseFilter.frequency.value = 800;
+            noiseFilter.frequency.setValueAtTime(800, t); // ต่ำลงเพื่อให้หัวเสียงนุ่มและทุ้ม
+            noiseFilter.frequency.exponentialRampToValueAtTime(100, t + 0.1);
 
             const noiseGain = audioCtx.createGain();
-            noiseGain.gain.setValueAtTime(0.8 * velocity, t);
-            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05); 
+            noiseGain.gain.setValueAtTime(1.2 * velocity, t);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.08);
 
-            // เชื่อมต่อเข้ากับ masterGain
             noise.connect(noiseFilter);
             noiseFilter.connect(noiseGain);
-            noiseGain.connect(masterGain);
-            
+            noiseGain.connect(sourceBus);
             noise.start(t);
+
+            // Cleanup Gain Node
+            setTimeout(() => {
+                sourceBus.disconnect();
+            }, 6000);
         }
 
         // --- Interaction & Recording Logic ---
@@ -342,16 +409,33 @@
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 
-                // Setup Master Audio Graph
-                masterGain = audioCtx.createGain();
-                masterGain.gain.value = 1.0;
-                
-                // 1. ส่งเสียงออกลำโพง
-                masterGain.connect(audioCtx.destination);
+                // 1. Master Compressor (ปรับให้รองรับเสียงที่สะสมกัน)
+                compressor = audioCtx.createDynamicsCompressor();
+                compressor.threshold.value = -15; // เริ่มกดเมื่อเสียงดังระดับกลาง
+                compressor.knee.value = 20; // Smooth
+                compressor.ratio.value = 6; // ไม่บีบแรงเกินไป ปล่อยให้เสียง Boom ได้
+                compressor.attack.value = 0.05; // ช้าลงเพื่อให้หัวเสียงผ่าน
+                compressor.release.value = 0.3;
 
-                // 2. เตรียมช่องทางสำหรับอัดเสียง (MediaStream)
+                // 2. Reverb System
+                convolver = audioCtx.createConvolver();
+                convolver.buffer = createHallReverbBuffer(audioCtx);
+                reverbGain = audioCtx.createGain();
+                reverbGain.gain.value = 1.3; // เพิ่ม Reverb ให้กังวาล
+                reverbGain.connect(convolver);
+                convolver.connect(compressor); 
+
+                // 3. Main Mix Bus
+                masterBus = audioCtx.createGain();
+                masterBus.gain.value = 1.0; 
+                masterBus.connect(compressor); 
+
+                // 4. Output
+                compressor.connect(audioCtx.destination);
+
+                // 5. Recorder
                 mediaDest = audioCtx.createMediaStreamDestination();
-                masterGain.connect(mediaDest);
+                compressor.connect(mediaDest); 
             }
 
             if (audioCtx.state === 'suspended') {
@@ -367,10 +451,8 @@
             if (!audioCtx) initAudio();
 
             if (!isRecording) {
-                // เริ่มบันทึก
                 audioChunks = [];
                 try {
-                    // ใช้ mimeType มาตรฐาน หรือปล่อยว่างเพื่อให้ Browser เลือกเอง
                     mediaRecorder = new MediaRecorder(mediaDest.stream);
                 } catch (err) {
                     alert("Browser ของคุณไม่รองรับการบันทึกเสียงนี้");
@@ -384,21 +466,18 @@
                 };
 
                 mediaRecorder.onstop = () => {
-                    // สร้างไฟล์เสียงและดาวน์โหลด
                     const blob = new Blob(audioChunks, { type: 'audio/webm' });
                     const url = URL.createObjectURL(blob);
                     
                     const a = document.createElement('a');
                     a.style.display = 'none';
                     a.href = url;
-                    // ตั้งชื่อไฟล์ตามเวลาปัจจุบัน
                     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                    a.download = `BassDrum_Record_${timestamp}.webm`;
+                    a.download = `ConcertDrum_DeepRoar_${timestamp}.webm`;
                     
                     document.body.appendChild(a);
                     a.click();
                     
-                    // Cleanup
                     setTimeout(() => {
                         document.body.removeChild(a);
                         window.URL.revokeObjectURL(url);
@@ -408,17 +487,14 @@
                 mediaRecorder.start();
                 isRecording = true;
                 
-                // Update UI
                 recordBtn.classList.add('recording');
                 recordText.textContent = "หยุดและบันทึก";
                 statusText.classList.add('visible');
 
             } else {
-                // หยุดบันทึก
                 mediaRecorder.stop();
                 isRecording = false;
 
-                // Update UI
                 recordBtn.classList.remove('recording');
                 recordText.textContent = "บันทึกเสียง";
                 statusText.classList.remove('visible');
@@ -428,17 +504,17 @@
         // --- Visuals ---
         function createLugs() {
             const rim = document.querySelector('.drum-rim');
-            const totalLugs = 10;
+            const totalLugs = 12;
             
             for(let i=0; i<totalLugs; i++) {
                 const lug = document.createElement('div');
                 lug.className = 'lug';
                 const angle = (i / totalLugs) * 2 * Math.PI;
-                const x = 50 + 46 * Math.cos(angle); 
-                const y = 50 + 46 * Math.sin(angle);
+                const x = 50 + 46.5 * Math.cos(angle); 
+                const y = 50 + 46.5 * Math.sin(angle);
                 
-                lug.style.left = `calc(${x}% - 6px)`;
-                lug.style.top = `calc(${y}% - 6px)`;
+                lug.style.left = `calc(${x}% - 7px)`;
+                lug.style.top = `calc(${y}% - 7px)`;
                 lug.style.transform = `rotate(${angle * 180 / Math.PI}deg)`;
                 
                 rim.appendChild(lug);
@@ -464,7 +540,7 @@
                 y = rect.height / 2;
             }
 
-            const size = 50;
+            const size = 60;
             circle.style.width = circle.style.height = `${size}px`;
             circle.style.left = `${x - size/2}px`;
             circle.style.top = `${y - size/2}px`;
