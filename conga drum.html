@@ -274,15 +274,23 @@
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 audioCtx = new AudioContext();
 
+                // Create DynamicsCompressor to prevent clipping (distortion) when volume is high
+                const compressor = audioCtx.createDynamicsCompressor();
+                compressor.threshold.value = -10;
+                compressor.ratio.value = 12;
+                compressor.connect(audioCtx.destination);
+
                 // Create a main output node (GainNode)
                 // All sounds will connect to THIS instead of audioCtx.destination directly
                 mainOutputNode = audioCtx.createGain();
-                mainOutputNode.connect(audioCtx.destination); // Connect to speakers
+                mainOutputNode.gain.value = 2.5; // Boost volume significantly (250%)
+                mainOutputNode.connect(compressor); // Connect to compressor -> speakers
 
                 // Setup Recording Stream
                 try {
                     mediaDest = audioCtx.createMediaStreamDestination();
-                    mainOutputNode.connect(mediaDest); // Connect output to recorder stream as well
+                    // Connect compressor to recording so the recorded file is also loud and clear
+                    compressor.connect(mediaDest); 
                 } catch (e) {
                     console.error("MediaStreamDestination not supported", e);
                 }
@@ -400,7 +408,7 @@
             // CRITICAL CHANGE: Connect to mainOutputNode (for recording) instead of destination directly
             hitMasterGain.connect(mainOutputNode);
 
-            hitMasterGain.gain.setValueAtTime(1, t);
+            hitMasterGain.gain.setValueAtTime(1.2, t); // Boost individual hit gain
             hitMasterGain.gain.exponentialRampToValueAtTime(0.01, t + 0.5); // Decay
 
             // --- Oscillators (The Skin Sound) ---
@@ -419,7 +427,7 @@
                 osc.frequency.setValueAtTime(baseFreq * 0.6, t);
                 osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.4, t + 0.1);
                 
-                oscGain.gain.setValueAtTime(0.8, t);
+                oscGain.gain.setValueAtTime(1.5, t); // Louder Bass
                 oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
 
             } else if (toneType === 'open') {
@@ -437,14 +445,14 @@
                 osc.frequency.setValueAtTime(baseFreq, t);
                 osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.9, t + 0.15);
 
-                oscGain.gain.setValueAtTime(0.7, t);
+                oscGain.gain.setValueAtTime(1.2, t); // Louder Open Tone
                 oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
                 
                 // Add a "Slap" overtone for open hit
                 const slapOsc = audioCtx.createOscillator();
                 const slapGain = audioCtx.createGain();
                 slapOsc.frequency.value = baseFreq * 2.5;
-                slapGain.gain.setValueAtTime(0.2, t);
+                slapGain.gain.setValueAtTime(0.4, t); // Louder overtone
                 slapGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
                 slapOsc.connect(slapGain);
                 slapGain.connect(hitMasterGain);
@@ -456,7 +464,7 @@
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(baseFreq * 1.8, t);
                 
-                oscGain.gain.setValueAtTime(0.6, t);
+                oscGain.gain.setValueAtTime(1.0, t); // Louder Slap
                 oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
 
                 // Add Noise for the "Crack" sound
@@ -479,7 +487,7 @@
                 noiseFilter.connect(noiseGain);
                 noiseGain.connect(hitMasterGain);
 
-                noiseGain.gain.setValueAtTime(0.6, t);
+                noiseGain.gain.setValueAtTime(1.2, t); // Louder Noise Crack
                 noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.08);
                 noise.start(t);
             }
