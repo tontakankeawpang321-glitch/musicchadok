@@ -2,335 +2,483 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เปิงมาง (Pong Mang) เครื่องดนตรีไทยเสมือนจริง</title>
-    <!-- โหลด Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- โหลด Tone.js สำหรับการสร้างเสียง -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>เปิงมางคอกเสมือนจริง (Poeng Mang Khok)</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap');
-        
-        /* ตั้งค่าให้เต็มจอและไม่มีการเลื่อน */
-        html, body {
-            height: 100%;
-            overflow: hidden;
-            font-family: 'Sarabun', sans-serif;
-            background-color: #0d0d0d; /* พื้นหลังสีเข้ม */
-        }
-        
-        /* สไตล์สำหรับหัวกลอง */
-        .drum-head {
-            width: 15vh; /* ใช้หน่วย vh เพื่อให้ปรับตามความสูงหน้าจอ */
-            height: 15vh;
-            background: radial-gradient(circle at 70% 30%, #ffc078, #b87333); /* สีทองแดง/น้ำตาลอ่อน */
-            border-radius: 50%;
-            box-shadow: 0 0 10px rgba(255, 255, 255, 0.4), inset 0 0 15px rgba(0, 0, 0, 0.7);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5vh;
-            font-weight: 700;
-            color: #4a2b14;
-            cursor: pointer;
-            transition: all 0.1s ease;
-            position: relative;
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        :root {
+            --wood-dark: #3e2723;
+            --wood-light: #8d6e63;
+            --skin-color: #f5deb3;
+            --skin-shadow: #d2b48c;
+            --khao-paste: #212121; /* สีข้าวสุกติดหน้ากลอง */
+            --bg-color: #1a1a1a;
         }
 
-        /* สไตล์ขอบกลอง (เหมือนไม้) */
-        .drum-body {
-            background-color: #5c3922; /* สีไม้เข้ม */
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        /* เอฟเฟกต์เมื่อกด */
-        .drum-head:active {
-            box-shadow: 0 0 5px rgba(255, 255, 255, 0.6), inset 0 0 10px rgba(0, 0, 0, 0.9);
-            transform: scale(0.95);
-        }
-
-        /* สไตล์ปุ่มควบคุม */
-        .control-btn {
-            padding: 1vh 2vh;
-            font-size: 1.8vh;
-            font-weight: 600;
-            border-radius: 9999px;
-            transition: all 0.2s;
-            box-shadow: 0 4px #4a4a4a;
+        * {
+            box-sizing: border-box;
             user-select: none;
-            cursor: pointer;
-        }
-        .control-btn:active {
-            box-shadow: 0 2px #4a4a4a;
-            transform: translateY(2px);
+            -webkit-user-select: none;
+            touch-action: none; /* ป้องกันการเลื่อนหน้าจอ */
         }
 
-        .drum-container-wrapper {
-            /* จำกัดความกว้างของกลุ่มกลองไม่ให้ล้นขอบมือถือ */
-            max-width: 90vw;
-            margin: auto;
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(circle at center, #2a2a2a 0%, #000000 100%);
+            font-family: 'Sarabun', sans-serif;
+            overflow: hidden; /* ห้ามเลื่อน */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
         }
+
+        /* --- Control Panel --- */
+        .controls {
+            width: 100%;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            z-index: 100;
+            border-bottom: 2px solid var(--wood-dark);
+        }
+
+        .btn {
+            background: linear-gradient(145deg, var(--wood-light), var(--wood-dark));
+            color: white;
+            border: 2px solid #5d4037;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            transition: all 0.2s;
+            outline: none;
+            white-space: nowrap;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 3px rgba(0,0,0,0.5);
+        }
+
+        .btn.recording {
+            background: linear-gradient(145deg, #e53935, #b71c1c);
+            animation: pulse 1.5s infinite;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(100%);
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(229, 57, 53, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0); }
+        }
+
+        /* --- Main Instrument Area --- */
+        .khok-container {
+            flex-grow: 1;
+            width: 100%;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding-bottom: 5vh;
+        }
+
+        /* The Frame (Khok) Visualization */
+        .khok-frame {
+            position: absolute;
+            bottom: -20%;
+            width: 120vw; /* กว้างกว่าจอนิดหน่อยให้ดูโอบล้อม */
+            height: 60vh;
+            border: 15px solid var(--wood-dark);
+            border-radius: 50%;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+            pointer-events: none; /* ให้กดทะลุไปโดนกลองได้ */
+            z-index: 0;
+            background: url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="%233e2723"/><path d="M0 0 L100 100 M100 0 L0 100" stroke="%234e342e" stroke-width="2"/></svg>');
+        }
+
+        /* Drum Positioning */
+        .drum-wrapper {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            pointer-events: none; /* Container ไม่รับสัมผัส */
+        }
+
+        .drum {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, var(--skin-color), var(--skin-shadow));
+            border: 6px solid var(--wood-dark);
+            box-shadow: 
+                0 10px 20px rgba(0,0,0,0.5),
+                inset 0 0 15px rgba(0,0,0,0.2);
+            cursor: pointer;
+            pointer-events: auto; /* กลองรับสัมผัส */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.05s, filter 0.1s;
+            touch-action: none;
+            /* ทำให้กลองดูมีมิติ */
+        }
+
+        .drum:active, .drum.active {
+            transform: scale(0.92) !important; /* Scale ลงเมื่อกด */
+            filter: brightness(0.9);
+        }
+
+        /* Tuning Paste (Khao) - จุดดำตรงกลาง */
+        .drum::after {
+            content: '';
+            width: 25%;
+            height: 25%;
+            background: radial-gradient(circle, #444, #111);
+            border-radius: 50%;
+            opacity: 0.9;
+            box-shadow: 0 1px 2px rgba(255,255,255,0.2);
+        }
+
+        /* Note Label */
+        .note-label {
+            position: absolute;
+            top: -30px;
+            color: #fff;
+            background: rgba(0,0,0,0.7);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            text-shadow: 0 1px 2px black;
+        }
+
+        .show-notes .note-label {
+            opacity: 1;
+        }
+
+        /* Positioning the 7 drums in an arc */
+        /* คำนวณตำแหน่งให้เป็นครึ่งวงกลม */
+        .d1 { width: 16vh; height: 16vh; bottom: 5%;  left: 5%;   transform: translate(0, -20px); }
+        .d2 { width: 15.5vh; height: 15.5vh; bottom: 12%; left: 18%;  transform: translate(0, -10px); }
+        .d3 { width: 15vh; height: 15vh; bottom: 18%; left: 32%;  transform: translate(0, 0); }
+        .d4 { width: 14.5vh; height: 14.5vh; bottom: 20%; left: 50%;  transform: translate(-50%, 0); } /* Center */
+        .d5 { width: 14vh; height: 14vh; bottom: 18%; right: 32%; transform: translate(0, 0); }
+        .d6 { width: 13.5vh; height: 13.5vh; bottom: 12%; right: 18%; transform: translate(0, -10px); }
+        .d7 { width: 13vh; height: 13vh; bottom: 5%;  right: 5%;  transform: translate(0, -20px); }
+
+        /* Mobile specific adjustments */
+        @media (max-width: 600px) {
+            .controls { padding: 8px; gap: 4px; flex-wrap: wrap; justify-content: space-around; }
+            .btn { font-size: 11px; padding: 8px 10px; flex: 1 1 auto; margin: 2px; }
+            
+            /* ขยายขนาดกลองให้ใหญ่ขึ้นสำหรับนิ้วมือ และจัดตำแหน่งให้ชิดขอบจอมากขึ้น */
+            .d1 { width: 19vh; height: 19vh; left: -2%; bottom: 14%; transform: none; }
+            .d2 { width: 18.5vh; height: 18.5vh; left: 14%; bottom: 23%; transform: none; }
+            .d3 { width: 18vh; height: 18vh; left: 30%; bottom: 29%; transform: none; }
+            .d4 { width: 17.5vh; height: 17.5vh; bottom: 31%; transform: translateX(-50%); }
+            .d5 { width: 18vh; height: 18vh; right: 30%; bottom: 29%; transform: none; }
+            .d6 { width: 18.5vh; height: 18.5vh; right: 14%; bottom: 23%; transform: none; }
+            .d7 { width: 19vh; height: 19vh; right: -2%; bottom: 14%; transform: none; }
+            
+            /* ปรับเฟรมให้รองรับกลองที่ใหญ่ขึ้น */
+            .khok-frame { height: 45vh; width: 100vw; bottom: 0; border-radius: 40% 40% 0 0; border-width: 10px; }
+            
+            /* ล็อคหน้าจอแน่นหนา ป้องกันการเลื่อน */
+            body { position: fixed; width: 100%; height: 100%; overflow: hidden; touch-action: none; }
+        }
+
+        /* Indicator for recording */
+        #recStatus {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            width: 15px;
+            height: 15px;
+            background-color: red;
+            border-radius: 50%;
+            display: none;
+            box-shadow: 0 0 10px red;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink { 50% { opacity: 0; } }
+
     </style>
 </head>
 <body>
 
-    <!-- Overlay สำหรับการเริ่มต้น AudioContext -->
-    <div id="start-overlay" class="absolute inset-0 bg-gray-900 bg-opacity-95 flex flex-col items-center justify-center z-50 transition-opacity duration-500">
-        <h1 class="text-3xl sm:text-4xl text-white font-bold mb-6 animate-pulse">เปิงมาง (Pong Mang)</h1>
-        <p class="text-white text-lg mb-8 text-center px-4">แตะที่หน้าจอเพื่อเริ่มต้นการเล่นดนตรี</p>
-        <button id="start-button" class="px-8 py-4 bg-green-600 hover:bg-green-700 text-white text-xl rounded-xl shadow-lg transition duration-200">
-            เริ่มเล่น
-        </button>
+    <div class="controls">
+        <button class="btn" id="btnNotes" onclick="toggleNotes()">แสดงโน้ต</button>
+        <button class="btn" id="btnRecord" onclick="toggleRecording()">🔴 อัดเสียง</button>
+        <button class="btn" id="btnPlay" onclick="playRecording()" disabled>▶️ เล่นเสียงที่อัด</button>
+        <button class="btn" id="btnDownload" onclick="downloadRecording()" disabled>💾 ดาวน์โหลด</button>
     </div>
 
-    <!-- ส่วนหลักของเครื่องดนตรี -->
-    <div id="main-app" class="hidden h-full flex flex-col items-center justify-between p-4 sm:p-6">
-        
-        <!-- ส่วนแสดงผล (โน้ตและสถานะ) -->
-        <div class="w-full text-center">
-            <h1 class="text-2xl sm:text-3xl font-extrabold text-amber-500 mb-2">เปิงมางเสมือนจริง</h1>
-            <div id="note-display" class="h-10 text-3xl sm:text-4xl font-bold text-white mb-4 transition duration-100 ease-in-out">
-                -- พร้อมเล่น --
+    <div id="recStatus"></div>
+
+    <div class="khok-container" id="instrumentArea">
+        <div class="khok-frame"></div>
+        <div class="drum-wrapper">
+            <!-- Drums 1-7 (Low to High pitch approximately) -->
+            <!-- เสียงเปิงมาง: ติง, เพิง, พิง, ... -->
+            <div class="drum d1" data-pitch="200" data-note="ลูกยอด (7)" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
+                <div class="note-label">ลูกยอด</div>
             </div>
-            <!-- สถานะการบันทึก -->
-            <div id="record-status" class="h-6 text-base sm:text-lg font-medium text-gray-400">
-                ไม่ได้บันทึก
+            <div class="drum d2" data-pitch="185" data-note="6" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
+                <div class="note-label">6</div>
+            </div>
+            <div class="drum d3" data-pitch="170" data-note="5" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
+                <div class="note-label">5</div>
+            </div>
+            <div class="drum d4" data-pitch="155" data-note="4 (จ่าฝูง)" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
+                <div class="note-label">จ่าฝูง</div>
+            </div>
+            <div class="drum d5" data-pitch="140" data-note="3" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
+                <div class="note-label">3</div>
+            </div>
+            <div class="drum d6" data-pitch="125" data-note="2" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
+                <div class="note-label">2</div>
+            </div>
+            <div class="drum d7" data-pitch="110" data-note="ลูกทวน (1)" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
+                <div class="note-label">ลูกทวน</div>
             </div>
         </div>
-
-        <!-- ส่วนกลอง (Pong Mang Drums) -->
-        <div class="drum-container-wrapper flex justify-center items-center flex-wrap gap-2 sm:gap-4 md:gap-6">
-            <!-- Drum 1 - 7 -->
-            <div id="drum-1" class="drum-head" data-note="G3" data-name="โด (ต่ำ)">G3</div>
-            <div id="drum-2" class="drum-head" data-note="A3" data-name="เร">A3</div>
-            <div id="drum-3" class="drum-head" data-note="C4" data-name="มี">C4</div>
-            <div id="drum-4" class="drum-head" data-note="D4" data-name="ฟา (กลาง)">D4</div>
-            <div id="drum-5" class="drum-head" data-note="E4" data-name="ซอล">E4</div>
-            <div id="drum-6" class="drum-head" data-note="G4" data-name="ลา">G4</div>
-            <div id="drum-7" class="drum-head" data-note="A4" data-name="ที (สูง)">A4</div>
-        </div>
-        
-        <!-- ส่วนควบคุม (ปุ่มอัด, เล่น, ดาวน์โหลด) -->
-        <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 w-full justify-center max-w-lg mb-4">
-            
-            <!-- ปุ่มอัดเสียง -->
-            <button id="record-btn" class="control-btn bg-red-600 hover:bg-red-700 text-white">
-                <span id="record-icon">●</span> อัดเสียง
-            </button>
-            
-            <!-- ปุ่มเล่นเสียง -->
-            <button id="play-btn" class="control-btn bg-blue-600 hover:bg-blue-700 text-white" disabled>
-                <span id="play-icon">▶</span> เล่นเสียง
-            </button>
-
-            <!-- ปุ่มดาวน์โหลด -->
-            <button id="download-btn" class="control-btn bg-gray-500 hover:bg-gray-600 text-white" disabled>
-                <span id="download-icon">↓</span> ดาวน์โหลด
-            </button>
-        </div>
-
     </div>
 
-    <script type="module">
-        // Global variables required by the environment for Firebase/Auth setup (though not used for sound logic)
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        
-        // --- ส่วนการตั้งค่าเสียงและ Logic ของเครื่องดนตรี ---
-        let synth;
-        let recorder;
-        let recording = false;
-        let recordedBlob = null;
+    <script>
+        // --- Audio Engine ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        let masterGain;
+        let destStream; // For recording
+        let mediaRecorder;
         let recordedChunks = [];
+        let audioBlob = null;
+        let isRecording = false;
 
-        const noteMap = [
-            { id: 'drum-1', note: 'G3', name: 'โด (ต่ำ)' },
-            { id: 'drum-2', note: 'A3', name: 'เร' },
-            { id: 'drum-3', note: 'C4', name: 'มี' },
-            { id: 'drum-4', note: 'D4', name: 'ฟา (กลาง)' },
-            { id: 'drum-5', note: 'E4', name: 'ซอล' },
-            { id: 'drum-6', note: 'G4', name: 'ลา' },
-            { id: 'drum-7', note: 'A4', name: 'ที (สูง)' },
-        ];
-
-        // UI Elements
-        const startOverlay = document.getElementById('start-overlay');
-        const mainApp = document.getElementById('main-app');
-        const startButton = document.getElementById('start-button');
-        const noteDisplay = document.getElementById('note-display');
-        const recordStatus = document.getElementById('record-status');
-        const recordBtn = document.getElementById('record-btn');
-        const playBtn = document.getElementById('play-btn');
-        const downloadBtn = document.getElementById('download-btn');
-        
-        // 1. ฟังก์ชันเริ่มต้น AudioContext และ Tone.js
-        function initializeAudio() {
-            try {
-                // สร้าง MembraneSynth สำหรับเสียงกลอง
-                synth = new Tone.MembraneSynth({
-                    // ตั้งค่า Envelope สำหรับเสียงกระทบที่สั้นและคม
-                    envelope: {
-                        attack: 0.001,
-                        decay: 0.2,
-                        sustain: 0.01,
-                        release: 0.5,
-                    },
-                    // ปรับ Octave/Pitch เพื่อให้เสียงทุ้มแบบกลอง
-                    octaves: 1, 
-                }).toDestination(); 
-
-                // สร้าง Recorder เพื่อบันทึกเสียงจาก Synth
-                recorder = new Tone.Recorder();
-                synth.connect(recorder); // เชื่อม Synth เข้ากับ Recorder
+        // Init Audio Context on first user interaction
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
                 
-                console.log("Audio initialized successfully.");
-            } catch (error) {
-                console.error("Error initializing Tone.js:", error);
+                // Master Volume & Compression setup
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 2.5; // เพิ่มความดัง (Boost Volume)
+
+                // เพิ่ม Compressor เพื่อให้เสียงแน่นและไม่แตกเมื่อเร่งเสียง
+                const compressor = audioCtx.createDynamicsCompressor();
+                compressor.threshold.value = -20;
+                compressor.knee.value = 40;
+                compressor.ratio.value = 12;
+                compressor.attack.value = 0.003;
+                compressor.release.value = 0.25;
+
+                // Chain: MasterGain -> Compressor -> Destination
+                masterGain.connect(compressor);
+                compressor.connect(audioCtx.destination);
+
+                // Setup Recording Stream (Record from compressor output)
+                destStream = audioCtx.createMediaStreamDestination();
+                compressor.connect(destStream);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
             }
         }
 
-        // 2. ฟังก์ชันเล่นโน้ต
-        function playNote(note, noteName) {
-            if (!synth) {
-                console.error("Synth not initialized.");
-                return;
+        // Synthesize Drum Sound (Poeng Mang Style)
+        function triggerSound(freq) {
+            initAudio();
+
+            const t = audioCtx.currentTime;
+            
+            // 1. Fundamental Tone (The "Pong" sound)
+            const osc = audioCtx.createOscillator();
+            const gainOsc = audioCtx.createGain();
+            
+            osc.type = 'sine';
+            // Pitch envelope: Start slightly higher and drop (simulation of skin tension change)
+            osc.frequency.setValueAtTime(freq * 1.2, t);
+            osc.frequency.exponentialRampToValueAtTime(freq, t + 0.1);
+
+            // Amplitude envelope: Sharp attack, quick decay (because of the tuning paste)
+            gainOsc.gain.setValueAtTime(0, t);
+            gainOsc.gain.linearRampToValueAtTime(1, t + 0.005);
+            gainOsc.gain.exponentialRampToValueAtTime(0.01, t + 0.4); // Decay time
+
+            osc.connect(gainOsc);
+            gainOsc.connect(masterGain);
+            
+            osc.start(t);
+            osc.stop(t + 0.5);
+
+            // 2. Impact Noise (The slap/skin sound)
+            const bufferSize = audioCtx.sampleRate * 0.1; // Short burst
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
             }
 
-            // เล่นโน้ตที่ความดัง 0.8 และมีความยาวโน้ต 0.1 วินาที
-            synth.triggerAttackRelease(note, "8n"); 
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            const noiseGain = audioCtx.createGain();
             
-            // แสดงโน้ต
-            noteDisplay.textContent = noteName;
+            // Filter noise to sound more like skin
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'lowpass';
+            noiseFilter.frequency.value = 1000;
+
+            noiseGain.gain.setValueAtTime(0.5, t);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(masterGain);
             
-            // เอฟเฟกต์ภาพ
-            const drumElement = document.querySelector(`[data-note="${note}"]`);
-            if (drumElement) {
-                drumElement.style.transform = 'scale(1.05)';
-                drumElement.style.backgroundColor = '#fff';
-                setTimeout(() => {
-                    drumElement.style.transform = 'scale(1)';
-                    drumElement.style.backgroundColor = ''; // คืนค่าสีตาม CSS
-                }, 100);
-            }
+            noise.start(t);
         }
 
-        // 3. จัดการการบันทึก
-        async function toggleRecording() {
-            if (!synth) return; // ป้องกันการทำงานก่อนเริ่มต้น
+        // --- UI Interactions ---
+        
+        function playDrum(element, event) {
+            if(event) {
+                // Prevent default touches to avoid scrolling or double firing
+                if(event.type === 'touchstart') {
+                    event.preventDefault(); 
+                }
+            }
 
-            if (recording) {
-                // หยุดการบันทึก
+            // Visual feedback
+            element.classList.add('active');
+            setTimeout(() => element.classList.remove('active'), 100);
+
+            // Audio trigger
+            const pitch = parseFloat(element.getAttribute('data-pitch'));
+            triggerSound(pitch);
+
+            // Logic for recording check not needed here as we record the Master Output directly
+        }
+
+        // --- Recording Logic (MediaRecorder) ---
+
+        function toggleRecording() {
+            initAudio();
+            const btn = document.getElementById('btnRecord');
+            const status = document.getElementById('recStatus');
+
+            if (!isRecording) {
+                // Start Recording
+                recordedChunks = [];
+                // Check browser support
+                const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+                
                 try {
-                    const blob = await recorder.stop();
-                    recordedBlob = blob;
-                    recording = false;
-                    recordStatus.textContent = 'บันทึกเสร็จสิ้น';
-                    recordBtn.textContent = '● อัดเสียง';
-                    recordBtn.classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
-                    recordBtn.classList.add('bg-red-600', 'hover:bg-red-700');
-                    playBtn.disabled = false;
-                    downloadBtn.disabled = false;
-                    console.log("Recording stopped. Blob size:", blob.size);
-                } catch (error) {
-                    console.error("Error stopping recorder:", error);
-                    recordStatus.textContent = 'เกิดข้อผิดพลาดในการบันทึก';
+                    mediaRecorder = new MediaRecorder(destStream.stream, { mimeType: mimeType });
+                } catch (e) {
+                    alert("Browser doesn't support MediaRecorder with this mimeType.");
+                    return;
                 }
 
-            } else {
-                // เริ่มการบันทึก
-                recordedBlob = null;
-                await recorder.start();
-                recording = true;
-                recordStatus.textContent = 'กำลังบันทึก...';
-                recordBtn.textContent = '■ หยุดอัด';
-                recordBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
-                recordBtn.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
-                playBtn.disabled = true;
-                downloadBtn.disabled = true;
-                console.log("Recording started.");
-            }
-        }
-
-        // 4. จัดการการเล่นเสียงที่บันทึก
-        function playRecording() {
-            if (recordedBlob) {
-                const audioUrl = URL.createObjectURL(recordedBlob);
-                const audio = new Audio(audioUrl);
-                
-                playBtn.disabled = true;
-                playBtn.textContent = '⏸ กำลังเล่น...';
-
-                audio.onended = () => {
-                    playBtn.textContent = '▶ เล่นเสียง';
-                    playBtn.disabled = false;
-                    URL.revokeObjectURL(audioUrl); // ลบคืนหน่วยความจำ
-                };
-                
-                audio.onerror = (e) => {
-                    console.error("Audio playback error:", e);
-                    playBtn.textContent = '▶ เล่นเสียง (ERR)';
-                    playBtn.disabled = false;
+                mediaRecorder.ondataavailable = (evt) => {
+                    if (evt.data.size > 0) recordedChunks.push(evt.data);
                 };
 
-                audio.play();
-                recordStatus.textContent = 'กำลังเล่นไฟล์ที่บันทึก';
+                mediaRecorder.onstop = () => {
+                    audioBlob = new Blob(recordedChunks, { type: mimeType });
+                    document.getElementById('btnPlay').disabled = false;
+                    document.getElementById('btnDownload').disabled = false;
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                btn.innerHTML = "⏹ หยุดอัด";
+                btn.classList.add('recording');
+                status.style.display = "block";
+                
+                // Disable play/download while recording
+                document.getElementById('btnPlay').disabled = true;
+                document.getElementById('btnDownload').disabled = true;
+
             } else {
-                recordStatus.textContent = 'ไม่มีไฟล์บันทึก';
+                // Stop Recording
+                mediaRecorder.stop();
+                isRecording = false;
+                btn.innerHTML = "🔴 อัดเสียง";
+                btn.classList.remove('recording');
+                status.style.display = "none";
             }
         }
 
-        // 5. จัดการการดาวน์โหลด
-        function downloadRecording() {
-            if (recordedBlob) {
-                const audioUrl = URL.createObjectURL(recordedBlob);
-                const link = document.createElement('a');
-                link.href = audioUrl;
-                link.download = `pong_mang_recording_${Date.now()}.wav`; // บันทึกเป็นไฟล์ .wav
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(audioUrl);
-                recordStatus.textContent = 'ดาวน์โหลดสำเร็จ';
-            } else {
-                recordStatus.textContent = 'ไม่มีไฟล์บันทึกให้ดาวน์โหลด';
-            }
-        }
-
-        // --- Event Listeners ---
+        // --- Playback ---
         
-        // 1. เริ่มต้น Audio Context เมื่อผู้ใช้กดปุ่ม
-        startButton.addEventListener('click', async () => {
-            if (Tone.context.state !== 'running') {
-                await Tone.start();
-                console.log("Tone.js AudioContext started.");
-            }
-            initializeAudio(); // Initialized synth and recorder after context is running
-            startOverlay.classList.add('opacity-0');
+        function playRecording() {
+            if (!audioBlob) return;
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            audio.play();
+        }
+
+        // --- Download ---
+
+        function downloadRecording() {
+            if (!audioBlob) return;
+            const url = URL.createObjectURL(audioBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            
+            // Get timestamp for filename
+            const now = new Date();
+            const timeStr = now.getHours() + "-" + now.getMinutes() + "-" + now.getSeconds();
+            a.download = `poeng_mang_${timeStr}.webm`; // or .wav depending on codec
+            
+            document.body.appendChild(a);
+            a.click();
+            
+            // Cleanup
             setTimeout(() => {
-                startOverlay.style.display = 'none';
-                mainApp.classList.remove('hidden');
-            }, 500); // Wait for fade out
-        });
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+        }
 
-        // 2. ผูก Event Listener เข้ากับหัวกลองแต่ละอัน
-        noteMap.forEach(item => {
-            const drum = document.getElementById(item.id);
-            drum.addEventListener('pointerdown', () => {
-                // เล่นโน้ตเมื่อมีการแตะหรือคลิก
-                playNote(item.note, item.name);
-            });
-            // แสดงโน้ตตะวันตกบนตัวกลอง
-            drum.textContent = item.note;
-        });
-
-        // 3. ผูก Event Listener เข้ากับปุ่มควบคุม
-        recordBtn.addEventListener('click', toggleRecording);
-        playBtn.addEventListener('click', playRecording);
-        downloadBtn.addEventListener('click', downloadRecording);
+        // --- Notes Toggle ---
+        function toggleNotes() {
+            const wrapper = document.querySelector('.drum-wrapper');
+            const btn = document.getElementById('btnNotes');
+            wrapper.classList.toggle('show-notes');
+            if (wrapper.classList.contains('show-notes')) {
+                btn.style.background = "#4caf50";
+            } else {
+                btn.style.background = ""; // Reset to CSS default
+            }
+        }
+        
+        // Prevent context menu on right click
+        document.addEventListener('contextmenu', event => event.preventDefault());
 
     </script>
 </body>
