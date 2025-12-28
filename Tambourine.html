@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>แทมบูรีนจำลอง + บันทึกเสียง (Virtual Tambourine)</title>
+    <title>แทมบูรีนจำลอง V.3 (Pro Rhythm)</title>
     <style>
         /* รีเซ็ตค่าเริ่มต้นและตั้งค่าพื้นฐาน */
         * {
@@ -206,7 +206,7 @@
 
         /* แอนิเมชันการสั่น */
         .shake-anim {
-            animation: shake 0.1s ease-in-out; /* ทำให้ไวขึ้นสำหรับการเขย่ารัวๆ */
+            animation: shake 0.08s ease-in-out; /* ทำให้กระชับขึ้นอีก */
         }
 
         @keyframes shake {
@@ -222,9 +222,9 @@
 <body>
 
     <div id="info">
-        <h1>แทมบูรีนจำลอง V.2</h1>
-        <p>แตะเพื่อตี หรือ เขย่ามือถือ (รัวได้)</p>
-        <p style="font-size: 0.8em; color: #bdc3c7;">(รองรับ Multi-touch)</p>
+        <h1>แทมบูรีนจำลอง V.3</h1>
+        <p>แตะเพื่อตี หรือ เขย่ามือถือ (Rhythm Mode)</p>
+        <p style="font-size: 0.8em; color: #bdc3c7;">(รองรับการเขย่าแบบรัวและแม่นยำ)</p>
     </div>
 
     <div id="start-overlay">
@@ -251,14 +251,12 @@
         let skinBuffer;
         let isAudioInit = false;
         
-        // ตัวแปรสำหรับการบันทึกเสียง
-        let masterGain; // จุดรวมเสียงก่อนส่งออก
-        let compressor; // ตัวบีบอัดเสียงเพื่อความดังต่อเนื่อง
-        let mediaDest;  // ปลายทางสำหรับส่งเสียงไปบันทึก
+        let masterGain;
+        let compressor;
+        let mediaDest;
         let mediaRecorder;
         let audioChunks = [];
 
-        // ฟังก์ชันสร้างเสียง Noise (เสียงซ่า)
         function createNoiseBuffer(duration) {
             const bufferSize = audioCtx.sampleRate * duration;
             const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
@@ -269,46 +267,38 @@
             return buffer;
         }
 
-        // เตรียมเสียงเมื่อเริ่มแอป
         function initAudio() {
             if (isAudioInit) return;
             
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             audioCtx = new AudioContext();
 
-            // 1. สร้าง Master Gain (เพิ่มความดังที่จุดรวม)
             masterGain = audioCtx.createGain();
             masterGain.gain.value = 1.0; 
 
-            // 2. สร้าง Compressor (หัวใจสำคัญของเสียงดังต่อเนื่อง)
-            // ช่วยให้เสียงดังได้โดยไม่แตก และทำให้เสียง Sustain ดีขึ้นเวลาเขย่ารัวๆ
             compressor = audioCtx.createDynamicsCompressor();
-            compressor.threshold.setValueAtTime(-12, audioCtx.currentTime); // เริ่มทำงานเร็วขึ้น
+            compressor.threshold.setValueAtTime(-12, audioCtx.currentTime);
             compressor.knee.setValueAtTime(40, audioCtx.currentTime);
             compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
             compressor.attack.setValueAtTime(0, audioCtx.currentTime);
             compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
 
-            // เชื่อมต่อ: Master -> Compressor -> ลำโพง
             masterGain.connect(compressor);
             compressor.connect(audioCtx.destination);
 
-            // เชื่อมต่อ: Compressor -> เครื่องอัดเสียง
             mediaDest = audioCtx.createMediaStreamDestination();
             compressor.connect(mediaDest); 
 
-            // 3. เตรียม Buffer เสียง
-            const noise = createNoiseBuffer(0.4); 
-            jingleBuffer = noise;
-
-            const tapNoise = createNoiseBuffer(0.1);
-            skinBuffer = tapNoise;
+            // เสียง Jingle (โลหะ)
+            jingleBuffer = createNoiseBuffer(0.4); 
+            // เสียง Skin (หนัง)
+            skinBuffer = createNoiseBuffer(0.1);
 
             isAudioInit = true;
         }
 
-        // ฟังก์ชันเล่นเสียง Jingle (ปรับให้ดังและคมชัดขึ้น)
-        function playJingle(intensity = 1.0) {
+        // เพิ่มพารามิเตอร์ durationMultiplier เพื่อคุมหางเสียง
+        function playJingle(intensity = 1.0, durationMultiplier = 1.0) {
             if (!audioCtx) return;
 
             const source = audioCtx.createBufferSource();
@@ -316,14 +306,16 @@
 
             const filter = audioCtx.createBiquadFilter();
             filter.type = "highpass";
-            filter.frequency.value = 4000 + (Math.random() * 2000); // ลดความถี่ลงนิดนึงให้เนื้อเสียงหนาขึ้น
+            filter.frequency.value = 4000 + (Math.random() * 2000); 
             filter.Q.value = 1;
 
             const gainNode = audioCtx.createGain();
-            // เพิ่มความดังพื้นฐาน (Compressor จะช่วยคุมไม่ให้แตก)
             const volume = intensity * 1.5; 
             gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35); // หางเสียงยาวขึ้นนิดนึง
+            
+            // ปรับ Decay ตาม durationMultiplier: ถ้าเขย่ารัวๆ หางเสียงจะสั้นลงเพื่อความกระชับ
+            const decayTime = 0.3 * durationMultiplier; 
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + decayTime);
 
             source.connect(filter);
             filter.connect(gainNode);
@@ -332,7 +324,6 @@
             source.start();
         }
 
-        // ฟังก์ชันเล่นเสียง Skin (ปรับให้หนักแน่น)
         function playSkin(intensity = 1.0) {
             if (!audioCtx) return;
 
@@ -344,7 +335,7 @@
             filter.frequency.value = 350;
 
             const gainNode = audioCtx.createGain();
-            gainNode.gain.setValueAtTime(intensity * 1.2, audioCtx.currentTime); // ดังขึ้น
+            gainNode.gain.setValueAtTime(intensity * 1.2, audioCtx.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
 
             source.connect(filter);
@@ -353,7 +344,6 @@
 
             source.start();
 
-            // Tone
             const osc = audioCtx.createOscillator();
             osc.frequency.setValueAtTime(150, audioCtx.currentTime);
             osc.frequency.exponentialRampToValueAtTime(90, audioCtx.currentTime + 0.1);
@@ -367,7 +357,6 @@
             osc.start();
         }
 
-        // ฟังก์ชันรวม: ตีแทมบูรีน
         function hitTambourine(intensity = 1.0, type = 'full') {
             if (!isAudioInit) return;
             
@@ -376,14 +365,14 @@
             }
 
             if (type === 'shake') {
-                // เขย่ารัว: สุ่ม pitch เล็กน้อยเพื่อให้เสียงไม่ทับกันจนบอด
-                playJingle(intensity);
+                // เขย่า: เสียงสั้นลงเล็กน้อย (0.6) เพื่อให้จังหวะรัวๆ ฟังชัดเจน ไม่มัว
+                playJingle(intensity, 0.6); 
             } else {
+                // ตี: เสียงเต็ม
                 playSkin(intensity);
-                setTimeout(() => playJingle(intensity * 0.9), 10);
+                setTimeout(() => playJingle(intensity * 0.9, 1.0), 10);
             }
 
-            // Visual Effect
             const tamb = document.getElementById('tambourine');
             tamb.classList.remove('shake-anim');
             void tamb.offsetWidth; 
@@ -396,7 +385,6 @@
             }
         }
 
-        // --- ส่วนการสร้าง Graphic Zils (แผ่นโลหะ) ---
         function createZils() {
             const container = document.getElementById('zils-layer');
             const numberOfZils = 6; 
@@ -409,19 +397,17 @@
             }
         }
 
-        // --- ส่วนการจัดการ Event และการบันทึกเสียง ---
+        // --- Event Handlers ---
         const startBtn = document.getElementById('start-btn');
         const startOverlay = document.getElementById('start-overlay');
         const tambourine = document.getElementById('tambourine');
         const recBtn = document.getElementById('rec-btn');
         const stopBtn = document.getElementById('stop-btn');
 
-        // เริ่มต้นแอป
         startBtn.addEventListener('click', async () => {
             initAudio();
             createZils();
             
-            // ขอ Permission Motion
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                 try {
                     const permissionState = await DeviceMotionEvent.requestPermission();
@@ -437,10 +423,9 @@
             setTimeout(() => startOverlay.style.display = 'none', 500);
         });
 
-        // ลอจิกการบันทึกเสียง
+        // Recording Logic
         recBtn.addEventListener('click', () => {
             if (!isAudioInit) return;
-
             audioChunks = [];
             
             let options = { mimeType: 'audio/webm' };
@@ -455,9 +440,7 @@
             }
             
             mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    audioChunks.push(event.data);
-                }
+                if (event.data.size > 0) audioChunks.push(event.data);
             };
 
             mediaRecorder.onstop = () => {
@@ -479,7 +462,6 @@
             };
 
             mediaRecorder.start();
-            
             recBtn.innerHTML = 'กำลังบันทึก...';
             recBtn.classList.add('recording');
             recBtn.style.pointerEvents = 'none'; 
@@ -491,12 +473,9 @@
         });
 
         stopBtn.addEventListener('click', () => {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-            }
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
         });
 
-        // Event การตี
         function handleInput(e) {
             e.preventDefault();
             if (e.target.closest('#record-controls')) return; 
@@ -514,42 +493,47 @@
         tambourine.addEventListener('touchstart', handleInput, { passive: false });
         
         window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space' && isAudioInit) {
-                hitTambourine(1.0, 'hit');
-            }
+            if (e.code === 'Space' && isAudioInit) hitTambourine(1.0, 'hit');
         });
 
-        // Event การเขย่า (ปรับปรุงใหม่เพื่อความเร็วและเสถียร)
+        // --- ระบบตรวจจับการเขย่าแบบใหม่ (แม่นยำขึ้น) ---
         let lastX = 0, lastY = 0, lastZ = 0;
         let lastTime = 0;
-        const SHAKE_THRESHOLD = 8; // ลด Threshold ลงให้เขย่าง่ายขึ้น (จาก 15 เหลือ 8)
+        let lastShakeTime = 0;
         
-        // เราลดเวลาตรวจสอบลงเพื่อให้จับการสั่นรัวๆ ได้ละเอียดขึ้น
         function handleMotion(event) {
-            const current = event.accelerationIncludingGravity;
-            if (!current) return;
+            const acc = event.accelerationIncludingGravity;
+            if (!acc) return;
 
-            const currentTime = new Date().getTime();
-            // ตรวจสอบทุกๆ 40ms (25fps) แทน 100ms เพื่อจับจังหวะรัว
-            if ((currentTime - lastTime) > 40) { 
-                const diffTime = currentTime - lastTime;
-                lastTime = currentTime;
+            const currentTime = Date.now();
+            const dt = currentTime - lastTime;
+            
+            // ตรวจสอบถี่ขึ้น (ประมาณ 50Hz) เพื่อจับ Peak ของการสะบัด
+            if (dt > 20) { 
+                const deltaX = acc.x - lastX;
+                const deltaY = acc.y - lastY;
+                const deltaZ = acc.z - lastZ;
+                
+                // คำนวณความเร็วของการเปลี่ยนแปลง (Jerk approximation)
+                // สูตรนี้ช่วยให้จับแรงกระชากได้ดีกว่าจับความเร็วปลาย
+                const speed = Math.sqrt(deltaX*deltaX + deltaY*deltaY + deltaZ*deltaZ) / dt * 1000;
 
-                const speed = Math.abs(current.x + current.y + current.z - lastX - lastY - lastZ) / diffTime * 10000;
-
-                // ปรับเกณฑ์การเช็ค speed ให้สัมพันธ์กับ Threshold ใหม่
-                if (speed > SHAKE_THRESHOLD * 100) { 
-                     // คำนวณความแรงเสียงตามความแรงการเขย่า (Max ไว้ที่ 1.2 เพื่อให้ดังสู้มือ)
-                     let vol = Math.min(speed / 2000, 1.2);
-                     // ถ้าเขย่าเบาไป ให้ขั้นต่ำดังหน่อย จะได้รู้สึกตอบสนองดี
-                     if(vol < 0.4) vol = 0.4;
-                     
-                     hitTambourine(vol, 'shake');
+                // Threshold: ค่า 300 คือจุดที่เริ่มเขย่าเบาๆ
+                if (speed > 300) { 
+                    // Cooldown 50ms: เร็วพอที่จะทำ Roll (รัว) ได้ แต่ไม่เร็วเกินไปจนเสียงซ้อนทับกันเละ
+                    if (currentTime - lastShakeTime > 50) { 
+                        let vol = Math.min(speed / 1000, 1.2);
+                        if (vol < 0.3) vol = 0.3; // ขั้นต่ำ
+                        
+                        hitTambourine(vol, 'shake');
+                        lastShakeTime = currentTime;
+                    }
                 }
-
-                lastX = current.x;
-                lastY = current.y;
-                lastZ = current.z;
+                
+                lastX = acc.x;
+                lastY = acc.y;
+                lastZ = acc.z;
+                lastTime = currentTime;
             }
         }
 
