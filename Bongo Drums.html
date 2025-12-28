@@ -21,10 +21,10 @@
             border-radius: 50%;
             background: linear-gradient(135deg, #d4a373 0%, #a97142 100%);
             box-shadow: 
-                0 10px 20px rgba(0,0,0,0.5),
+                0 15px 35px rgba(0,0,0,0.6),
                 inset 0 -5px 15px rgba(0,0,0,0.3);
             border: 8px solid #5d4037;
-            transition: transform 0.05s ease;
+            transition: transform 0.05s cubic-bezier(0.1, 0.7, 1.0, 0.1);
             cursor: pointer;
             display: flex;
             justify-content: center;
@@ -37,13 +37,13 @@
             height: 90%;
             border-radius: 50%;
             background: radial-gradient(circle at 30% 30%, #fef3c7, #eaddcf, #d4c5b0);
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.2);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
             position: relative;
         }
 
         /* เอฟเฟกต์ตอนตี */
         .drum-container.active {
-            transform: scale(0.95);
+            transform: scale(0.92) translateY(5px);
         }
         .drum-container.active .drum-head {
             background: radial-gradient(circle at 30% 30%, #fffbf0, #f5eadd, #e0d0b8);
@@ -65,7 +65,7 @@
             border-radius: 50%;
             border: 4px solid #9e9e9e;
             box-shadow: 
-                0 2px 5px rgba(0,0,0,0.5),
+                0 4px 8px rgba(0,0,0,0.6),
                 inset 0 2px 2px rgba(255,255,255,0.5);
             pointer-events: none;
             z-index: 10;
@@ -119,7 +119,7 @@
 
     <!-- Header -->
     <header class="text-center z-10 flex flex-col items-center">
-        <h1 class="text-3xl font-bold text-[#f3e5f5] drop-shadow-md tracking-wider">BONGO DRUMS</h1>
+        <h1 class="text-3xl font-bold text-[#f3e5f5] drop-shadow-md tracking-wider">BONGO PRO</h1>
         
         <!-- Controls Area -->
         <div class="mt-4 z-20">
@@ -155,7 +155,7 @@
 
     <!-- Footer / Controls -->
     <footer class="mb-4 text-[#a1887f] text-xs text-center">
-        <p class="instruction">แตะหน้าจอเพื่อเล่น | กดปุ่มบันทึกเพื่ออัดเสียง</p>
+        <p class="instruction">แตะหน้าจอเพื่อเล่น | เสียงทุ้มและกังวาลสมจริง</p>
         <p class="mt-2 opacity-50">Keyboard: กด 'A' (ใบใหญ่) และ 'D' (ใบเล็ก)</p>
     </footer>
 
@@ -163,91 +163,114 @@
         // --- Web Audio API Setup ---
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
-        let masterGain; // ตัวควบคุมเสียงหลักเพื่อส่งไปทั้งหูฟังและเครื่องอัด
+        let masterGain; 
+        let reverbNode; // เพิ่ม Reverb (Convolver)
         
         // Recording Variables
         let mediaRecorder;
         let audioChunks = [];
         let isRecording = false;
         
-        // ฟังก์ชันเริ่ม AudioContext และเตรียมระบบอัดเสียง
+        // สร้าง Impulse Response สำหรับ Reverb (จำลองเสียงห้อง)
+        function createReverbBuffer() {
+            const sampleRate = audioCtx.sampleRate;
+            const length = sampleRate * 1.5; // 1.5 วินาที reverb tail
+            const impulse = audioCtx.createBuffer(2, length, sampleRate);
+            const impulseL = impulse.getChannelData(0);
+            const impulseR = impulse.getChannelData(1);
+
+            for (let i = 0; i < length; i++) {
+                const n = i;
+                // สร้าง noise ที่ค่อยๆ เบาลง (Exponential decay)
+                let decay = Math.pow(1 - n / length, 2);
+                impulseL[i] = (Math.random() * 2 - 1) * decay;
+                impulseR[i] = (Math.random() * 2 - 1) * decay;
+            }
+            return impulse;
+        }
+
         function initAudio() {
             if (!audioCtx) {
                 audioCtx = new AudioContext();
                 
-                // 1. สร้าง Master Gain Node (จุดรวมเสียง)
+                // Master Gain
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 1.0;
+                masterGain.gain.value = 0.8; // ลด Volume หลักลงนิดหน่อยกันแตก
 
-                // 2. เชื่อม Master ไปยังลำโพง (Destination)
+                // Setup Reverb
+                reverbNode = audioCtx.createConvolver();
+                reverbNode.buffer = createReverbBuffer();
+                
+                // Dry/Wet Mix (เสียงสด vs เสียงก้อง)
+                const dryGain = audioCtx.createGain(); // เสียงสด
+                dryGain.gain.value = 1.0;
+                
+                const wetGain = audioCtx.createGain(); // เสียงก้อง
+                wetGain.gain.value = 0.3; // ปรับความกังวาลตรงนี้ (0.3 = ปานกลาง)
+
+                // Routing Graph
+                // Sound -> [Dry] -> Master
+                // Sound -> [Reverb] -> [Wet] -> Master
+                // Note: We will connect individual drum sounds to a temporary 'source bus' in playBongoSound
+                
+                // เชื่อม Master ไปยัง Destination
                 masterGain.connect(audioCtx.destination);
 
-                // 3. เตรียมระบบอัดเสียง (MediaStreamDestination)
+                // Setup Recorder
                 const dest = audioCtx.createMediaStreamDestination();
-                masterGain.connect(dest); // ส่งเสียงจาก Master ไปเข้าตัวอัดด้วย
+                masterGain.connect(dest);
 
-                // 4. ตั้งค่า MediaRecorder
                 try {
                     mediaRecorder = new MediaRecorder(dest.stream);
-                    
                     mediaRecorder.ondataavailable = (event) => {
-                        if (event.data.size > 0) {
-                            audioChunks.push(event.data);
-                        }
+                        if (event.data.size > 0) audioChunks.push(event.data);
                     };
-
                     mediaRecorder.onstop = () => {
-                        // สร้าง Blob ไฟล์เสียง
                         const blob = new Blob(audioChunks, { type: 'audio/webm' });
                         const url = URL.createObjectURL(blob);
-                        
-                        // สร้างลิงก์ดาวน์โหลดอัตโนมัติ
                         const a = document.createElement('a');
                         a.style.display = 'none';
                         a.href = url;
                         const timestamp = new Date().toLocaleTimeString('th-TH').replace(/:/g, '-');
-                        a.download = `bongo-recording-${timestamp}.webm`;
+                        a.download = `bongo-pro-${timestamp}.webm`;
                         document.body.appendChild(a);
                         a.click();
-                        
-                        // คืนค่าหน่วยความจำ
-                        setTimeout(() => {
-                            document.body.removeChild(a);
-                            window.URL.revokeObjectURL(url);
-                        }, 100);
-                        
-                        // รีเซ็ต Chunks
+                        setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 100);
                         audioChunks = [];
                     };
                 } catch (e) {
-                    console.error("Browser does not support MediaRecorder for WebAudio", e);
-                    alert("เบราว์เซอร์นี้ไม่รองรับการอัดเสียงจาก WebAudio โดยตรง");
+                    console.error("Recording not supported", e);
                 }
+
+                // Global routing helper
+                audioCtx.dryDest = dryGain;
+                audioCtx.wetDest = reverbNode;
+                
+                // Connect Mixer
+                dryGain.connect(masterGain);
+                reverbNode.connect(wetGain);
+                wetGain.connect(masterGain);
 
             } else if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
         }
 
-        // ฟังก์ชันจัดการปุ่มอัดเสียง
         function toggleRecording() {
-            initAudio(); // ตรวจสอบว่า audio context ทำงาน
-            
+            initAudio();
             const btn = document.getElementById('record-btn');
             const icon = document.getElementById('record-icon');
             const text = document.getElementById('record-text');
 
             if (!isRecording) {
-                // เริ่มอัด
                 if (mediaRecorder && mediaRecorder.state === "inactive") {
                     mediaRecorder.start();
                     isRecording = true;
                     btn.classList.add('recording');
-                    icon.textContent = '⬛'; // สัญลักษณ์หยุด
+                    icon.textContent = '⬛';
                     text.textContent = 'หยุดบันทึก';
                 }
             } else {
-                // หยุดอัด
                 if (mediaRecorder && mediaRecorder.state === "recording") {
                     mediaRecorder.stop();
                     isRecording = false;
@@ -258,143 +281,132 @@
             }
         }
 
-        // ฟังก์ชันสร้างเสียงกลองสังเคราะห์
         function playBongoSound(type) {
             if (!audioCtx) initAudio();
-
             const t = audioCtx.currentTime;
+
+            // -- Parameter Tuning --
+            // Low (Hembra): ทุ้มลึก, High (Macho): ใส, คม
+            const fundFreq = type === 'high' ? 420 : 180; 
+            const dropFreq = type === 'high' ? 120 : 60;  // Pitch drop amount
+            const decayTime = type === 'high' ? 0.25 : 0.45; // หางเสียง (Low ยาวกว่า)
+            const volume = type === 'high' ? 0.8 : 1.0;
+
+            // 1. Fundamental Oscillator (เสียงหลัก - Sine Wave)
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
             
-            // Oscillator สร้างคลื่นเสียง
-            const oscillator = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-
-            // ตั้งค่าความถี่ (Pitch)
-            // Macho (High) ~ 480Hz, Hembra (Low) ~ 220Hz
-            const baseFreq = type === 'high' ? 480 : 220; 
+            osc.frequency.setValueAtTime(fundFreq, t);
+            osc.frequency.exponentialRampToValueAtTime(fundFreq - dropFreq, t + 0.15); // Pitch drop
             
-            oscillator.frequency.setValueAtTime(baseFreq, t);
-            // Pitch drop (ทำให้เสียงเหมือนหนังกลองที่ถูกตีแล้วหย่อนลง)
-            oscillator.frequency.exponentialRampToValueAtTime(baseFreq * 0.8, t + 0.1); 
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(volume, t + 0.005); // Attack
+            gain.gain.exponentialRampToValueAtTime(0.001, t + decayTime); // Decay
 
-            // สร้างรูปคลื่น
-            oscillator.type = 'sine'; // Sine wave ให้เสียงนุ่มแบบหนังกลอง
+            osc.connect(gain);
+            
+            // 2. Overtone Oscillator (เสียงรอง - เพื่อความสมจริงของไม้/หนัง)
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            
+            // Harmonic ที่ 1.5 หรือ 2 เท่า
+            osc2.frequency.setValueAtTime(fundFreq * 1.6, t); 
+            osc2.type = 'triangle'; // Triangle ให้เสียงที่มี texture มากกว่า Sine
+            
+            gain2.gain.setValueAtTime(0, t);
+            gain2.gain.linearRampToValueAtTime(volume * 0.2, t + 0.005);
+            gain2.gain.exponentialRampToValueAtTime(0.001, t + (decayTime * 0.6)); // หางเสียงสั้นกว่าตัวหลัก
 
-            // Gain Envelope (การควบคุมความดัง)
-            gainNode.gain.setValueAtTime(0, t);
-            gainNode.gain.linearRampToValueAtTime(1, t + 0.005); // Attack เร็วมาก
-            gainNode.gain.exponentialRampToValueAtTime(0.01, t + 0.4); // Decay
+            osc2.connect(gain2);
 
-            // เชื่อมต่อ: Oscillator -> Gain -> MasterGain (สำคัญ! ต้องเข้า Master เพื่อให้อัดเสียงได้)
-            oscillator.connect(gainNode);
-            if (masterGain) {
-                gainNode.connect(masterGain);
-            } else {
-                gainNode.connect(audioCtx.destination); // Fallback
-            }
+            // 3. Routing
+            // ส่งเข้าทั้ง Dry (เสียงสด) และ Wet (เสียงก้อง Reverb)
+            gain.connect(audioCtx.dryDest);
+            gain.connect(audioCtx.wetDest); // ส่งเข้า Reverb
+            
+            gain2.connect(audioCtx.dryDest);
 
-            // เริ่มเล่นและหยุด
-            oscillator.start(t);
-            oscillator.stop(t + 0.4);
+            // Start
+            osc.start(t);
+            osc.stop(t + decayTime + 0.1);
+            osc2.start(t);
+            osc2.stop(t + decayTime + 0.1);
 
-            // เพิ่มเสียง "Slap" (Noise) เล็กน้อยเพื่อให้ดูสมจริงขึ้น
-            if (type === 'high') {
-                createSlapNoise(t);
-            }
+            // 4. Slap Noise (เสียงกระทบหนัง - ปรับให้แน่นขึ้น)
+            createSlapNoise(t, type);
         }
 
-        function createSlapNoise(t) {
-            const bufferSize = audioCtx.sampleRate * 0.05; // 50ms noise
+        function createSlapNoise(t, type) {
+            const bufferSize = audioCtx.sampleRate * 0.025; // สั้นลงเพื่อให้คม (25ms)
             const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
             const data = buffer.getChannelData(0);
             for (let i = 0; i < bufferSize; i++) {
-                data[i] = Math.random() * 2 - 1;
+                data[i] = (Math.random() * 2 - 1);
             }
 
             const noise = audioCtx.createBufferSource();
             noise.buffer = buffer;
-            const noiseFilter = audioCtx.createBiquadFilter();
-            noiseFilter.type = 'highpass';
-            noiseFilter.frequency.value = 1000;
-            const noiseGain = audioCtx.createGain();
             
-            noiseGain.gain.setValueAtTime(0.3, t);
-            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'lowpass';
+            noiseFilter.frequency.value = type === 'high' ? 3000 : 1200; // Low drum เสียงตบจะทุ้มกว่า
+            
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(type === 'high' ? 0.6 : 0.4, t);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.02);
 
             noise.connect(noiseFilter);
             noiseFilter.connect(noiseGain);
-            
-            // เชื่อมต่อเข้า MasterGain เช่นกัน
-            if (masterGain) {
-                noiseGain.connect(masterGain);
-            } else {
-                noiseGain.connect(audioCtx.destination);
-            }
+            noiseGain.connect(audioCtx.dryDest); // เสียงตบไม่ส่งเข้า reverb มากนัก เพื่อความชัด
             
             noise.start(t);
         }
 
-        // --- Interaction Logic ---
+        // --- Interaction Logic (Original) ---
         const drumLow = document.getElementById('drum-low');
         const drumHigh = document.getElementById('drum-high');
 
         function triggerDrum(element, type) {
-            // เล่นเสียง
             playBongoSound(type);
-
-            // Visual feedback
+            element.classList.remove('active');
+            void element.offsetWidth; // Trigger reflow
             element.classList.add('active');
             setTimeout(() => {
                 element.classList.remove('active');
-            }, 80);
+            }, 100);
         }
 
-        // รองรับ Touch Event (Multi-touch)
         function handleTouch(e) {
-            e.preventDefault(); // ป้องกันการซูมหรือเลื่อนหน้าจอ
-            initAudio(); // มั่นใจว่า AudioContext ทำงาน
-
-            // วนลูปทุกนิ้วที่แตะลงมา (รองรับการตีพร้อมกัน)
+            e.preventDefault();
+            initAudio();
             for (let i = 0; i < e.changedTouches.length; i++) {
                 const touch = e.changedTouches[i];
                 const target = document.elementFromPoint(touch.clientX, touch.clientY);
-
                 if (target) {
-                    // หา Element ที่เป็นกลอง (เผื่อแตะโดน drum-head หรือ rim)
                     const drumContainer = target.closest('.drum-container');
-                    const recordBtn = target.closest('#record-btn'); // อนุญาตให้กดปุ่มอัดได้
-
+                    const recordBtn = target.closest('#record-btn');
                     if (drumContainer) {
                         if (drumContainer.id === 'drum-low') triggerDrum(drumLow, 'low');
                         if (drumContainer.id === 'drum-high') triggerDrum(drumHigh, 'high');
                     }
-                    
-                    if (recordBtn) {
-                        recordBtn.click();
-                    }
+                    if (recordBtn) recordBtn.click();
                 }
             }
         }
 
-        // Event Listeners สำหรับหน้าจอสัมผัส
         document.addEventListener('touchstart', handleTouch, { passive: false });
-
-        // Event Listeners สำหรับเมาส์ (Desktop)
         drumLow.addEventListener('mousedown', () => triggerDrum(drumLow, 'low'));
         drumHigh.addEventListener('mousedown', () => triggerDrum(drumHigh, 'high'));
-
-        // Keyboard Support
         document.addEventListener('keydown', (e) => {
-            if (e.repeat) return; // ป้องกันการกดค้าง
+            if (e.repeat) return;
             const key = e.key.toLowerCase();
             if (key === 'a') triggerDrum(drumLow, 'low');
             if (key === 'd' || key === 'l') triggerDrum(drumHigh, 'high'); 
-            if (key === ' ' || key === 'r') toggleRecording(); // Spacebar หรือ R เพื่ออัดเสียง
+            if (key === ' ' || key === 'r') toggleRecording();
         });
 
-        // เริ่มต้น AudioContext เมื่อมีการคลิกที่ใดก็ได้บนหน้าจอ (เพื่อแก้ Policy ของบาง Browser)
         document.body.addEventListener('click', initAudio, { once: true });
         document.body.addEventListener('touchstart', initAudio, { once: true });
-
     </script>
 </body>
 </html>
