@@ -216,6 +216,8 @@
         let audioCtx;
         let masterGain;
         let compressor;
+        let reverbNode;
+        let reverbGain;
         let analyser;
         let mediaRecorder;
         let recordedChunks = [];
@@ -231,6 +233,22 @@
         const activeTouches = new Map();
 
         const statusText = document.getElementById('status-text');
+
+        // --- Reverb Generation ---
+        function createReverbBuffer(ctx) {
+            // Create a simple impulse response for reverb
+            const length = ctx.sampleRate * 1.5; // 1.5 seconds tail
+            const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
+            const left = impulse.getChannelData(0);
+            const right = impulse.getChannelData(1);
+            for (let i = 0; i < length; i++) {
+                // Exponential decay
+                const decay = Math.pow(1 - i / length, 3);
+                left[i] = (Math.random() * 2 - 1) * decay;
+                right[i] = (Math.random() * 2 - 1) * decay;
+            }
+            return impulse;
+        }
 
         // --- Initialization ---
         async function initAudio() {
@@ -248,17 +266,34 @@
                 compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
                 compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
 
+                // Reverb Setup (ความกังวาล)
+                reverbNode = audioCtx.createConvolver();
+                reverbNode.buffer = createReverbBuffer(audioCtx);
+                
+                reverbGain = audioCtx.createGain();
+                reverbGain.gain.value = 0.5; // ระดับความกังวาล (0.0 - 1.0)
+
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 0.8; 
+                masterGain.gain.value = 0.7; 
                 
                 analyser = audioCtx.createAnalyser();
                 analyser.fftSize = 256;
                 
                 destNode = audioCtx.createMediaStreamDestination();
 
-                // Chain: Notes -> Master -> Compressor -> Analyser -> Dest & Speakers
+                // Routing: 
+                // Notes -> MasterGain -> Compressor
                 masterGain.connect(compressor);
+                
+                // Dry Path (เสียงตรง)
                 compressor.connect(analyser);
+                
+                // Wet Path (เสียงก้อง)
+                compressor.connect(reverbNode);
+                reverbNode.connect(reverbGain);
+                reverbGain.connect(analyser);
+
+                // Output
                 analyser.connect(destNode);
                 analyser.connect(audioCtx.destination);
 
@@ -306,15 +341,21 @@
             const t = audioCtx.currentTime;
 
             // 1. Oscillators
+            // Tone 1: Triangle (เนื้อเสียงหลัก) - ผ่าน Filter ให้นุ่มขึ้น
             const osc = audioCtx.createOscillator();
             osc.type = 'triangle';
             osc.frequency.setValueAtTime(freq, t);
 
+            const toneFilter = audioCtx.createBiquadFilter();
+            toneFilter.type = 'lowpass';
+            toneFilter.frequency.value = 1200; // ตัดเสียงแหลมออกให้นุ่ม
+
+            // Tone 2: Sine (ความทุ้มลึก)
             const osc2 = audioCtx.createOscillator();
             osc2.type = 'sine';
             osc2.frequency.setValueAtTime(freq, t);
 
-            // 2. Breath Noise
+            // 2. Breath Noise (เสียงลมเป่า)
             const bufferSize = audioCtx.sampleRate * 0.5;
             const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
             const data = buffer.getChannelData(0);
@@ -327,7 +368,7 @@
             
             const noiseFilter = audioCtx.createBiquadFilter();
             noiseFilter.type = 'lowpass';
-            noiseFilter.frequency.value = 1000;
+            noiseFilter.frequency.value = 800; // ลดเสียงซ่าให้เหมือนลมหายใจ
 
             // 3. Gain Envelopes
             const envMain = audioCtx.createGain();
@@ -335,31 +376,35 @@
             const envNoise = audioCtx.createGain();
 
             // Connections
-            osc.connect(envMain);
+            osc.connect(toneFilter);
+            toneFilter.connect(envMain);
+            
             osc2.connect(env2);
+            
             noise.connect(noiseFilter);
             noiseFilter.connect(envNoise);
 
+            // Connect all to Master
             envMain.connect(masterGain);
             env2.connect(masterGain);
             envNoise.connect(masterGain);
 
-            // ADSR - Attack Phase
-            const attack = 0.05;
-            const sustainVol = 0.5;
+            // ADSR - Attack Phase (ปรับให้นุ่มนวลขึ้น Attack ช้าลงนิดหน่อย)
+            const attack = 0.08; // นุ่มขึ้น
+            const sustainVol = 0.45;
 
-            // Main Tone Attack
+            // Main Tone Attack (Triangle)
             envMain.gain.setValueAtTime(0, t);
             envMain.gain.linearRampToValueAtTime(sustainVol, t + attack);
 
             // Sine Tone Attack
             env2.gain.setValueAtTime(0, t);
-            env2.gain.linearRampToValueAtTime(0.4, t + attack);
+            env2.gain.linearRampToValueAtTime(0.5, t + attack);
 
-            // Noise Attack
+            // Noise Attack (ลมเข้าก่อนเสียงเล็กน้อย)
             envNoise.gain.setValueAtTime(0, t);
-            envNoise.gain.linearRampToValueAtTime(0.15, t + 0.02);
-            envNoise.gain.exponentialRampToValueAtTime(0.02, t + 0.1); 
+            envNoise.gain.linearRampToValueAtTime(0.1, t + 0.04);
+            envNoise.gain.exponentialRampToValueAtTime(0.02, t + 0.15); 
 
             osc.start(t);
             osc2.start(t);
@@ -370,7 +415,7 @@
                 stop: () => {
                     if (!audioCtx) return;
                     const now = audioCtx.currentTime;
-                    const release = 0.15; // Release time
+                    const release = 0.25; // หางเสียงยาวขึ้นตอนปล่อยนิ้ว
 
                     // Cancel sustain loop
                     try {
@@ -401,6 +446,7 @@
                             envMain.disconnect();
                             env2.disconnect();
                             envNoise.disconnect();
+                            toneFilter.disconnect(); // Don't forget filters
                         }, (release + 0.2) * 1000);
                     } catch(e) { console.log(e); }
                 }
