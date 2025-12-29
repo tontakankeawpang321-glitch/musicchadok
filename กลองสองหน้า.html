@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>กลองสองหน้าเสมือนจริง</title>
+    <title>กลองสองหน้า - เสียงสมจริง</title>
     <style>
         /* รีเซ็ตและตั้งค่าพื้นฐาน */
         * {
@@ -26,9 +26,9 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            overflow: hidden; /* ป้องกันการเลื่อน */
+            overflow: hidden;
             font-family: 'Sarabun', sans-serif;
-            touch-action: none; /* ป้องกัน gesture ของ browser */
+            touch-action: none;
         }
 
         /* แผงควบคุมด้านบน */
@@ -124,11 +124,23 @@
             justify-content: center;
             align-items: center;
             -webkit-tap-highlight-color: transparent;
+            overflow: hidden; /* เพื่อให้ ripple ไม่ล้น */
         }
 
         .drum-head:active, .drum-head.active {
             transform: scale(0.96);
             background: radial-gradient(circle at 30% 30%, #ffe0b2, #d7ccc8, #8d6e63);
+        }
+
+        /* โซนสัมผัสพิเศษ */
+        .hit-zone-indicator {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            pointer-events: none;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 60%, rgba(255,200,100,0.2) 61%);
+            opacity: 0.5;
         }
 
         /* หน้าซ้าย (เสียงทุ้ม/ใหญ่) */
@@ -149,22 +161,6 @@
             margin-right: -5%;
         }
 
-        /* เชือกรัดหน้ากลอง (Decoration) */
-        .ropes {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 2;
-        }
-        
-        .rope-line {
-            position: absolute;
-            height: 2px;
-            background: #3e2723;
-            box-shadow: 0 1px 1px rgba(0,0,0,0.5);
-        }
-
         /* การแสดงโน้ต */
         .note-label {
             position: absolute;
@@ -175,6 +171,7 @@
             opacity: 0;
             transition: opacity 0.3s;
             text-shadow: 1px 1px 0px rgba(255,255,255,0.3);
+            z-index: 10;
         }
         
         .show-notes .note-label {
@@ -185,7 +182,7 @@
         .ripple {
             position: absolute;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.6);
             transform: scale(0);
             animation: ripple-anim 0.4s linear;
             pointer-events: none;
@@ -193,7 +190,7 @@
 
         @keyframes ripple-anim {
             to {
-                transform: scale(2);
+                transform: scale(2.5);
                 opacity: 0;
             }
         }
@@ -209,6 +206,7 @@
             bottom: 10px;
             color: #666;
             font-size: 12px;
+            text-align: center;
         }
 
     </style>
@@ -226,46 +224,98 @@
     <div class="drum-container" id="drumContainer">
         <div class="drum-body">
             <div class="wood-texture"></div>
-            <!-- Ropes decoration (CSS drawn) -->
             <div style="width:100%; height: 2px; background:#3e2723; position:absolute; top:20%;"></div>
             <div style="width:100%; height: 2px; background:#3e2723; position:absolute; bottom:20%;"></div>
             <div style="width:100%; height: 2px; background:#3e2723; position:absolute; top:50%;"></div>
         </div>
 
         <!-- หน้าซ้าย (ทุ้ม) -->
-        <div class="drum-head head-left" id="padLeft" data-note="ตุ้ม">
-            <span class="note-label">ตุ้ม</span>
+        <div class="drum-head head-left" id="padLeft">
+            <div class="hit-zone-indicator"></div>
+            <span class="note-label">ตุ้ม/ขอบ</span>
         </div>
 
         <!-- หน้าขวา (แหลม) -->
-        <div class="drum-head head-right" id="padRight" data-note="ตึง">
-            <span class="note-label">ตึง</span>
+        <div class="drum-head head-right" id="padRight">
+            <div class="hit-zone-indicator"></div>
+            <span class="note-label">ตึง/แป๊ะ</span>
         </div>
     </div>
 
-    <div class="footer-text">แตะหน้าจอเพื่อเล่น | ใส่หูฟังเพื่อเสียงที่ดีที่สุด</div>
+    <div class="footer-text">
+        ตีตรงกลาง: เสียงสั้นกระชับ | ตีขอบ: เสียงโลหะ/Slap<br>
+        รองรับ Multi-touch ตีพร้อมกันได้
+    </div>
 
     <script>
-        // --- Audio Context Setup ---
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
         let masterGain;
-        let dest; // For recording
+        let limiter;
+        let reverbNode;
+        let reverbFilter;
+        let dryGain;
+        let wetGain;
+        let dest;
         let mediaRecorder;
         let chunks = [];
         let recordedBlob;
         let audioURL;
         let playbackAudio = new Audio();
 
+        function createReverbBuffer() {
+            // Reverb แบบสั้นมาก (Short Room) เพื่อไม่ให้เบสบวม
+            const duration = 0.4; // ลดลงอีกเหลือ 0.4 เพื่อความกระชับที่สุด
+            const decay = 5.0;    // หายเร็วขึ้น
+            const rate = audioCtx.sampleRate;
+            const length = rate * duration;
+            const impulse = audioCtx.createBuffer(2, length, rate);
+            const left = impulse.getChannelData(0);
+            const right = impulse.getChannelData(1);
+
+            for (let i = 0; i < length; i++) {
+                const n = i / length;
+                left[i] = (Math.random() * 2 - 1) * Math.pow(1 - n, decay);
+                right[i] = (Math.random() * 2 - 1) * Math.pow(1 - n, decay);
+            }
+            return impulse;
+        }
+
         function initAudio() {
             if (!audioCtx) {
                 audioCtx = new AudioContext();
-                masterGain = audioCtx.createGain();
-                masterGain.gain.value = 0.8;
                 
-                // Setup recording destination
+                limiter = audioCtx.createDynamicsCompressor();
+                limiter.threshold.value = -3;
+                limiter.ratio.value = 12;
+                limiter.attack.value = 0.002;
+
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 1.0;
+
+                reverbNode = audioCtx.createConvolver();
+                reverbNode.buffer = createReverbBuffer();
+                
+                reverbFilter = audioCtx.createBiquadFilter();
+                reverbFilter.type = 'lowpass';
+                reverbFilter.frequency.value = 800; // กรองความถี่สูงออก เพื่อให้เหลือแต่บรรยากาศทุ้มๆ
+
+                wetGain = audioCtx.createGain();
+                wetGain.gain.value = 0.3; // Reverb บางๆ พอมีมิติ
+                
+                dryGain = audioCtx.createGain();
+                dryGain.gain.value = 1.0;
+
+                reverbNode.connect(reverbFilter);
+                reverbFilter.connect(wetGain);
+                
+                wetGain.connect(masterGain);
+                dryGain.connect(masterGain);
+                
+                masterGain.connect(limiter);
+                limiter.connect(audioCtx.destination);
+
                 dest = audioCtx.createMediaStreamDestination();
-                masterGain.connect(audioCtx.destination);
                 masterGain.connect(dest);
             }
             if (audioCtx.state === 'suspended') {
@@ -273,145 +323,243 @@
             }
         }
 
-        // --- Sound Synthesis (Physical Modeling Approximation) ---
+        // --- Sound Synthesis ---
         
-        function playSound(type) {
+        function playSound(type, zoneFactor) {
             initAudio();
             const t = audioCtx.currentTime;
             
-            // 1. Impact Sound (Click/Attack)
-            const oscNoise = audioCtx.createOscillator();
-            const gainNoise = audioCtx.createGain();
-            oscNoise.type = 'square'; // Rich harmonic for initial slap
-            
-            // 2. Body Resonance (The Tone)
-            const oscTone = audioCtx.createOscillator();
-            const gainTone = audioCtx.createGain();
-            oscTone.type = 'sine';
+            const hitGain = audioCtx.createGain();
+            hitGain.connect(dryGain);
+            hitGain.connect(reverbNode);
+            hitGain.gain.setValueAtTime(1.0, t);
 
-            // Parameters based on type
-            if (type === 'low') { // "ตุ้ม" - Left Side
-                // Pitch drop for realistic drum tension
-                oscTone.frequency.setValueAtTime(120, t);
-                oscTone.frequency.exponentialRampToValueAtTime(60, t + 0.5);
+            if (type === 'left') { 
+                // ซ้าย: ทุ้ม + สั้น (Deep Thud)
                 
-                gainTone.gain.setValueAtTime(1.0, t);
-                gainTone.gain.exponentialRampToValueAtTime(0.01, t + 0.8);
+                if (zoneFactor < 0.6) { // === CENTER / ตุ้ม ===
+                    // 1. Sub Bass (Deep & Short)
+                    const oscSub = audioCtx.createOscillator();
+                    const gainSub = audioCtx.createGain();
+                    oscSub.frequency.setValueAtTime(60, t); // ลดความถี่ลง (Deep) เริ่มที่ 60Hz
+                    oscSub.frequency.exponentialRampToValueAtTime(30, t + 0.2); // ลงลึกไปถึง 30Hz
+                    
+                    gainSub.gain.setValueAtTime(1.5, t);
+                    gainSub.gain.exponentialRampToValueAtTime(0.01, t + 0.15); // สั้น! (Short)
 
-                oscNoise.frequency.setValueAtTime(100, t);
-                gainNoise.gain.setValueAtTime(0.3, t);
-                gainNoise.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+                    // 2. Impact (หัวเสียงหนักๆ)
+                    const oscImpact = audioCtx.createOscillator();
+                    const gainImpact = audioCtx.createGain();
+                    oscImpact.type = 'square'; // Square ให้เนื้อที่หนากว่า Sine
+                    oscImpact.frequency.setValueAtTime(100, t); // หัวเสียงต่ำลง
+                    oscImpact.frequency.exponentialRampToValueAtTime(40, t + 0.08);
+                    
+                    gainImpact.gain.setValueAtTime(1.0, t);
+                    gainImpact.gain.exponentialRampToValueAtTime(0.01, t + 0.08); // สั้นมาก
 
-            } else if (type === 'high') { // "ตึง" - Right Side
-                oscTone.frequency.setValueAtTime(280, t);
-                oscTone.frequency.exponentialRampToValueAtTime(180, t + 0.3);
+                    oscSub.connect(gainSub).connect(hitGain);
+                    oscImpact.connect(gainImpact).connect(hitGain);
+                    
+                    oscSub.start(t); oscSub.stop(t + 0.25);
+                    oscImpact.start(t); oscImpact.stop(t + 0.1);
+
+                } else { // === RIM / ขอบ (Metallic but Heavy) ===
+                    // เสียงขอบที่หนักขึ้น ให้เข้ากับความทุ้ม
+                    const carrier = audioCtx.createOscillator();
+                    const modulator = audioCtx.createOscillator();
+                    const modGain = audioCtx.createGain();
+                    const carrierGain = audioCtx.createGain();
+
+                    carrier.type = 'sine';
+                    carrier.frequency.setValueAtTime(600, t); // ลดความถี่ขอบลงให้หนาขึ้น
+                    
+                    modulator.type = 'square';
+                    modulator.frequency.value = 840;
+                    
+                    modGain.gain.setValueAtTime(800, t);
+                    modGain.gain.exponentialRampToValueAtTime(1, t + 0.1);
+
+                    carrierGain.gain.setValueAtTime(0.8, t);
+                    carrierGain.gain.exponentialRampToValueAtTime(0.01, t + 0.2); // หางสั้น
+
+                    // Impact
+                    const oscClick = audioCtx.createOscillator();
+                    const gainClick = audioCtx.createGain();
+                    oscClick.type = 'triangle';
+                    oscClick.frequency.setValueAtTime(2000, t);
+                    oscClick.frequency.exponentialRampToValueAtTime(200, t + 0.05);
+                    gainClick.gain.setValueAtTime(0.8, t);
+                    gainClick.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+                    
+                    modulator.connect(modGain);
+                    modGain.connect(carrier.frequency);
+                    carrier.connect(carrierGain).connect(hitGain);
+                    oscClick.connect(gainClick).connect(hitGain);
+
+                    carrier.start(t); carrier.stop(t + 0.3);
+                    modulator.start(t); modulator.stop(t + 0.3);
+                    oscClick.start(t); oscClick.stop(t + 0.1);
+                }
+
+            } else if (type === 'right') { 
+                // ขวา: ตึง (ยังคงคาแรคเตอร์ไว้ แต่ปรับให้เข้ากับความทุ้ม)
                 
-                gainTone.gain.setValueAtTime(0.8, t);
-                gainTone.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
+                if (zoneFactor < 0.6) { // === CENTER ===
+                    const oscTone = audioCtx.createOscillator();
+                    const gainTone = audioCtx.createGain();
+                    oscTone.type = 'sine';
+                    oscTone.frequency.setValueAtTime(220, t); // ลดลงนิดหน่อยให้มีเนื้อ (จาก 340 -> 220)
+                    oscTone.frequency.exponentialRampToValueAtTime(120, t + 0.15);
+                    gainTone.gain.setValueAtTime(1.0, t);
+                    gainTone.gain.exponentialRampToValueAtTime(0.01, t + 0.15); // สั้น
 
-                oscNoise.frequency.setValueAtTime(300, t);
-                gainNoise.gain.setValueAtTime(0.4, t);
-                gainNoise.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+                    const oscWood = audioCtx.createOscillator();
+                    const gainWood = audioCtx.createGain();
+                    oscWood.type = 'triangle';
+                    oscWood.frequency.setValueAtTime(350, t);
+                    gainWood.gain.setValueAtTime(0.3, t);
+                    gainWood.gain.linearRampToValueAtTime(0.0, t + 0.1);
+
+                    oscTone.connect(gainTone).connect(hitGain);
+                    oscWood.connect(gainWood).connect(hitGain);
+                    
+                    oscTone.start(t); oscTone.stop(t + 0.2);
+                    oscWood.start(t); oscWood.stop(t + 0.15);
+
+                } else { // === RIM ===
+                    const oscSlap = audioCtx.createOscillator();
+                    const gainSlap = audioCtx.createGain();
+                    oscSlap.type = 'sawtooth';
+                    oscSlap.frequency.setValueAtTime(1200, t);
+                    oscSlap.frequency.exponentialRampToValueAtTime(150, t + 0.05);
+                    gainSlap.gain.setValueAtTime(0.7, t);
+                    gainSlap.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+
+                    const bufferSize = audioCtx.sampleRate * 0.02; 
+                    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                    
+                    const noise = audioCtx.createBufferSource();
+                    noise.buffer = buffer;
+                    const noiseFilter = audioCtx.createBiquadFilter();
+                    noiseFilter.type = 'highpass';
+                    noiseFilter.frequency.value = 3000;
+                    
+                    const gainNoise = audioCtx.createGain();
+                    gainNoise.gain.setValueAtTime(0.6, t);
+                    gainNoise.gain.exponentialRampToValueAtTime(0.01, t + 0.02);
+
+                    oscSlap.connect(gainSlap).connect(hitGain);
+                    noise.connect(noiseFilter).connect(gainNoise).connect(hitGain);
+                    
+                    oscSlap.start(t); oscSlap.stop(t + 0.1);
+                    noise.start(t);
+                }
             }
-
-            // Connect graph
-            oscTone.connect(gainTone);
-            gainTone.connect(masterGain);
-            
-            oscNoise.connect(gainNoise);
-            gainNoise.connect(masterGain);
-
-            // Start/Stop
-            oscTone.start(t);
-            oscTone.stop(t + 1);
-            oscNoise.start(t);
-            oscNoise.stop(t + 0.1);
         }
 
-        // --- Interaction Logic ---
+        // --- Interaction Logic with Position Detection ---
+        
+        function handleInteraction(event, padId, type) {
+            // ป้องกันการทำงานซ้ำซ้อนในบางเบราว์เซอร์
+            if(event.type === 'touchstart') event.preventDefault();
+            
+            const pad = document.getElementById(padId);
+            const rect = pad.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            // รองรับ Multi-touch
+            let touches = event.changedTouches ? Array.from(event.changedTouches) : [{clientX: event.clientX, clientY: event.clientY}];
+
+            touches.forEach(touch => {
+                // ตรวจสอบว่า touch นี้อยู่ใน element นี้หรือไม่ (สำหรับ multi-touch)
+                // สำหรับ mouse event เราข้ามการเช็คนี้เพราะมัน trigger บน element อยู่แล้ว
+                if (event.changedTouches) {
+                    const touchTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+                    if (touchTarget !== pad && !pad.contains(touchTarget)) return;
+                }
+
+                // คำนวณระยะห่างจากจุดศูนย์กลาง (0.0 - 1.0)
+                const dx = touch.clientX - centerX;
+                const dy = touch.clientY - centerY;
+                const distance = Math.sqrt(dx*dx + dy*dy);
+                const maxRadius = rect.width / 2;
+                
+                // Normalized distance (0 = center, 1 = edge)
+                let zoneFactor = Math.min(distance / maxRadius, 1.0);
+
+                playSound(type, zoneFactor);
+
+                // Visual Feedback
+                pad.classList.remove('active');
+                void pad.offsetWidth; // Trigger reflow
+                pad.classList.add('active');
+                setTimeout(() => pad.classList.remove('active'), 100);
+
+                // Ripple at touch point
+                const ripple = document.createElement('div');
+                ripple.className = 'ripple';
+                ripple.style.left = (touch.clientX - rect.left) + 'px';
+                ripple.style.top = (touch.clientY - rect.top) + 'px';
+                pad.appendChild(ripple);
+                setTimeout(() => ripple.remove(), 400);
+            });
+        }
+
         const padLeft = document.getElementById('padLeft');
         const padRight = document.getElementById('padRight');
         const container = document.getElementById('drumContainer');
 
-        function triggerPad(pad, type) {
-            playSound(type);
-            
-            // Visual Animation
-            pad.classList.add('active');
-            setTimeout(() => pad.classList.remove('active'), 100);
-
-            // Ripple Effect
-            const ripple = document.createElement('div');
-            ripple.className = 'ripple';
-            // Center the ripple roughly
-            const rect = pad.getBoundingClientRect();
-            ripple.style.width = rect.width + 'px';
-            ripple.style.height = rect.height + 'px';
-            ripple.style.left = '0';
-            ripple.style.top = '0';
-            pad.appendChild(ripple);
-            
-            setTimeout(() => ripple.remove(), 400);
-        }
-
         // Touch Events
-        padLeft.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            triggerPad(padLeft, 'low');
-        }, {passive: false});
-
-        padRight.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            triggerPad(padRight, 'high');
-        }, {passive: false});
+        padLeft.addEventListener('touchstart', (e) => handleInteraction(e, 'padLeft', 'left'), {passive: false});
+        padRight.addEventListener('touchstart', (e) => handleInteraction(e, 'padRight', 'right'), {passive: false});
 
         // Mouse Events
-        padLeft.addEventListener('mousedown', () => triggerPad(padLeft, 'low'));
-        padRight.addEventListener('mousedown', () => triggerPad(padRight, 'high'));
+        padLeft.addEventListener('mousedown', (e) => handleInteraction(e, 'padLeft', 'left'));
+        padRight.addEventListener('mousedown', (e) => handleInteraction(e, 'padRight', 'right'));
 
-        // Keyboard Support (A/D or Left/Right Arrows)
+        // Keyboard Support (Fixed zones for keyboard)
         document.addEventListener('keydown', (e) => {
             if (e.repeat) return;
-            if (e.key === 'a' || e.key === 'ArrowLeft') triggerPad(padLeft, 'low');
-            if (e.key === 'd' || e.key === 'ArrowRight') triggerPad(padRight, 'high');
+            // A = Left Center, Z = Left Rim
+            if (e.key === 'a') playSound('left', 0.0); // Center
+            if (e.key === 'z') playSound('left', 0.8); // Rim
+            
+            // D = Right Center, C = Right Rim
+            if (e.key === 'd') playSound('right', 0.0); // Center
+            if (e.key === 'c') playSound('right', 0.8); // Rim
+            
+            // Visual feedback for keyboard is tricky without mapping, simplified here
         });
 
         // --- Controls Logic ---
-        
-        // Toggle Notes
         const btnNotes = document.getElementById('btnNotes');
         btnNotes.addEventListener('click', () => {
             container.classList.toggle('show-notes');
             btnNotes.textContent = container.classList.contains('show-notes') ? "🎵 ซ่อนโน้ต" : "🎵 โน้ต";
         });
 
-        // Recording
         const btnRecord = document.getElementById('btnRecord');
         const btnStop = document.getElementById('btnStop');
         const btnPlay = document.getElementById('btnPlay');
         const btnDownload = document.getElementById('btnDownload');
 
         btnRecord.addEventListener('click', () => {
-            initAudio(); // Ensure context is ready
+            initAudio();
             chunks = [];
-            // Create recorder from destination stream
-            // Check browser support for types
             let options = { mimeType: 'audio/webm' };
-            if (!MediaRecorder.isTypeSupported('audio/webm')) {
-                 options = { mimeType: 'audio/mp4' }; // Safari fallback usually
-            }
+            if (!MediaRecorder.isTypeSupported('audio/webm')) options = { mimeType: 'audio/mp4' };
             
             try {
                 mediaRecorder = new MediaRecorder(dest.stream, options);
             } catch (err) {
-                alert("เบราว์เซอร์นี้อาจไม่รองรับการอัดเสียงแบบนี้สมบูรณ์");
+                alert("Recording not supported fully");
                 mediaRecorder = new MediaRecorder(dest.stream);
             }
 
-            mediaRecorder.ondataavailable = (evt) => {
-                chunks.push(evt.data);
-            };
-
+            mediaRecorder.ondataavailable = (evt) => chunks.push(evt.data);
             mediaRecorder.onstop = () => {
                 recordedBlob = new Blob(chunks, { type: 'audio/webm' });
                 audioURL = URL.createObjectURL(recordedBlob);
@@ -437,24 +585,17 @@
             }
         });
 
-        btnPlay.addEventListener('click', () => {
-            if (audioURL) {
-                playbackAudio.play();
-            }
-        });
+        btnPlay.addEventListener('click', () => { if (audioURL) playbackAudio.play(); });
 
         btnDownload.addEventListener('click', () => {
             if (audioURL) {
                 const a = document.createElement('a');
                 a.style.display = 'none';
                 a.href = audioURL;
-                a.download = 'my-drum-solo.webm';
+                a.download = 'thud-drum-solo.webm';
                 document.body.appendChild(a);
                 a.click();
-                setTimeout(() => {
-                    document.body.removeChild(a);
-                    // window.URL.revokeObjectURL(audioURL); // Keep it for replay
-                }, 100);
+                setTimeout(() => document.body.removeChild(a), 100);
             }
         });
 
