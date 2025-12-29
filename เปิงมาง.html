@@ -193,17 +193,26 @@
             .controls { padding: 8px; gap: 4px; flex-wrap: wrap; justify-content: space-around; }
             .btn { font-size: 11px; padding: 8px 10px; flex: 1 1 auto; margin: 2px; }
             
-            /* ขยายขนาดกลองให้ใหญ่ขึ้นสำหรับนิ้วมือ และจัดตำแหน่งให้ชิดขอบจอมากขึ้น */
-            .d1 { width: 19vh; height: 19vh; left: -2%; bottom: 14%; transform: none; }
-            .d2 { width: 18.5vh; height: 18.5vh; left: 14%; bottom: 23%; transform: none; }
-            .d3 { width: 18vh; height: 18vh; left: 30%; bottom: 29%; transform: none; }
-            .d4 { width: 17.5vh; height: 17.5vh; bottom: 31%; transform: translateX(-50%); }
-            .d5 { width: 18vh; height: 18vh; right: 30%; bottom: 29%; transform: none; }
-            .d6 { width: 18.5vh; height: 18.5vh; right: 14%; bottom: 23%; transform: none; }
-            .d7 { width: 19vh; height: 19vh; right: -2%; bottom: 14%; transform: none; }
+            /* ปรับขนาดกลองโดยอิงจากความกว้างหน้าจอ (vw) เพื่อให้เรียง 7 ใบได้พอดีในแนวตั้ง */
+            /* ลดขนาดลงเล็กน้อยและจัดระยะห่างใหม่ไม่ให้ล้นจอ */
             
-            /* ปรับเฟรมให้รองรับกลองที่ใหญ่ขึ้น */
-            .khok-frame { height: 45vh; width: 100vw; bottom: 0; border-radius: 40% 40% 0 0; border-width: 10px; }
+            /* ซ้ายสุด */
+            .d1 { width: 14vw; height: 14vw; left: 1%; bottom: 15%; transform: none; }
+            /* ถัดมา */
+            .d2 { width: 14vw; height: 14vw; left: 15%; bottom: 22%; transform: none; }
+            /* ถัดมา */
+            .d3 { width: 14vw; height: 14vw; left: 29%; bottom: 28%; transform: none; }
+            /* ตรงกลาง */
+            .d4 { width: 14vw; height: 14vw; bottom: 30%; transform: translateX(-50%); } 
+            /* ขวา */
+            .d5 { width: 14vw; height: 14vw; right: 29%; bottom: 28%; transform: none; }
+            /* ถัดมา */
+            .d6 { width: 14vw; height: 14vw; right: 15%; bottom: 22%; transform: none; }
+            /* ขวาสุด */
+            .d7 { width: 14vw; height: 14vw; right: 1%; bottom: 15%; transform: none; }
+            
+            /* ปรับเฟรมให้โค้งรับกับตำแหน่งใหม่ */
+            .khok-frame { height: 40vh; width: 98vw; left: 1vw; bottom: 5vh; border-radius: 50% 50% 0 0; border-width: 8px; }
             
             /* ล็อคหน้าจอแน่นหนา ป้องกันการเลื่อน */
             body { position: fixed; width: 100%; height: 100%; overflow: hidden; touch-action: none; }
@@ -241,28 +250,29 @@
     <div class="khok-container" id="instrumentArea">
         <div class="khok-frame"></div>
         <div class="drum-wrapper">
-            <!-- Drums 1-7 (Low to High pitch approximately) -->
-            <!-- เสียงเปิงมาง: ติง, เพิง, พิง, ... -->
-            <div class="drum d1" data-pitch="200" data-note="ลูกยอด (7)" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
-                <div class="note-label">ลูกยอด</div>
+            <!-- ปรับลำดับใหม่: ไล่เสียงจากต่ำไปสูง (ซ้าย -> ขวา) เพื่อให้เล่นเพลงง่ายขึ้น -->
+            <!-- d1 (ซ้ายสุด) -> เสียงต่ำสุด (ลูกทวน/โด) ไล่ไป d7 (ขวาสุด) -> เสียงสูงสุด (ลูกยอด/ที) -->
+            
+            <div class="drum d1" data-pitch="110" data-note="ลูกทวน (1)" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
+                <div class="note-label">ลูกทวน (1)</div>
             </div>
-            <div class="drum d2" data-pitch="185" data-note="6" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
-                <div class="note-label">6</div>
-            </div>
-            <div class="drum d3" data-pitch="170" data-note="5" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
-                <div class="note-label">5</div>
-            </div>
-            <div class="drum d4" data-pitch="155" data-note="4 (จ่าฝูง)" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
-                <div class="note-label">จ่าฝูง</div>
-            </div>
-            <div class="drum d5" data-pitch="140" data-note="3" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
-                <div class="note-label">3</div>
-            </div>
-            <div class="drum d6" data-pitch="125" data-note="2" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
+            <div class="drum d2" data-pitch="125" data-note="2" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
                 <div class="note-label">2</div>
             </div>
-            <div class="drum d7" data-pitch="110" data-note="ลูกทวน (1)" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
-                <div class="note-label">ลูกทวน</div>
+            <div class="drum d3" data-pitch="140" data-note="3" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
+                <div class="note-label">3</div>
+            </div>
+            <div class="drum d4" data-pitch="155" data-note="4 (จ่าฝูง)" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
+                <div class="note-label">จ่าฝูง (4)</div>
+            </div>
+            <div class="drum d5" data-pitch="170" data-note="5" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
+                <div class="note-label">5</div>
+            </div>
+            <div class="drum d6" data-pitch="185" data-note="6" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
+                <div class="note-label">6</div>
+            </div>
+            <div class="drum d7" data-pitch="200" data-note="ลูกยอด (7)" ontouchstart="playDrum(this, event)" onmousedown="playDrum(this, event)">
+                <div class="note-label">ลูกยอด (7)</div>
             </div>
         </div>
     </div>
