@@ -3,581 +3,484 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Concert Bass Drum - Deep Roar</title>
+    <title>กลองใหญ่ (Lunar Short Spiral)</title>
     <style>
-        /* รีเซ็ตค่าพื้นฐาน */
-        * {
-            box-sizing: border-box;
-            user-select: none; /* ป้องกันการเลือกข้อความเวลาตีรัวๆ */
-            -webkit-tap-highlight-color: transparent; /* ปิดสีฟ้าเวลาแตะบนมือถือ */
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+
+        :root {
+            --primary-red: #c92a2a;
+            --dark-red: #8a1c1c;
+            --gold: #ffd43b;
+            --wood: #4a3728; /* Darker wood for Lunar style */
+            --skin: #f4e4bc;
+            --bg-color: #121212;
         }
 
         body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(circle at center, #252525 0%, #000000 100%);
+            color: white;
             margin: 0;
-            padding: 0;
-            width: 100vw;
-            height: 100vh;
-            background: #050505;
-            background-image: radial-gradient(circle at center, #1f1f1f 0%, #000000 100%);
+            height: 100dvh;
             display: flex;
             flex-direction: column;
-            justify-content: center;
             align-items: center;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            overflow: hidden; /* ป้องกันการเลื่อนหน้าจอ */
-            touch-action: none; /* ป้องกัน gesture ของ browser */
+            overflow: hidden;
+            touch-action: none;
         }
 
-        /* พื้นที่แสดงข้อความ */
-        .info {
-            color: #aaa;
-            margin-bottom: 20px;
+        header {
             text-align: center;
-            pointer-events: none;
+            padding: 15px;
+            background: linear-gradient(to bottom, var(--dark-red), var(--primary-red));
+            width: 100%;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            border-bottom: 2px solid var(--gold);
             z-index: 10;
+            flex-shrink: 0;
         }
-        .info h1 {
+
+        h1 {
             margin: 0;
             font-size: 1.5rem;
-            color: #fff;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
-        .info p {
-            margin: 5px 0 0;
-            font-size: 0.9rem;
-        }
-
-        /* ตัวกลอง */
-        .drum-container {
-            position: relative;
-            width: 300px;
-            height: 300px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            transition: transform 0.05s ease;
-            margin-bottom: 30px; /* เพิ่มระยะห่างสำหรับปุ่มอัดเสียง */
-        }
-
-        /* ขอบไม้/โลหะของกลอง */
-        .drum-rim {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: linear-gradient(145deg, #3e1e05, #1a0d02);
-            box-shadow: 
-                0 10px 50px rgba(0,0,0,1.0),
-                inset 0 2px 5px rgba(255,255,255,0.1);
-            z-index: 1;
-            border: 2px solid #111;
-        }
-
-        /* น็อตยึดหน้ากลอง (ตกแต่ง) */
-        .lug {
-            position: absolute;
-            width: 14px;
-            height: 14px;
-            background: radial-gradient(circle at 30% 30%, #ddd, #666);
-            border-radius: 50%;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.8);
-            z-index: 3;
-        }
-
-        /* หนังกลอง */
-        .drum-head {
-            position: absolute;
-            width: 92%;
-            height: 92%;
-            border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #f0f0f0, #d0d0d0 60%, #b0b0b0 100%);
-            z-index: 2;
-            box-shadow: inset 0 0 40px rgba(0,0,0,0.4);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        /* โลโก้กลางกลอง */
-        .brand {
-            font-size: 1.2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            color: var(--gold);
             font-weight: bold;
-            color: rgba(0,0,0,0.15);
-            font-family: serif;
-            letter-spacing: 2px;
-            pointer-events: none;
-            text-shadow: 0 1px 1px rgba(255,255,255,0.3);
-        }
-
-        /* เอฟเฟกต์ตอนตี */
-        .drum-container:active, .drum-container.hit {
-            transform: scale(0.95);
-        }
-        
-        .ripple {
-            position: absolute;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.2);
-            transform: scale(0);
-            animation: ripple-anim 0.5s ease-out;
-            pointer-events: none;
-            z-index: 4;
-        }
-
-        @keyframes ripple-anim {
-            to {
-                transform: scale(3.0);
-                opacity: 0;
-            }
-        }
-
-        /* ส่วนควบคุมการบันทึกเสียง */
-        .controls {
-            z-index: 20;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-
-        .record-btn {
-            background: #222;
-            color: white;
-            border: 1px solid #444;
-            padding: 10px 20px;
-            border-radius: 25px;
-            font-size: 1rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.3s;
-            outline: none;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
-        }
-
-        .record-btn:hover {
-            background: #333;
-        }
-
-        .record-btn .dot {
-            width: 12px;
-            height: 12px;
-            background-color: #ff4444;
-            border-radius: 50%;
-            transition: all 0.3s;
-        }
-
-        /* สถานะกำลังบันทึก */
-        .record-btn.recording {
-            background: #a00;
-            color: white;
-            border-color: #f00;
-            animation: pulse-red 2s infinite;
-        }
-
-        .record-btn.recording .dot {
-            background-color: white;
-            border-radius: 2px; /* เปลี่ยนเป็นสี่เหลี่ยม (Stop Icon) */
-            transform: scale(0.9);
-        }
-
-        @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(170, 0, 0, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(170, 0, 0, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(170, 0, 0, 0); }
-        }
-
-        .status-text {
-            color: #ff4444;
-            font-size: 0.9rem;
-            font-weight: bold;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        .status-text.visible {
-            opacity: 1;
-        }
-
-        /* ปุ่มเริ่ม (สำหรับ Browser ที่บล็อกเสียงอัตโนมัติ) */
-        #start-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.9);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-            flex-direction: column;
-        }
-        
-        #start-btn {
-            padding: 20px 50px;
-            font-size: 1.3rem;
-            background: linear-gradient(135deg, #d4a017, #b8860b);
-            color: #000;
-            border: none;
-            border-radius: 40px;
-            cursor: pointer;
-            font-weight: bold;
-            box-shadow: 0 0 25px rgba(212, 160, 23, 0.4);
-            transition: transform 0.2s;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
 
-        #start-btn:active {
-            transform: scale(0.95);
+        .drum-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            position: relative;
         }
 
-        /* Responsive สำหรับมือถือ */
-        @media (max-width: 600px) {
-            .drum-container {
-                width: 85vw;
-                height: 85vw;
-                max-width: 350px;
-                max-height: 350px;
+        /* Drum Pad Styling - Lunar Style (More Modern/Sleek) */
+        .drum-pad {
+            width: min(70vw, 40vh);
+            height: min(70vw, 40vh);
+            max-width: 450px;
+            max-height: 450px;
+            
+            border-radius: 50%;
+            /* ผิวหน้ากลองแบบเรียบเนียนขึ้น */
+            background: radial-gradient(circle at 35% 35%, #fffbf0, #eaddcf 50%, #d4b895 100%);
+            border: min(2vw, 15px) solid var(--wood);
+            
+            box-shadow: 
+                0 20px 60px rgba(0,0,0,0.9),
+                inset 0 0 50px rgba(0,0,0,0.3);
+            
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.05s cubic-bezier(0.1, 0.7, 1.0, 0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Lunar often has distinct rims/lugs visual, represented simply here */
+        .drum-pad::after {
+            content: '';
+            position: absolute;
+            width: 94%;
+            height: 94%;
+            border-radius: 50%;
+            border: 2px solid rgba(100, 100, 100, 0.1);
+            pointer-events: none;
+        }
+
+        .drum-pad:active, .drum-pad.active {
+            transform: scale(0.97);
+            box-shadow: 
+                0 10px 30px rgba(0,0,0,0.8),
+                inset 0 0 70px rgba(0,0,0,0.5);
+        }
+
+        .drum-label {
+            margin-top: 30px;
+            font-size: 1.3rem;
+            color: var(--gold);
+            background: rgba(0,0,0,0.8);
+            padding: 8px 25px;
+            border-radius: 4px;
+            border-bottom: 2px solid var(--gold);
+            pointer-events: none;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,1);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(0);
+            animation: ripple-anim 0.25s ease-out; /* Fast, tight ripple */
+            pointer-events: none;
+        }
+
+        @keyframes ripple-anim {
+            to {
+                transform: scale(1.6);
+                opacity: 0;
             }
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            padding: 25px;
+            justify-content: center;
+            background: rgba(0,0,0,0.6);
+            width: 100%;
+            backdrop-filter: blur(10px);
+            position: absolute;
+            bottom: 0;
+            box-sizing: border-box;
+            border-top: 1px solid rgba(255,212,59,0.1);
+        }
+
+        button.ctrl-btn {
+            padding: 12px 24px;
+            border: 1px solid var(--gold);
+            background: rgba(0,0,0,0.5);
+            color: var(--gold);
+            border-radius: 4px; /* More square/modern buttons */
+            font-family: 'Sarabun', sans-serif;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button.ctrl-btn:active {
+            transform: scale(0.95);
+            background: rgba(255,212,59,0.1);
+        }
+        
+        button.ctrl-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            border-color: #555;
+            color: #999;
+            background: transparent;
+        }
+
+        button.ctrl-btn.recording {
+            background: var(--primary-red);
+            color: white;
+            border-color: #ff6b6b;
+            box-shadow: 0 0 15px rgba(201, 42, 42, 0.5);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(201, 42, 42, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(201, 42, 42, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(201, 42, 42, 0); }
+        }
+
+        #notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95);
+            color: var(--gold);
+            padding: 25px 50px;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            border: 1px solid var(--gold);
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+            z-index: 100;
+            text-align: center;
+            font-weight: bold;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
     </style>
 </head>
 <body>
 
-    <div class="info">
-        <h1>Concert Bass Drum (Deep Roar)</h1>
-        <p>ตีรัวๆ เพื่อสะสมพลังเสียงให้กระหึ่ม</p>
-    </div>
+    <header>
+        <h1>🥁 Lunar Short Spiral</h1>
+    </header>
 
-    <div id="drum" class="drum-container">
-        <div class="drum-rim"></div>
-        <div class="drum-head">
-            <div class="brand">FORTISSIMO</div>
+    <div class="drum-container">
+        <div class="drum-pad" id="bigDrum">
         </div>
+        <div class="drum-label">LUNAR SERIES</div>
     </div>
 
     <div class="controls">
-        <button id="recordBtn" class="record-btn">
-            <div class="dot"></div>
-            <span id="recordText">บันทึกเสียง</span>
+        <button id="recordBtn" class="ctrl-btn">
+            <span>●</span> อัด
         </button>
-        <div id="statusText" class="status-text">● กำลังบันทึก...</div>
+        <button id="stopBtn" class="ctrl-btn" disabled>
+            <span>■</span> หยุด
+        </button>
+        <button id="playBtn" class="ctrl-btn" disabled>
+            <span>▶</span> ฟัง
+        </button>
+        <button id="downloadBtn" class="ctrl-btn" disabled>
+            <span>⬇</span> โหลด
+        </button>
     </div>
 
-    <div id="start-overlay">
-        <button id="start-btn">แตะเพื่อเริ่มใช้งาน</button>
-        <p style="color: #ccc; margin-top: 15px; font-size: 0.9rem;">(จำเป็นต้องเปิดระบบเสียง)</p>
-    </div>
+    <div id="notification">Notification</div>
+    <audio id="playbackAudio" style="display:none;"></audio>
 
     <script>
-        // --- Audio Context & Recording Setup ---
+        // --- Audio Engine (Web Audio API) ---
         let audioCtx;
-        let masterBus; // Main mixing bus
+        let masterGain;
         let compressor;
-        let convolver; // สำหรับ Reverb
-        let reverbGain; // ปรับความดัง Reverb
-        let mediaDest;  
+        let dest;
         let mediaRecorder;
         let audioChunks = [];
-        let isRecording = false;
-
-        // ฟังก์ชันสร้าง Impulse Response (Hall Reverb) - ขยายให้กว้างและยาวขึ้น
-        function createHallReverbBuffer(context) {
-            const duration = 4.5; // ยาวขึ้นเพื่อให้เสียงสะสมกัน (Wall of sound)
-            const rate = context.sampleRate;
-            const length = rate * duration;
-            const buffer = context.createBuffer(2, length, rate);
-            const left = buffer.getChannelData(0);
-            const right = buffer.getChannelData(1);
-
-            for (let i = 0; i < length; i++) {
-                const t = i / rate;
-                // Decay ช้าลง เพื่อให้เสียงอื้ออึงนานขึ้น
-                const decay = Math.pow(1 - (i / length), 1.5); 
-                
-                left[i] = (Math.random() * 2 - 1) * decay;
-                right[i] = (Math.random() * 2 - 1) * decay;
-            }
-            return buffer;
-        }
-
-        // Concert Bass Drum Sound Synthesis (Deep & Building Up)
-        function playBassDrum(velocity = 1.0) {
-            if (!audioCtx) return;
-
-            const t = audioCtx.currentTime;
-            
-            // Mix Bus สำหรับเสียงนี้
-            const sourceBus = audioCtx.createGain();
-            sourceBus.gain.value = 1.0;
-            sourceBus.connect(masterBus);
-            sourceBus.connect(reverbGain);
-
-            // --- LAYER 1: Fundamental (Deep Thud - ทุ้มลึก) ---
-            const fundOsc = audioCtx.createOscillator();
-            const fundGain = audioCtx.createGain();
-            fundOsc.type = 'sine';
-            // ปรับ Pitch ให้ต่ำลงอีก (80Hz -> 30Hz) เพื่อความทุ้ม
-            fundOsc.frequency.setValueAtTime(80, t); 
-            fundOsc.frequency.exponentialRampToValueAtTime(30, t + 0.2); 
-            
-            fundGain.gain.setValueAtTime(0, t);
-            fundGain.gain.linearRampToValueAtTime(1.0 * velocity, t + 0.01);
-            // ลากหางยาวขึ้น (3.5 วินาที) เพื่อให้ตีรัวๆ แล้วเสียงสะสมกัน
-            fundGain.gain.exponentialRampToValueAtTime(0.01, t + 3.5);
-            
-            fundOsc.connect(fundGain);
-            fundGain.connect(sourceBus);
-            fundOsc.start(t);
-            fundOsc.stop(t + 4.0);
-
-            // --- LAYER 2: Sub-Low (Earthquake - เบสเดินพื้น) ---
-            const subOsc = audioCtx.createOscillator();
-            const subGain = audioCtx.createGain();
-            subOsc.type = 'sine';
-            subOsc.frequency.value = 25; // ต่ำมาก จนรู้สึกสั่นมากกว่าได้ยิน
-            
-            subGain.gain.setValueAtTime(0, t);
-            subGain.gain.linearRampToValueAtTime(1.0 * velocity, t + 0.1); // เข้าช้ากว่านิดนึง
-            // หางยาวมาก (5.0 วินาที) นี่คือหัวใจของ "ดังขึ้นเรื่อยๆ"
-            subGain.gain.exponentialRampToValueAtTime(0.01, t + 5.0); 
-            
-            subOsc.connect(subGain);
-            subGain.connect(sourceBus);
-            subOsc.start(t);
-            subOsc.stop(t + 5.5);
-
-            // --- LAYER 3: Harmonics (Resonance - ความกังวาล) ---
-            const harm1Osc = audioCtx.createOscillator();
-            const harm1Gain = audioCtx.createGain();
-            harm1Osc.type = 'sine';
-            harm1Osc.frequency.setValueAtTime(120, t); 
-            harm1Osc.frequency.exponentialRampToValueAtTime(70, t + 0.3); 
-            
-            harm1Gain.gain.setValueAtTime(0, t);
-            harm1Gain.gain.linearRampToValueAtTime(0.3 * velocity, t + 0.02);
-            harm1Gain.gain.exponentialRampToValueAtTime(0.01, t + 2.0);
-            
-            harm1Osc.connect(harm1Gain);
-            harm1Gain.connect(sourceBus);
-            harm1Osc.start(t);
-            harm1Osc.stop(t + 2.5);
-
-            // --- LAYER 4: Impact Noise (Attack - หัวไม้กระทบ) ---
-            // ปรับให้มีความคมแต่ทุ้ม (Thuddy Attack)
-            const bufferSize = audioCtx.sampleRate * 0.1;
-            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                data[i] = (Math.random() * 2 - 1);
-            }
-
-            const noise = audioCtx.createBufferSource();
-            noise.buffer = buffer;
-            
-            const noiseFilter = audioCtx.createBiquadFilter();
-            noiseFilter.type = 'lowpass';
-            noiseFilter.frequency.setValueAtTime(800, t); // ต่ำลงเพื่อให้หัวเสียงนุ่มและทุ้ม
-            noiseFilter.frequency.exponentialRampToValueAtTime(100, t + 0.1);
-
-            const noiseGain = audioCtx.createGain();
-            noiseGain.gain.setValueAtTime(1.2 * velocity, t);
-            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.08);
-
-            noise.connect(noiseFilter);
-            noiseFilter.connect(noiseGain);
-            noiseGain.connect(sourceBus);
-            noise.start(t);
-
-            // Cleanup Gain Node
-            setTimeout(() => {
-                sourceBus.disconnect();
-            }, 6000);
-        }
-
-        // --- Interaction & Recording Logic ---
-        const drum = document.getElementById('drum');
-        const startOverlay = document.getElementById('start-overlay');
-        const startBtn = document.getElementById('start-btn');
-        const recordBtn = document.getElementById('recordBtn');
-        const recordText = document.getElementById('recordText');
-        const statusText = document.getElementById('statusText');
+        let audioBlob;
+        let audioUrl;
 
         function initAudio() {
             if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
                 
-                // 1. Master Compressor (ปรับให้รองรับเสียงที่สะสมกัน)
+                // Dynamics Compressor - Tight & Punchy settings
                 compressor = audioCtx.createDynamicsCompressor();
-                compressor.threshold.value = -15; // เริ่มกดเมื่อเสียงดังระดับกลาง
-                compressor.knee.value = 20; // Smooth
-                compressor.ratio.value = 6; // ไม่บีบแรงเกินไป ปล่อยให้เสียง Boom ได้
-                compressor.attack.value = 0.05; // ช้าลงเพื่อให้หัวเสียงผ่าน
-                compressor.release.value = 0.3;
+                compressor.threshold.value = -12; 
+                compressor.knee.value = 30; 
+                compressor.ratio.value = 15; // High ratio for punch
+                compressor.attack.value = 0.003; 
+                compressor.release.value = 0.15; // Fast release
 
-                // 2. Reverb System
-                convolver = audioCtx.createConvolver();
-                convolver.buffer = createHallReverbBuffer(audioCtx);
-                reverbGain = audioCtx.createGain();
-                reverbGain.gain.value = 1.3; // เพิ่ม Reverb ให้กังวาล
-                reverbGain.connect(convolver);
-                convolver.connect(compressor); 
+                // Master Volume - Powerful
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 3.5; 
+                
+                // Final EQ - Clean up mud
+                const lowpass = audioCtx.createBiquadFilter();
+                lowpass.type = 'lowpass';
+                lowpass.frequency.value = 280; 
 
-                // 3. Main Mix Bus
-                masterBus = audioCtx.createGain();
-                masterBus.gain.value = 1.0; 
-                masterBus.connect(compressor); 
-
-                // 4. Output
+                masterGain.connect(lowpass);
+                lowpass.connect(compressor);
                 compressor.connect(audioCtx.destination);
-
-                // 5. Recorder
-                mediaDest = audioCtx.createMediaStreamDestination();
-                compressor.connect(mediaDest); 
+                
+                dest = audioCtx.createMediaStreamDestination();
+                compressor.connect(dest);
             }
-
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
-            startOverlay.style.opacity = '0';
+        }
+
+        // --- Bass Drum Synthesis Logic (Lunar Short Spiral) ---
+        function playBassDrum() {
+            initAudio();
+            
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume().then(() => {
+                    generateSound(audioCtx.currentTime);
+                });
+            } else {
+                generateSound(audioCtx.currentTime);
+            }
+        }
+
+        function generateSound(t) {
+            const gainNode = audioCtx.createGain();
+            gainNode.connect(masterGain);
+
+            // 1. Main Tone ("Short Spiral" Characteristic)
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            
+            // Pitch Envelope: Drop faster to simulate tighter head/short shell
+            // Starts slightly higher (110Hz) to give a bit more "knock" impact
+            osc.frequency.setValueAtTime(110, t); 
+            osc.frequency.exponentialRampToValueAtTime(45, t + 0.15); // Fast drop (Spiral effect)
+            
+            // Gain Envelope: "Tum" impact, but shorter tail
+            gainNode.gain.setValueAtTime(0, t);
+            gainNode.gain.linearRampToValueAtTime(1.2, t + 0.015); // Fast, soft attack
+            // Tail ends firmly at ~0.65s (Short Spiral)
+            gainNode.gain.exponentialRampToValueAtTime(0.001, t + 0.65); 
+            
+            osc.connect(gainNode);
+            osc.start(t);
+            osc.stop(t + 0.7);
+
+            // 2. Sub-Bass (Body/Weight)
+            const subOsc = audioCtx.createOscillator();
+            subOsc.type = 'sine';
+            subOsc.frequency.setValueAtTime(40, t); // Solid low end
+            
+            const subGain = audioCtx.createGain();
+            subGain.gain.setValueAtTime(0, t);
+            subGain.gain.linearRampToValueAtTime(1.3, t + 0.015);
+            // Matches main envelope tightly
+            subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
+            
+            subOsc.connect(subGain);
+            subGain.connect(masterGain);
+            subOsc.start(t);
+            subOsc.stop(t + 0.7);
+        }
+
+        // --- Interaction Logic ---
+        const bigDrum = document.getElementById('bigDrum');
+
+        function triggerDrum(element) {
+            playBassDrum(); 
+
+            element.classList.add('active');
+            createRipple(element);
+            
             setTimeout(() => {
-                startOverlay.style.display = 'none';
-            }, 300);
+                element.classList.remove('active');
+            }, 80); // Faster visual feedback for "Short" feel
         }
 
-        function toggleRecording() {
-            if (!audioCtx) initAudio();
-
-            if (!isRecording) {
-                audioChunks = [];
-                try {
-                    mediaRecorder = new MediaRecorder(mediaDest.stream);
-                } catch (err) {
-                    alert("Browser ของคุณไม่รองรับการบันทึกเสียงนี้");
-                    return;
-                }
-
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        audioChunks.push(event.data);
-                    }
-                };
-
-                mediaRecorder.onstop = () => {
-                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
-                    const url = URL.createObjectURL(blob);
-                    
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                    a.download = `ConcertDrum_DeepRoar_${timestamp}.webm`;
-                    
-                    document.body.appendChild(a);
-                    a.click();
-                    
-                    setTimeout(() => {
-                        document.body.removeChild(a);
-                        window.URL.revokeObjectURL(url);
-                    }, 100);
-                };
-
-                mediaRecorder.start();
-                isRecording = true;
-                
-                recordBtn.classList.add('recording');
-                recordText.textContent = "หยุดและบันทึก";
-                statusText.classList.add('visible');
-
-            } else {
-                mediaRecorder.stop();
-                isRecording = false;
-
-                recordBtn.classList.remove('recording');
-                recordText.textContent = "บันทึกเสียง";
-                statusText.classList.remove('visible');
-            }
-        }
-
-        // --- Visuals ---
-        function createLugs() {
-            const rim = document.querySelector('.drum-rim');
-            const totalLugs = 12;
+        function createRipple(element) {
+            const ripple = document.createElement('div');
+            ripple.classList.add('ripple');
+            const size = element.offsetWidth;
+            ripple.style.width = size + 'px';
+            ripple.style.height = size + 'px';
+            ripple.style.left = '0px'; 
+            ripple.style.top = '0px';
             
-            for(let i=0; i<totalLugs; i++) {
-                const lug = document.createElement('div');
-                lug.className = 'lug';
-                const angle = (i / totalLugs) * 2 * Math.PI;
-                const x = 50 + 46.5 * Math.cos(angle); 
-                const y = 50 + 46.5 * Math.sin(angle);
-                
-                lug.style.left = `calc(${x}% - 7px)`;
-                lug.style.top = `calc(${y}% - 7px)`;
-                lug.style.transform = `rotate(${angle * 180 / Math.PI}deg)`;
-                
-                rim.appendChild(lug);
-            }
-        }
-
-        function createRipple(e) {
-            const circle = document.createElement('div');
-            circle.classList.add('ripple');
-            const rect = drum.getBoundingClientRect();
-            let x, y;
-            
-            if (e.touches && e.touches.length > 0) {
-                 x = e.touches[0].clientX - rect.left;
-                 y = e.touches[0].clientY - rect.top;
-            } else {
-                 x = e.clientX - rect.left;
-                 y = e.clientY - rect.top;
-            }
-            
-            if (x === undefined || isNaN(x)) {
-                x = rect.width / 2;
-                y = rect.height / 2;
-            }
-
-            const size = 60;
-            circle.style.width = circle.style.height = `${size}px`;
-            circle.style.left = `${x - size/2}px`;
-            circle.style.top = `${y - size/2}px`;
-            
-            drum.querySelector('.drum-head').appendChild(circle); 
-            setTimeout(() => circle.remove(), 400);
-        }
-
-        function hitDrum(e) {
-            if (e.type === 'touchstart') e.preventDefault(); 
-            playBassDrum();
-            createRipple(e);
-            drum.classList.add('hit');
-            setTimeout(() => drum.classList.remove('hit'), 50);
+            element.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 300);
         }
 
         // Event Listeners
-        startBtn.addEventListener('click', initAudio);
-        recordBtn.addEventListener('click', toggleRecording);
-        
-        drum.addEventListener('touchstart', (e) => {
+        bigDrum.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            triggerDrum(bigDrum);
+        });
+
+        bigDrum.addEventListener('touchstart', (e) => {
+            e.preventDefault();
             initAudio(); 
-            hitDrum(e);
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                triggerDrum(bigDrum);
+            }
         }, { passive: false });
 
-        drum.addEventListener('mousedown', hitDrum);
-
-        document.addEventListener('keydown', (e) => {
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
             if (e.code === 'Space' || e.key === ' ') {
-                initAudio();
-                hitDrum({});
+                triggerDrum(bigDrum);
             }
         });
 
-        createLugs();
+        // --- Recording Logic ---
+        const recordBtn = document.getElementById('recordBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const playBtn = document.getElementById('playBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const playbackAudio = document.getElementById('playbackAudio');
+
+        recordBtn.addEventListener('click', startRecording);
+        stopBtn.addEventListener('click', stopRecording);
+        playBtn.addEventListener('click', playRecording);
+        downloadBtn.addEventListener('click', downloadRecording);
+
+        function startRecording() {
+            initAudio();
+            audioChunks = [];
+            
+            const options = MediaRecorder.isTypeSupported('audio/webm') 
+                ? { mimeType: 'audio/webm' } 
+                : { mimeType: 'audio/mp4' };
+
+            try {
+                mediaRecorder = new MediaRecorder(dest.stream, options);
+            } catch (e) {
+                showToast("ไม่รองรับการอัดเสียง");
+                return;
+            }
+            
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                audioUrl = URL.createObjectURL(audioBlob);
+                playbackAudio.src = audioUrl;
+                
+                playBtn.disabled = false;
+                downloadBtn.disabled = false;
+                showToast("บันทึกเสร็จสิ้น!");
+            };
+
+            mediaRecorder.start();
+            recordBtn.classList.add('recording');
+            recordBtn.innerHTML = "<span>●</span> กำลังอัด...";
+            recordBtn.disabled = true;
+            stopBtn.disabled = false;
+            playBtn.disabled = true;
+            downloadBtn.disabled = true;
+            
+            showToast("เริ่มอัดเสียง...");
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                recordBtn.classList.remove('recording');
+                recordBtn.innerHTML = "<span>●</span> อัด";
+                recordBtn.disabled = false;
+                stopBtn.disabled = true;
+            }
+        }
+
+        function playRecording() {
+            if (audioUrl) {
+                playbackAudio.play();
+                showToast("กำลังเล่นเสียงที่อัด...");
+            }
+        }
+
+        function downloadRecording() {
+            if (audioUrl) {
+                const a = document.createElement('a');
+                a.href = audioUrl;
+                a.download = `lunar_spiral_short_${new Date().getTime()}.wav`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        }
+
+        function showToast(msg) {
+            const el = document.getElementById('notification');
+            el.innerText = msg;
+            el.style.opacity = '1';
+            setTimeout(() => {
+                el.style.opacity = '0';
+            }, 2000);
+        }
 
     </script>
 </body>
 </html>
-
