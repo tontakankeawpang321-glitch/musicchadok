@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ไหซอง - เครื่องดนตรีไทยเสมือนจริง</title>
+    <title>ไหซอง - เสียงดังฟังชัด</title>
     <style>
         /* CSS Reset & Basic Setup */
         * {
@@ -166,8 +166,8 @@
         /* The Rubber Band */
         .string {
             position: absolute;
-            top: 15%; /* Starts at mouth */
-            bottom: -5%; /* Goes down slightly past visuals visually or anchored */
+            top: 15%; 
+            bottom: -5%; 
             left: 50%;
             width: 6px;
             background: linear-gradient(90deg, #d32f2f, #ef5350, #b71c1c);
@@ -175,7 +175,6 @@
             z-index: 3;
             box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
             border-radius: 3px;
-            /* Anchored visual */
             height: 80%;
         }
 
@@ -205,7 +204,7 @@
             margin-top: 5px;
         }
 
-        /* Footer / Instructions */
+        /* Footer */
         footer {
             text-align: center;
             padding: 5px;
@@ -215,7 +214,7 @@
             flex-shrink: 0;
         }
 
-        /* Animation */
+        /* Animations */
         @keyframes vibrate {
             0% { transform: translateX(-50%) scaleX(1); }
             25% { transform: translateX(-56%) scaleX(1.1); }
@@ -230,32 +229,32 @@
             100% { opacity: 1; }
         }
 
-        /* Responsive Adjustments */
+        /* Responsive */
         @media (min-width: 768px) {
             .jar-container {
                 flex: 1 1 20%;
             }
         }
         
-        /* Audio visualizer (Hidden logic but visible effect) */
+        /* Audio visualizer effect */
         .active-ring {
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             width: 100%; height: 100%;
             border-radius: 50%;
-            border: 2px solid rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.4);
             opacity: 0;
             pointer-events: none;
         }
         
         .active-ring.ripple {
-            animation: rippleEffect 0.5s ease-out;
+            animation: rippleEffect 0.4s ease-out;
         }
 
         @keyframes rippleEffect {
-            0% { width: 90%; height: 90%; opacity: 0.5; border-color: white;}
-            100% { width: 130%; height: 130%; opacity: 0; }
+            0% { width: 90%; height: 90%; opacity: 0.8; border-color: #ffffff;}
+            100% { width: 125%; height: 125%; opacity: 0; }
         }
     </style>
 </head>
@@ -323,30 +322,40 @@
     </footer>
 
     <script>
-        // --- Audio Context & Sound Engine ---
+        // --- High Performance Audio Engine ---
         let audioCtx;
         let masterGain;
-        let dest; // For recording
+        let compressor; // Adds stability and loudness
+        let dest;
         let mediaRecorder;
         let chunks = [];
         let audioBlob;
         let audioUrl;
         let isRecording = false;
 
-        // Initialize Audio Context on first user interaction
         function initAudio() {
             if (!audioCtx) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 audioCtx = new AudioContext();
                 
-                // Master Gain (Volume Control)
+                // 1. Dynamics Compressor (The "Glue" and Loudness booster)
+                // This prevents clipping while allowing us to push the volume up
+                compressor = audioCtx.createDynamicsCompressor();
+                compressor.threshold.value = -10; // Start compressing early
+                compressor.knee.value = 40;
+                compressor.ratio.value = 4;       // Strong compression
+                compressor.attack.value = 0;
+                compressor.release.value = 0.25;
+
+                // 2. Master Gain (Volume Control)
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 0.8;
+                masterGain.gain.value = 1.2; // Boost volume (Compressor protects clipping)
                 
-                // Create destination for recorder
+                // 3. Recorder Destination
                 dest = audioCtx.createMediaStreamDestination();
                 
-                // Connect Master to Speakers AND Recorder
+                // Chain: Input(Jars) -> Compressor -> Master -> [Speakers, Recorder]
+                compressor.connect(masterGain);
                 masterGain.connect(audioCtx.destination);
                 masterGain.connect(dest);
             }
@@ -355,92 +364,99 @@
             }
         }
 
-        // Synthesis Function for "Hai Song" (Plucked Earthy Bass)
+        // Enhanced Synthesis for Punchy Bass Sound
         function playSound(freq) {
             initAudio();
-
             const t = audioCtx.currentTime;
 
-            // 1. Oscillator (The vibration)
-            // Using a mix of Triangle (for body) and Sine (for depth)
+            // Oscillator 1: The Main Body (Triangle)
             const osc = audioCtx.createOscillator();
-            osc.type = 'triangle'; 
+            osc.type = 'triangle';
             
-            // Pitch Bend Effect (The "Pluck" tension release)
-            // Starts slightly higher and drops quickly to the target pitch
-            osc.frequency.setValueAtTime(freq * 1.05, t); 
-            osc.frequency.exponentialRampToValueAtTime(freq, t + 0.1);
+            // Oscillator 2: Sub Bass (Sine) - Adds deep thud
+            const subOsc = audioCtx.createOscillator();
+            subOsc.type = 'sine';
 
-            // 2. Filter (The "Thud" / Earthy sound)
+            // Pitch Bend (Pluck Effect)
+            osc.frequency.setValueAtTime(freq * 1.1, t); 
+            osc.frequency.exponentialRampToValueAtTime(freq, t + 0.08);
+            subOsc.frequency.value = freq / 2; // Octave lower for thickness
+
+            // Filter (Lowpass) - Simulates the clay pot resonance
             const filter = audioCtx.createBiquadFilter();
             filter.type = 'lowpass';
-            filter.Q.value = 1; // Resonance
-            // Envelope for filter: Opens up on pluck, then closes
-            filter.frequency.setValueAtTime(200, t);
-            filter.frequency.exponentialRampToValueAtTime(800, t + 0.02); // Attack
-            filter.frequency.exponentialRampToValueAtTime(100, t + 0.5);  // Decay
+            filter.Q.value = 3; // Higher resonance for more "Pong" sound
+            filter.frequency.setValueAtTime(150, t);
+            filter.frequency.exponentialRampToValueAtTime(1200, t + 0.02); // Snap attack
+            filter.frequency.exponentialRampToValueAtTime(100, t + 0.4);   // Fast decay
 
-            // 3. Amplitude Envelope (ADSR)
+            // Envelope (Amplitude)
             const amp = audioCtx.createGain();
             amp.gain.setValueAtTime(0, t);
-            amp.gain.linearRampToValueAtTime(1, t + 0.02); // Fast Attack
-            amp.gain.exponentialRampToValueAtTime(0.001, t + 0.8); // Decay to silence
+            amp.gain.linearRampToValueAtTime(1.0, t + 0.01); // Instant attack
+            amp.gain.exponentialRampToValueAtTime(0.01, t + 0.6); // Slightly longer sustain
 
-            // Connections: Osc -> Filter -> Amp -> Master
+            // Connections
+            // Osc -> Filter -> Amp -> Compressor(Global)
             osc.connect(filter);
+            subOsc.connect(amp); // Sub bass bypasses filter for clean low end
             filter.connect(amp);
-            amp.connect(masterGain);
+            amp.connect(compressor);
 
             osc.start(t);
-            osc.stop(t + 1.0); // Stop after 1 second
+            subOsc.start(t);
+            
+            // Stop logic
+            osc.stop(t + 0.8);
+            subOsc.stop(t + 0.8);
+            
+            // Garbage collection helper
+            setTimeout(() => {
+                osc.disconnect();
+                subOsc.disconnect();
+                filter.disconnect();
+                amp.disconnect();
+            }, 1000);
         }
 
-        // --- UI Interactions ---
+        // --- UI Interactions (Unchanged but optimized) ---
 
         const jars = document.querySelectorAll('.jar-container');
 
         function triggerJar(jar) {
             const freq = parseFloat(jar.dataset.freq);
             
-            // Visuals
             const string = jar.querySelector('.string');
             const ring = jar.querySelector('.active-ring');
             const jarBody = jar.querySelector('.jar');
             
-            // Add vibration class
+            // Re-trigger animations
             string.classList.remove('vibrating');
-            void string.offsetWidth; // Trigger reflow to restart animation
+            ring.classList.remove('ripple');
+            void string.offsetWidth; // Force Reflow
+            
             string.classList.add('vibrating');
-
-            // Add Press effect
             jarBody.classList.add('active');
+            ring.classList.add('ripple');
+            
             setTimeout(() => jarBody.classList.remove('active'), 100);
 
-            // Add Ripple
-            ring.classList.remove('ripple');
-            void ring.offsetWidth;
-            ring.classList.add('ripple');
-
-            // Sound
             playSound(freq);
         }
 
-        // Event Listeners for Jars (Touch & Mouse)
+        // Multi-touch support
         jars.forEach(jar => {
-            // Touch
             jar.addEventListener('touchstart', (e) => {
-                e.preventDefault(); // Prevent ghost clicks
+                e.preventDefault();
                 triggerJar(jar);
             }, { passive: false });
 
-            // Mouse
             jar.addEventListener('mousedown', (e) => {
                 triggerJar(jar);
             });
         });
 
-        // --- Recording Logic ---
-
+        // --- Recording Logic (Unchanged) ---
         const recBtn = document.getElementById('recBtn');
         const recText = document.getElementById('recText');
         const playBtn = document.getElementById('playBtn');
@@ -448,33 +464,32 @@
         let playbackAudio = new Audio();
 
         recBtn.addEventListener('click', () => {
-            initAudio(); // Ensure context is ready
-
-            if (!isRecording) {
-                // Start Recording
-                startRecording();
-            } else {
-                // Stop Recording
-                stopRecording();
-            }
+            initAudio();
+            if (!isRecording) startRecording();
+            else stopRecording();
         });
 
         function startRecording() {
             chunks = [];
-            mediaRecorder = new MediaRecorder(dest.stream);
+            // Use supported mime types
+            let options = { mimeType: 'audio/webm' };
+            if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                options = { mimeType: 'audio/mp4' }; // Fallback for Safari/iOS
+            }
+            
+            try {
+                mediaRecorder = new MediaRecorder(dest.stream, options);
+            } catch (e) {
+                // Ultimate fallback
+                mediaRecorder = new MediaRecorder(dest.stream);
+            }
 
-            mediaRecorder.ondataavailable = (evt) => {
-                chunks.push(evt.data);
-            };
-
+            mediaRecorder.ondataavailable = (evt) => chunks.push(evt.data);
             mediaRecorder.onstop = () => {
-                audioBlob = new Blob(chunks, { type: 'audio/webm' }); // Mobile friendly format
+                audioBlob = new Blob(chunks, { type: 'audio/webm' });
                 audioUrl = URL.createObjectURL(audioBlob);
-                
-                // Enable Play/Download buttons
                 playBtn.disabled = false;
                 dlBtn.disabled = false;
-                
                 playbackAudio.src = audioUrl;
             };
 
@@ -493,32 +508,22 @@
             recText.textContent = "อัดเสียง";
         }
 
-        // Playback
         playBtn.addEventListener('click', () => {
-            if (audioUrl) {
-                playbackAudio.play();
-            }
+            if (audioUrl) playbackAudio.play();
         });
 
-        // Download
         dlBtn.addEventListener('click', () => {
             if (audioUrl) {
                 const link = document.createElement('a');
                 link.href = audioUrl;
-                // Generate filename with timestamp
                 const date = new Date();
-                const timestamp = `${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`;
-                link.download = `haisong_record_${timestamp}.webm`;
+                link.download = `haisong_${date.getTime()}.webm`;
                 link.click();
             }
         });
 
-        // Prevent context menu on mobile long press
-        window.oncontextmenu = function(event) {
-            event.preventDefault();
-            event.stopPropagation();
-            return false;
-        };
+        // Prevent context menu
+        window.oncontextmenu = (e) => { e.preventDefault(); return false; };
 
     </script>
 </body>
