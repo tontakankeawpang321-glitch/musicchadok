@@ -6,12 +6,12 @@
     <title>กลองเทเนอร์จำลอง (Virtual Tenor Drums)</title>
     <style>
         :root {
-            --bg-color: #1a1a1a;
-            --drum-rim: #e0e0e0;
-            --drum-head: #f5f5f5;
-            --drum-shell: #2c3e50;
-            --highlight: #3498db;
-            --record-color: #e74c3c;
+            --bg-color: #121212;
+            --drum-rim: #e0e0e0; 
+            --drum-head: #ffffff; 
+            --drum-shell: #263238; 
+            --highlight: #00bcd4; 
+            --record-color: #ff5252;
         }
 
         body {
@@ -37,7 +37,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.9);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -57,7 +57,8 @@
             border-radius: 50px;
             cursor: pointer;
             margin-top: 20px;
-            box-shadow: 0 0 15px rgba(52, 152, 219, 0.5);
+            box-shadow: 0 0 20px rgba(0, 188, 212, 0.5);
+            font-weight: bold;
         }
 
         /* Controls Panel */
@@ -67,10 +68,11 @@
             display: flex;
             gap: 15px;
             z-index: 50;
-            background: rgba(0,0,0,0.3);
+            background: rgba(0,0,0,0.5);
             padding: 10px 20px;
             border-radius: 30px;
             backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.1);
         }
 
         .btn-control {
@@ -127,11 +129,12 @@
         .drum {
             position: absolute;
             border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, var(--drum-head), #dcdcdc);
+            /* Texture หน้ากลองแบบสว่าง */
+            background: radial-gradient(circle at 30% 30%, #ffffff, #eceff1);
             border: 8px solid var(--drum-shell);
             box-shadow: 
                 0 0 0 4px var(--drum-rim),
-                0 10px 20px rgba(0,0,0,0.5),
+                0 15px 25px rgba(0,0,0,0.6),
                 inset 0 0 20px rgba(0,0,0,0.1);
             cursor: pointer;
             transition: transform 0.05s, border-color 0.05s;
@@ -139,14 +142,14 @@
             justify-content: center;
             align-items: center;
             font-weight: bold;
-            color: rgba(0,0,0,0.2);
+            color: rgba(0,0,0,0.4);
             font-size: 1.5rem;
             -webkit-tap-highlight-color: transparent;
         }
 
         .drum:active, .drum.hit {
-            transform: scale(0.95);
-            background: radial-gradient(circle at 30% 30%, #fff, #eee);
+            transform: scale(0.96);
+            background: radial-gradient(circle at 30% 30%, #fff, #fafafa);
             border-color: var(--highlight);
         }
 
@@ -159,7 +162,9 @@
             left: 50%; top: 5%;
             transform: translateX(-50%);
             z-index: 3;
-            background: radial-gradient(circle at 30% 30%, #fff, #bbb);
+            background: radial-gradient(circle at 30% 30%, #455a64, #263238); 
+            border-color: #000;
+            color: rgba(255,255,255,0.3);
         }
         #drum-spock:active, #drum-spock.hit {
             transform: translateX(-50%) scale(0.95);
@@ -170,15 +175,17 @@
             bottom: 12%;
             width: 100%;
             text-align: center;
-            color: #666;
+            color: #aaa;
             pointer-events: none;
-            font-size: 0.8rem;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
 
         .footer {
             position: absolute;
             bottom: 20px;
-            color: #888;
+            color: #666;
             font-size: 0.8rem;
         }
 
@@ -198,7 +205,7 @@
 
     <div id="start-overlay">
         <h1>กลองเทเนอร์จำลอง</h1>
-        <p>รองรับมัลติทัช • บันทึกเสียงได้</p>
+        <p>เสียงแต๊กชัด + หางกังวาน (Sharp Tak + Resonance)</p>
         <button class="btn-start" onclick="initAudio()">แตะเพื่อเริ่มใช้งาน</button>
     </div>
 
@@ -213,15 +220,20 @@
     </div>
 
     <div class="drum-container">
-        <div id="drum-spock" class="drum" data-note="spock" data-pitch="466.16">S</div>
-        <div id="drum-2" class="drum" data-note="2" data-pitch="277.18">2</div>
-        <div id="drum-1" class="drum" data-note="1" data-pitch="349.23">1</div>
-        <div id="drum-4" class="drum" data-note="4" data-pitch="196.00">4</div>
-        <div id="drum-3" class="drum" data-note="3" data-pitch="233.08">3</div>
+        <!-- Spock (S) -->
+        <div id="drum-spock" class="drum" data-note="spock" data-pitch="580">S</div>
+        <!-- Drum 2 -->
+        <div id="drum-2" class="drum" data-note="2" data-pitch="311.13">2</div>
+        <!-- Drum 1 -->
+        <div id="drum-1" class="drum" data-note="1" data-pitch="370.00">1</div>
+        <!-- Drum 4 -->
+        <div id="drum-4" class="drum" data-note="4" data-pitch="207.65">4</div>
+        <!-- Drum 3 -->
+        <div id="drum-3" class="drum" data-note="3" data-pitch="261.63">3</div>
     </div>
     
     <div class="rim-hit-zone">
-        <p>High-Fidelity Audio Synthesis</p>
+        <p>Sharp "Tak" Attack Enhanced</p>
     </div>
 
     <div class="footer">สร้างโดย AI (Gemini)</div>
@@ -229,10 +241,9 @@
     <script>
         let audioCtx;
         let compressor;
-        // ตัวแปรสำหรับบันทึกเสียง
         let mediaRecorder;
         let audioChunks = [];
-        let destNode; // Destination node สำหรับส่งเสียงไปบันทึก
+        let destNode; 
         let isRecording = false;
 
         function initAudio() {
@@ -245,77 +256,56 @@
 
             // Master Compressor
             compressor = audioCtx.createDynamicsCompressor();
-            compressor.threshold.setValueAtTime(-24, audioCtx.currentTime);
-            compressor.knee.setValueAtTime(30, audioCtx.currentTime);
-            compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
-            compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
-            compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+            compressor.threshold.setValueAtTime(-18, audioCtx.currentTime); 
+            compressor.knee.setValueAtTime(5, audioCtx.currentTime); 
+            compressor.ratio.setValueAtTime(12, audioCtx.currentTime); 
+            compressor.attack.setValueAtTime(0.001, audioCtx.currentTime); // Fast attack for "Tak"
+            compressor.release.setValueAtTime(0.3, audioCtx.currentTime); 
             
-            // เชื่อมต่อ Compressor ไปยังลำโพง
             compressor.connect(audioCtx.destination);
 
-            // Setup Recording Stream (ดักจับเสียงที่ออกจาก Compressor)
             destNode = audioCtx.createMediaStreamDestination();
             compressor.connect(destNode);
 
-            // Setup MediaRecorder
             try {
                 mediaRecorder = new MediaRecorder(destNode.stream);
-                
-                mediaRecorder.ondataavailable = (event) => {
-                    audioChunks.push(event.data);
-                };
-
+                mediaRecorder.ondataavailable = (event) => audioChunks.push(event.data);
                 mediaRecorder.onstop = () => {
                     const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                     const audioUrl = URL.createObjectURL(audioBlob);
-                    
-                    // สร้าง Link สำหรับดาวน์โหลดอัตโนมัติ
                     const a = document.createElement('a');
                     a.style.display = 'none';
                     a.href = audioUrl;
                     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                    a.download = `tenor_drums_${timestamp}.webm`;
+                    a.download = `tenor_sharp_tak_${timestamp}.webm`; 
                     document.body.appendChild(a);
                     a.click();
-                    
-                    // Cleanup
                     setTimeout(() => {
                         document.body.removeChild(a);
                         window.URL.revokeObjectURL(audioUrl);
                     }, 100);
-                    
                     audioChunks = [];
                     alert('บันทึกเสียงเรียบร้อย! ไฟล์จะถูกดาวน์โหลดลงเครื่อง');
                 };
             } catch (e) {
-                console.error("MediaRecorder not supported or error:", e);
+                console.error("MediaRecorder Error:", e);
                 document.getElementById('btn-record').disabled = true;
                 document.getElementById('btn-record').innerText = "ไม่รองรับการอัด";
             }
         }
 
         function toggleRecord() {
-            if (!audioCtx) {
-                alert('กรุณากดเริ่มใช้งานก่อน');
-                return;
-            }
+            if (!audioCtx) { alert('กรุณากดเริ่มใช้งานก่อน'); return; }
             if (audioCtx.state === 'suspended') audioCtx.resume();
 
-            const btnRecord = document.getElementById('btn-record');
-            const btnStop = document.getElementById('btn-stop');
-            const statusText = document.getElementById('record-status');
-
             if (!isRecording) {
-                // เริ่มบันทึก
                 audioChunks = [];
                 mediaRecorder.start();
                 isRecording = true;
-                
-                btnRecord.classList.add('recording');
-                btnRecord.innerHTML = '<span class="icon">●</span> กำลังอัด...';
-                btnStop.disabled = false;
-                statusText.style.display = 'flex';
+                document.getElementById('btn-record').classList.add('recording');
+                document.getElementById('btn-record').innerHTML = '<span class="icon">●</span> กำลังอัด...';
+                document.getElementById('btn-stop').disabled = false;
+                document.getElementById('record-status').style.display = 'flex';
             }
         }
 
@@ -323,78 +313,115 @@
             if (isRecording) {
                 mediaRecorder.stop();
                 isRecording = false;
-
-                const btnRecord = document.getElementById('btn-record');
-                const btnStop = document.getElementById('btn-stop');
-                const statusText = document.getElementById('record-status');
-
-                btnRecord.classList.remove('recording');
-                btnRecord.innerHTML = '<span class="icon">●</span> บันทึก';
-                btnStop.disabled = true;
-                statusText.style.display = 'none';
+                document.getElementById('btn-record').classList.remove('recording');
+                document.getElementById('btn-record').innerHTML = '<span class="icon">●</span> บันทึก';
+                document.getElementById('btn-stop').disabled = true;
+                document.getElementById('record-status').style.display = 'none';
             }
         }
 
-        function playDrumSound(frequency) {
+        function playDrumSound(frequency, note) {
             if (!audioCtx) return;
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
 
             const t = audioCtx.currentTime;
 
-            // --- 1. The Tone (Body) ---
-            const osc = audioCtx.createOscillator();
-            const gainOsc = audioCtx.createGain();
-
-            osc.type = 'sine'; 
-            osc.frequency.setValueAtTime(frequency, t);
-            osc.frequency.exponentialRampToValueAtTime(frequency * 0.9, t + 0.1); 
-
-            gainOsc.gain.setValueAtTime(0, t);
-            gainOsc.gain.linearRampToValueAtTime(1.0, t + 0.005); 
-            gainOsc.gain.exponentialRampToValueAtTime(0.01, t + 0.4); 
-
-            osc.connect(gainOsc);
-            gainOsc.connect(compressor); // ส่งเข้า Compressor (ซึ่งจะส่งต่อไปทั้ง Speaker และ Recorder)
-            osc.start(t);
-            osc.stop(t + 0.5);
-
-            // --- 2. The Attack (Snap) ---
-            const bufferSize = audioCtx.sampleRate * 0.05; 
+            // --- 1. The "Tak" (Super Sharp Attack) ---
+            
+            // LAYER A: High Freq Noise (ความคมแบบซ่าๆ)
+            const bufferSize = audioCtx.sampleRate * 0.02; 
             const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
             const data = buffer.getChannelData(0);
             for (let i = 0; i < bufferSize; i++) {
-                data[i] = Math.random() * 2 - 1;
+                data[i] = (Math.random() * 2 - 1); 
             }
-
             const noise = audioCtx.createBufferSource();
             noise.buffer = buffer;
-            const gainNoise = audioCtx.createGain();
+            const noiseGain = audioCtx.createGain();
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'highpass'; 
+            noiseFilter.frequency.value = 5000; 
             
-            const filter = audioCtx.createBiquadFilter();
-            filter.type = 'highpass';
-            filter.frequency.value = 1000;
-
-            gainNoise.gain.setValueAtTime(0.6, t);
-            gainNoise.gain.exponentialRampToValueAtTime(0.01, t + 0.05); 
-
-            noise.connect(filter);
-            filter.connect(gainNoise);
-            gainNoise.connect(compressor);
+            noiseGain.gain.setValueAtTime(2.0, t); 
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.015);
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(compressor);
             noise.start(t);
+
+            // LAYER B: Hard Click (เสียงแต๊ก) - ปรับให้คมขึ้น
+            const clickOsc = audioCtx.createOscillator();
+            const clickGain = audioCtx.createGain();
+            clickOsc.type = 'square'; // Square wave ให้เสียงที่แข็ง
+            
+            // Sweep ความถี่จากสูงลงต่ำอย่างเร็ว เพื่อสร้างแรงปะทะ
+            clickOsc.frequency.setValueAtTime(3000, t); 
+            clickOsc.frequency.exponentialRampToValueAtTime(800, t + 0.01);
+            
+            clickGain.gain.setValueAtTime(4.0, t); // เพิ่ม Gain ให้ "แต๊ก" ชัดทะลุออกมา
+            clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.02); // สั้นมาก
+
+            clickOsc.connect(clickGain);
+            clickGain.connect(compressor);
+            clickOsc.start(t);
+            clickOsc.stop(t + 0.03);
+
+            // --- 2. The Body (เนื้อเสียงหลัก) - เหมือนเดิม ---
+            const osc = audioCtx.createOscillator();
+            const gainOsc = audioCtx.createGain();
+            
+            osc.frequency.setValueAtTime(frequency * 2, t); 
+            osc.frequency.exponentialRampToValueAtTime(frequency, t + 0.02); 
+
+            gainOsc.gain.setValueAtTime(0, t);
+            gainOsc.gain.linearRampToValueAtTime(0.8, t + 0.001);
+            gainOsc.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+
+            osc.connect(gainOsc);
+            gainOsc.connect(compressor);
+            osc.start(t);
+            osc.stop(t + 0.15);
+
+            // --- 3. The Resonance (เสียงกังวาน) - เหมือนเดิม ---
+            const carrier = audioCtx.createOscillator();
+            const modulator = audioCtx.createOscillator();
+            const modGain = audioCtx.createGain();
+            const ringGain = audioCtx.createGain();
+
+            const fmRatio = 2.4; 
+            carrier.frequency.setValueAtTime(frequency, t);
+            modulator.frequency.setValueAtTime(frequency * fmRatio, t);
+            
+            modulator.connect(modGain);
+            modGain.connect(carrier.frequency);
+            carrier.connect(mainGain);
+
+            modGain.gain.setValueAtTime(frequency * 2, t); 
+            modGain.gain.exponentialRampToValueAtTime(0.1, t + 0.5);
+
+            ringGain.gain.setValueAtTime(0, t);
+            ringGain.gain.linearRampToValueAtTime(0.5, t + 0.005); 
+            ringGain.gain.exponentialRampToValueAtTime(0.001, t + 1.0); // หางยาว 1 วินาที
+
+            carrier.start(t);
+            modulator.start(t);
+            carrier.stop(t + 1.2);
+            modulator.stop(t + 1.2);
+            
+            ringGain.connect(compressor);
         }
 
         // Event Handling
         const drums = document.querySelectorAll('.drum');
         drums.forEach(drum => {
             const pitch = parseFloat(drum.dataset.pitch);
+            const note = drum.dataset.note;
 
             const hit = (e) => {
                 if(e.cancelable) e.preventDefault();
                 drum.classList.add('hit');
-                setTimeout(() => drum.classList.remove('hit'), 100);
-                playDrumSound(pitch);
+                setTimeout(() => drum.classList.remove('hit'), 100); 
+                playDrumSound(pitch, note);
             };
 
             drum.addEventListener('touchstart', hit, { passive: false });
