@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>แทมบูรีนจำลอง V.3 (Pro Rhythm)</title>
+    <title>แทมบูรีนจำลอง V.4 (Rhythm Shake)</title>
     <style>
         /* รีเซ็ตค่าเริ่มต้นและตั้งค่าพื้นฐาน */
         * {
@@ -222,9 +222,9 @@
 <body>
 
     <div id="info">
-        <h1>แทมบูรีนจำลอง V.3</h1>
-        <p>แตะเพื่อตี หรือ เขย่ามือถือ (Rhythm Mode)</p>
-        <p style="font-size: 0.8em; color: #bdc3c7;">(รองรับการเขย่าแบบรัวและแม่นยำ)</p>
+        <h1>แทมบูรีนจำลอง V.4</h1>
+        <p>แตะเพื่อตี (เสียงเต็ม) | เขย่า (จังหวะ)</p>
+        <p style="font-size: 0.8em; color: #bdc3c7;">(เสียงเขย่ากระชับ ไม่รวมเสียงหนัง)</p>
     </div>
 
     <div id="start-overlay">
@@ -365,10 +365,11 @@
             }
 
             if (type === 'shake') {
-                // เขย่า: เสียงสั้นลงเล็กน้อย (0.6) เพื่อให้จังหวะรัวๆ ฟังชัดเจน ไม่มัว
-                playJingle(intensity, 0.6); 
+                // เขย่า: **เอาเสียงคลิก (Skin) ออกแล้ว** เหลือแต่ Jingle
+                // ปรับเสียงให้สั้นลง (0.4) เพื่อให้ "เป็นจังหวะ" คมชัด
+                playJingle(intensity, 0.4); 
             } else {
-                // ตี: เสียงเต็ม
+                // ตีหน้าจอ: ยังคงมีเสียงเต็ม (Skin + Jingle)
                 playSkin(intensity);
                 setTimeout(() => playJingle(intensity * 0.9, 1.0), 10);
             }
@@ -496,7 +497,7 @@
             if (e.code === 'Space' && isAudioInit) hitTambourine(1.0, 'hit');
         });
 
-        // --- ระบบตรวจจับการเขย่าแบบใหม่ (แม่นยำขึ้น) ---
+        // --- ระบบตรวจจับการเขย่า ---
         let lastX = 0, lastY = 0, lastZ = 0;
         let lastTime = 0;
         let lastShakeTime = 0;
@@ -508,25 +509,21 @@
             const currentTime = Date.now();
             const dt = currentTime - lastTime;
             
-            // ตรวจสอบถี่ขึ้น (ประมาณ 50Hz) เพื่อจับ Peak ของการสะบัด
             if (dt > 20) { 
                 const deltaX = acc.x - lastX;
                 const deltaY = acc.y - lastY;
                 const deltaZ = acc.z - lastZ;
                 
-                // คำนวณความเร็วของการเปลี่ยนแปลง (Jerk approximation)
-                // สูตรนี้ช่วยให้จับแรงกระชากได้ดีกว่าจับความเร็วปลาย
                 const speed = Math.sqrt(deltaX*deltaX + deltaY*deltaY + deltaZ*deltaZ) / dt * 1000;
 
-                // Threshold: ค่า 300 คือจุดที่เริ่มเขย่าเบาๆ
+                // เขย่าแรงๆ ถึงจะดัง
                 if (speed > 300) { 
-                    // Cooldown 50ms: เร็วพอที่จะทำ Roll (รัว) ได้ แต่ไม่เร็วเกินไปจนเสียงซ้อนทับกันเละ
                     if (currentTime - lastShakeTime > 50) { 
                         let vol = Math.min(speed / 1000, 1.2);
-                        if (vol < 0.3) vol = 0.3; // ขั้นต่ำ
+                        if (vol < 0.3) vol = 0.3; 
                         
-                        // แก้ไข: เปลี่ยนจาก 'shake' เป็น 'full' เพื่อให้เสียงเหมือนการคลิก (ตี) เต็มรูปแบบ
-                        hitTambourine(vol, 'full');
+                        // กลับมาใช้โหมด 'shake' (เสียงกระดิ่งอย่างเดียว กระชับๆ)
+                        hitTambourine(vol, 'shake');
                         
                         lastShakeTime = currentTime;
                     }
