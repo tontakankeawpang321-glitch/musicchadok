@@ -525,7 +525,9 @@
                         let vol = Math.min(speed / 1000, 1.2);
                         if (vol < 0.3) vol = 0.3; // ขั้นต่ำ
                         
-                        hitTambourine(vol, 'shake');
+                        // แก้ไข: เปลี่ยนจาก 'shake' เป็น 'full' เพื่อให้เสียงเหมือนการคลิก (ตี) เต็มรูปแบบ
+                        hitTambourine(vol, 'full');
+                        
                         lastShakeTime = currentTime;
                     }
                 }
