@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Marching Bass Drum (Stable Audio)</title>
+    <title>Marching Bass Drum (Sample Only)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&family=Black+Ops+One&display=swap');
 
@@ -331,22 +331,12 @@
                 audioCtx.resume();
             }
             
-            // 1. Priority: Custom Sample from URL
+            // Only play if buffer is loaded (No Synthesis Fallback)
             if (loadedBuffers[type]) {
-                if (type === 'rim' && !loadedBuffers['rim'] && loadedBuffers['hit']) {
-                     playSample(loadedBuffers['hit'], intensity * 0.25); // Rim = Hit * 25% vol
-                } else {
-                     playSample(loadedBuffers[type], intensity);
-                }
-            } 
-            // 2. Fallback: Synthesis
-            else {
-                if (type === 'hit') {
-                    generateBassSound(audioCtx.currentTime, 1.0);
-                } else if (type === 'rim') {
-                    const rimVolume = 0.25 * intensity;
-                    generateBassSound(audioCtx.currentTime, rimVolume);
-                }
+                 playSample(loadedBuffers[type], intensity);
+            } else if (type === 'rim' && loadedBuffers['hit']) {
+                 // Fallback for rim if only hit is loaded (using hit sample at lower volume)
+                 playSample(loadedBuffers['hit'], intensity * 0.25);
             }
         }
 
@@ -361,47 +351,10 @@
             const vol = 0.8 * intensity;
             sampleGain.gain.setValueAtTime(0, t);
             sampleGain.gain.linearRampToValueAtTime(vol, t + 0.002); // 2ms attack
-            // Let sample play fully, fade out at end if buffer duration is known
-            // But usually just let it play. The clean start is most important.
             
             source.connect(sampleGain);
             sampleGain.connect(masterGain);
             source.start(t);
-        }
-
-        // 2. Synthesis: Bass Sound (Lunar Short Spiral)
-        function generateBassSound(t, volumeScale = 1.0) {
-            const gainNode = audioCtx.createGain();
-            gainNode.connect(masterGain);
-
-            // Main Tone
-            const osc = audioCtx.createOscillator();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(110, t); 
-            osc.frequency.exponentialRampToValueAtTime(45, t + 0.15); 
-            
-            gainNode.gain.setValueAtTime(0, t);
-            gainNode.gain.linearRampToValueAtTime(1.2 * volumeScale, t + 0.015);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, t + 0.65); 
-            
-            osc.connect(gainNode);
-            osc.start(t);
-            osc.stop(t + 0.7);
-
-            // Sub-Bass
-            const subOsc = audioCtx.createOscillator();
-            subOsc.type = 'sine';
-            subOsc.frequency.setValueAtTime(40, t); 
-            
-            const subGain = audioCtx.createGain();
-            subGain.gain.setValueAtTime(0, t);
-            subGain.gain.linearRampToValueAtTime(1.3 * volumeScale, t + 0.015);
-            subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
-            
-            subOsc.connect(subGain);
-            subGain.connect(masterGain);
-            subOsc.start(t);
-            subOsc.stop(t + 0.7);
         }
 
         // --- Interaction Logic (Rim vs Center) ---
