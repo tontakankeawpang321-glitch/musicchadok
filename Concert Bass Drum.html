@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Marching Bass Drum (Instant & Build-up)</title>
+    <title>Marching Bass Drum (De-clicked)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&family=Black+Ops+One&display=swap');
 
@@ -348,8 +348,10 @@
             // ปรับระดับความดังตามตำแหน่งที่ตี (Intensity)
             const vol = 1.0 * intensity;
             
-            // INSTANT ATTACK: ตั้งค่า Gain ทันที ไม่มีการ Fade-in เพื่อให้เสียงพุ่ง "ปึง" ทันทีที่แตะ
-            sampleGain.gain.setValueAtTime(vol, t);
+            // แก้ไขเสียง "ตื้ด" (Pop/Click) ที่หัวเสียง
+            // ต้องเริ่มจาก 0 แล้วเร่งขึ้นทันที (0.001 วินาที) เพื่อลบเสียงกระชากที่เกิดจาก Digital Clipping
+            sampleGain.gain.setValueAtTime(0, t);
+            sampleGain.gain.linearRampToValueAtTime(vol, t + 0.001); // 1ms fade-in (เร็วมากจนหูไม่ได้ยินดีเลย์ แต่ลบเสียงตื้ดได้)
             
             // เชื่อมต่อระบบ
             source.connect(sampleGain);
