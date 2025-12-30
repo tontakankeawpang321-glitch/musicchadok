@@ -37,6 +37,13 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.2);
             transition: transform 0.05s ease, background 0.1s;
             position: relative;
+            /* ป้องกันการลาก element ติดมือมา */
+            -webkit-user-drag: none;
+        }
+
+        /* เพิ่ม pointer-events: none เพื่อให้การลากนิ้ว (glissando) ไม่สะดุดที่ตัวหนังสือ */
+        .note-label {
+            pointer-events: none;
         }
 
         .key-wood::after {
@@ -49,6 +56,7 @@
             height: 2px;
             background: rgba(0,0,0,0.2);
             border-radius: 50%;
+            pointer-events: none; /* ไม่ให้เส้นเชือกขวางการกด */
         }
 
         .key-wood:active, .key-wood.active {
@@ -256,9 +264,27 @@
             osc2.stop(t + 0.7);
         }
 
-        // --- 3. UI GENERATION ---
+        // --- 3. UI GENERATION & INPUT HANDLING ---
+        
+        // Helper to trigger key visually and audibly
+        function triggerKey(keyElement) {
+            if (!keyElement || !keyElement.classList.contains('key-wood')) return;
+            
+            // Play sound
+            const freq = parseFloat(keyElement.dataset.freq);
+            initAudio();
+            playSound(freq);
+
+            // Visual feedback
+            keyElement.classList.remove('active');
+            void keyElement.offsetWidth; // Force reflow to restart animation if needed
+            keyElement.classList.add('active');
+            setTimeout(() => keyElement.classList.remove('active'), 150);
+        }
+
         function createKeys() {
             const container = document.getElementById('keys-container');
+            container.innerHTML = ''; // Clear existing
             const totalKeys = FREQUENCIES.length;
 
             FREQUENCIES.forEach((freq, index) => {
@@ -266,15 +292,12 @@
                 key.className = 'key-wood flex items-end justify-center pb-2 cursor-pointer select-none';
                 
                 // Style adjustment for realistic look (Middle keys are wider/longer)
-                // Actually in Ranat Thum, low keys are bigger. 
-                // Let's make them scale slightly in height.
                 const heightPercent = 100 - (index * 1.5); // Tapering height
-                const widthPercent = 100 / totalKeys;
                 
                 key.style.height = `${heightPercent}%`;
                 key.style.flexGrow = 1;
                 key.dataset.freq = freq;
-                key.id = `key-${index}`;
+                key.id = `key-${index}`; // Unique ID for touch tracking
 
                 // Note Label
                 const label = document.createElement('span');
@@ -283,25 +306,83 @@
                 if (!showNotes) label.style.display = 'none';
                 
                 key.appendChild(label);
-
-                // Interactions
-                const triggerSound = (e) => {
-                    e.preventDefault(); // Prevent scroll/zoom
-                    initAudio(); // Ensure audio context is ready
-                    playSound(freq);
-                    
-                    // Visual feedback
-                    key.classList.add('active');
-                    setTimeout(() => key.classList.remove('active'), 100);
-                };
-
-                // Mouse
-                key.addEventListener('mousedown', triggerSound);
-                // Touch (use start to prevent delay)
-                key.addEventListener('touchstart', triggerSound, {passive: false});
-
                 container.appendChild(key);
             });
+            
+            setupInputHandlers(container);
+        }
+
+        function setupInputHandlers(container) {
+            // --- MOUSE EVENTS (Drag to play) ---
+            let isMouseDown = false;
+            let lastHoveredKey = null;
+
+            container.addEventListener('mousedown', (e) => {
+                isMouseDown = true;
+                const key = e.target.closest('.key-wood');
+                if (key) {
+                    triggerKey(key);
+                    lastHoveredKey = key;
+                }
+            });
+
+            container.addEventListener('mousemove', (e) => {
+                if (!isMouseDown) return;
+                const key = e.target.closest('.key-wood');
+                // Play if we moved to a NEW key
+                if (key && key !== lastHoveredKey) {
+                    triggerKey(key);
+                    lastHoveredKey = key;
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                isMouseDown = false;
+                lastHoveredKey = null;
+            });
+
+            // --- TOUCH EVENTS (Multi-touch + Glissando/Drag) ---
+            // Map to track which key each finger (touchId) is currently on
+            const activeTouches = new Map();
+
+            const handleTouch = (e) => {
+                e.preventDefault(); // Prevent scrolling/zooming
+
+                // Iterate through all changed touches
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    
+                    // Get element under this specific finger
+                    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                    const key = element ? element.closest('.key-wood') : null;
+
+                    if (key) {
+                        const previousKeyId = activeTouches.get(touch.identifier);
+                        const currentKeyId = key.id;
+
+                        // Play sound only if this finger moved to a NEW key (or just started)
+                        if (currentKeyId !== previousKeyId) {
+                            triggerKey(key);
+                            activeTouches.set(touch.identifier, currentKeyId);
+                        }
+                    } else {
+                        // Finger moved off keys
+                        activeTouches.delete(touch.identifier);
+                    }
+                }
+            };
+
+            container.addEventListener('touchstart', handleTouch, { passive: false });
+            container.addEventListener('touchmove', handleTouch, { passive: false });
+            
+            const cleanupTouch = (e) => {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    activeTouches.delete(e.changedTouches[i].identifier);
+                }
+            };
+            
+            container.addEventListener('touchend', cleanupTouch);
+            container.addEventListener('touchcancel', cleanupTouch);
         }
 
         // --- 4. RECORDING LOGIC ---
@@ -330,7 +411,7 @@
             try {
                 mediaRecorder = new MediaRecorder(dest.stream, { mimeType: selectedType });
             } catch (e) {
-                alert('Browser not supporting MediaRecorder properly. Trying default.');
+                console.warn('MediaRecorder fallback');
                 mediaRecorder = new MediaRecorder(dest.stream);
             }
 
