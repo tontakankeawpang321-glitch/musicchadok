@@ -196,9 +196,9 @@
 
     <div id="start-overlay">
         <h1>กลองเทเนอร์จำลอง</h1>
-        <p style="color: #aaa; margin-bottom: 20px;">ใช้ไฟล์เสียงจริง (Samples)</p>
+        <p style="color: #aaa; margin-bottom: 20px;">โหมดเล่นไฟล์จากเครื่อง (Local Files)</p>
         <button id="btn-start-init" class="btn-start" onclick="initAudio()">
-            ดาวน์โหลดไฟล์เสียง & เริ่ม
+            โหลดไฟล์ & เริ่มเล่น
         </button>
         <div id="loading-text"></div>
     </div>
@@ -228,30 +228,25 @@
      
     <script>
         // ==========================================
-        // ตั้งค่าไฟล์เสียง (แก้ไขลิงก์ตรงนี้ถ้านำไปใช้จริงในเครื่อง)
-        // ใช้ลิงก์ออนไลน์เพื่อให้เสียงดังได้ทันทีในหน้าเว็บนี้
+        // ตั้งค่าไฟล์เสียง (ระบบเล่นจากไฟล์ในเครื่อง)
+        // **สำคัญ**: ต้องมีโฟลเดอร์ชื่อ "tenors" และมีไฟล์ .mp3 ตามชื่อด้านล่าง
         // ==========================================
         const soundFiles = {
-            // Spock: ใช้เสียง Snare/Timbales pitch สูง
-            'spock': 'tenors/4tenor.mp3, 
-            // 1: High Tom
-            '1': 'tenors/1tenor.mp3', 
-            // 2: Mid Tom
-            '2': 'tenors/tenor.mp3', 
-            // 3: Low Tom
-            '3': 'tenors/tenor.mp3', 
-            // 4: Floor Tom
-            '4': 'tenors/tenor.mp3'
+            'spock': 'tenors/stenor.mp3',
+            '1': 'tenors/1tenor.mp3',
+            '2': 'tenors/tenors.mp3',
+            '3': 'tenors/tenors.mp3',
+            '4': 'tenors/4tenors.mp3'
         };
 
-        // การปรับจูนเสียง (Playback Rate) เพื่อให้เหมือน Tenor Set
-        // 1.0 = ปกติ, >1.0 = สูงขึ้น, <1.0 = ต่ำลง
+        // การปรับจูนเสียง (Playback Rate) 
+        // หากไฟล์เสียงของคุณตรงคีย์อยู่แล้ว ให้แก้เลขเป็น 1.0 ทั้งหมดได้เลย
         const tuning = {
-            'spock': 1.5, // เร่งเสียงให้แหลมปรี๊ดเหมือน Spock
-            '1': 1.2,     // ปรับให้ตึง
-            '2': 1.0,     // ปกติ
-            '3': 1.0,     // ปกติ
-            '4': 0.9      // หย่อนลงให้ทุ้ม
+            'spock': 1.0, 
+            '1': 1.0,     
+            '2': 1.0,     
+            '3': 1.0,     
+            '4': 1.0      
         };
 
         let audioCtx;
@@ -284,8 +279,8 @@
             const loadingText = document.getElementById('loading-text');
             
             btnStart.disabled = true;
-            btnStart.innerText = "กำลังดาวน์โหลด...";
-            loadingText.innerText = "กำลังโหลดไฟล์เสียงจาก Server...";
+            btnStart.innerText = "กำลังโหลด...";
+            loadingText.innerText = "กำลังโหลดไฟล์เสียงจากโฟลเดอร์ tenors...";
 
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
