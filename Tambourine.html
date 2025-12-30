@@ -3,47 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>แทมบูรีนไม้ (Wood Tambourine)</title>
+    <title>แทมบูรีนไม้-เหล็ก (Embedded URLs)</title>
     <style>
-        /* รีเซ็ตค่าเริ่มต้น */
-        * {
-            box-sizing: border-box;
-            touch-action: none;
-            user-select: none;
-            -webkit-user-select: none;
+        :root {
+            --bg-color: #1a1a1a;
+            --wood-dark: #3e2723;
+            --wood-light: #5d4037;
+            --metal-gold: #f1c40f;
+            --metal-dark: #9a7d0a;
+            --highlight: #e67e22; 
+            --record-color: #ff5252;
+            --text-color: #ffe0b2;
         }
 
         body {
             margin: 0;
             padding: 0;
-            background-color: #3e2723; /* พื้นหลังสีไม้เข้ม */
+            background-color: var(--bg-color);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
-            overflow: hidden;
             font-family: 'Sarabun', sans-serif;
-            color: #ffe0b2;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            color: var(--text-color);
         }
 
-        #info {
-            position: absolute;
-            top: 20px;
-            text-align: center;
-            opacity: 0.9;
-            pointer-events: none;
-            z-index: 10;
-        }
-
-        h1 { margin: 0; font-size: 1.5rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-        p { margin: 5px 0; font-size: 0.9rem; }
-
-        /* Wood Tambourine Style */
+        /* --- Tambourine Visuals --- */
         #tambourine {
             position: relative;
-            width: 80vmin;
-            height: 80vmin;
+            width: 75vmin;
+            height: 75vmin;
             max-width: 400px;
             max-height: 400px;
             border-radius: 50%;
@@ -52,16 +47,16 @@
             justify-content: center;
             cursor: pointer;
             box-shadow: 
-                0 15px 30px rgba(0,0,0,0.6),
-                inset 0 0 20px rgba(0,0,0,0.4);
+                0 20px 40px rgba(0,0,0,0.6),
+                inset 0 0 30px rgba(0,0,0,0.5);
             -webkit-tap-highlight-color: transparent;
-            
-            /* ลายไม้ */
-            background: repeating-linear-gradient(45deg, #5d4037, #5d4037 10px, #4e342e 10px, #4e342e 20px);
-            border: 15px solid #3e2723;
+            /* ลายไม้สมจริง */
+            background: repeating-linear-gradient(45deg, var(--wood-light), var(--wood-light) 10px, var(--wood-dark) 10px, var(--wood-dark) 20px);
+            border: 12px solid #2d1e1a;
+            transition: transform 0.1s;
         }
 
-        /* Head (Skin) - หนังแท้สีนวล */
+        /* หนังกลอง */
         .skin {
             width: 85%;
             height: 85%;
@@ -70,12 +65,15 @@
             z-index: 2;
             background: radial-gradient(circle, #fff8e1 30%, #ffecb3 100%);
             box-shadow: inset 0 0 30px rgba(0,0,0,0.2);
-            transition: transform 0.05s;
+            transition: transform 0.05s, background 0.1s;
         }
 
-        .skin:active, .skin.hit-anim { transform: scale(0.98); background: radial-gradient(circle, #ffecb3 30%, #ffe0b2 100%); }
+        .skin:active, .skin.hit-anim { 
+            transform: scale(0.97); 
+            background: radial-gradient(circle, #ffecb3 30%, #ffe0b2 100%); 
+        }
 
-        /* Jingles (Common) */
+        /* จานโลหะ (Jingles) */
         .zils-container {
             position: absolute;
             width: 100%;
@@ -93,13 +91,13 @@
             top: 50%; left: 50%;
             transform-origin: 0 0;
             box-shadow: 2px 2px 5px rgba(0,0,0,0.4);
+            /* สีโลหะทองเหลือง */
+            background: radial-gradient(circle, var(--metal-gold) 10%, #d4ac0d 60%, var(--metal-dark) 100%);
         }
         
-        /* Brass Jingles (ทองเหลือง) */
-        .zil { background: radial-gradient(circle, #f1c40f 10%, #d4ac0d 60%, #9a7d0a 100%); }
         .zil::after {
             content: ''; position: absolute; top: 25%; left: 25%; width: 50%; height: 50%;
-            border-radius: 50%; border: 1px solid rgba(0,0,0,0.2);
+            border-radius: 50%; border: 1px solid rgba(0,0,0,0.3);
         }
 
         .shake-anim { animation: shake 0.1s ease-in-out; }
@@ -108,39 +106,66 @@
             75% { transform: rotate(-5deg); } 100% { transform: rotate(0deg); }
         }
 
+        /* --- UI Elements --- */
         #start-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); display: flex; flex-direction: column;
-            align-items: center; justify-content: center; z-index: 100; transition: opacity 0.5s;
+            background: rgba(0,0,0,0.9); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 100;
+            color: white; text-align: center; transition: opacity 0.5s;
         }
-        #start-btn {
-            padding: 15px 40px; font-size: 1.5rem; background: #8d6e63; color: white;
-            border: none; border-radius: 50px; cursor: pointer; animation: pulse 2s infinite;
-        }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-        
-        #record-controls { position: absolute; bottom: 30px; z-index: 20; display: flex; gap: 15px; }
-        .ctrl-btn {
-            padding: 10px 20px; border-radius: 25px; border: none; font-size: 1rem;
-            font-weight: bold; cursor: pointer; color: white;
-        }
-        #rec-btn { background-color: #d84315; }
-        #rec-btn.recording { background-color: #bf360c; animation: blinkRed 1s infinite; }
-        #stop-btn { background-color: #8d6e63; display: none; }
-        @keyframes blinkRed { 0%, 100% { box-shadow: 0 0 5px #d84315; } 50% { box-shadow: 0 0 20px #d84315; } }
 
+        .btn-start {
+            padding: 15px 30px; font-size: 1.5rem; background: var(--highlight);
+            border: none; color: white; border-radius: 50px; cursor: pointer;
+            margin-top: 20px; box-shadow: 0 0 20px rgba(230, 126, 34, 0.5); font-weight: bold;
+        }
+
+        #loading-text {
+            margin-top: 15px; font-size: 0.9rem; color: #aaa;
+        }
+
+        .controls {
+            position: absolute; top: 20px; display: flex; gap: 15px; z-index: 50;
+            background: rgba(0,0,0,0.5); padding: 10px 20px; border-radius: 30px;
+            backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .btn-control {
+            padding: 8px 16px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.1); color: white; cursor: pointer;
+            font-size: 1rem; display: flex; align-items: center; gap: 5px;
+        }
+        .btn-control:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-record.recording { background-color: var(--record-color); border-color: var(--record-color); animation: pulse 1.5s infinite; }
+        
+        .status-text { color: var(--record-color); font-weight: bold; display: none; align-items: center; margin-left: 10px; font-size: 0.9rem; }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 82, 82, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(255, 82, 82, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 82, 82, 0); }
+        }
+
+        .footer { position: absolute; bottom: 20px; color: #666; font-size: 0.8rem; }
     </style>
 </head>
 <body>
 
-    <div id="info">
-        <h1>แทมบูรีนไม้ (Wood Tambourine)</h1>
-        <p>เสียงอบอุ่น ธรรมชาติ | เขย่า = กระพรวน | ตี = หนัง</p>
+    <div id="start-overlay">
+        <h1>แทมบูรีนไม้-เหล็ก</h1>
+        <p>Embedded Audio Version</p>
+        <button id="btn-start-init" class="btn-start" onclick="initAudio()">แตะเพื่อเริ่มและโหลดเสียง</button>
+        <div id="loading-text">ระบบจะโหลดเสียงจาก URL ที่ระบุในโค้ด</div>
     </div>
 
-    <div id="start-overlay">
-        <button id="start-btn">แตะเพื่อเริ่มใช้งาน</button>
-        <p style="margin-top: 15px; color: #ddd;">(เสียงไม้แท้)</p>
+    <div class="controls">
+        <button id="btn-record" class="btn-control btn-record" onclick="toggleRecord()">
+            <span class="icon">●</span> บันทึก
+        </button>
+        <button id="btn-stop" class="btn-control" onclick="stopRecord()" disabled>
+            <span class="icon">■</span> หยุด & โหลด
+        </button>
+        <span id="record-status" class="status-text">กำลังบันทึก...</span>
     </div>
 
     <div id="tambourine">
@@ -148,136 +173,32 @@
         <div class="skin"></div>
     </div>
 
-    <div id="record-controls">
-        <button id="rec-btn" class="ctrl-btn">● บันทึก</button>
-        <button id="stop-btn" class="ctrl-btn">■ หยุด & โหลด</button>
-    </div>
+    <div class="footer">สร้างโดย AI (Gemini)</div>
 
     <script>
-        // --- Web Audio API ---
+        // ==========================================
+        // 🛠️ ตั้งค่า URL ไฟล์เสียงที่นี่ (แก้ไขลิงก์ได้เลย)
+        // ==========================================
+        const soundUrls = {
+            'hit': 'tamburin/toburi01.mp3',    // เช่น 'sounds/tambourine_hit.mp3' หรือ 'https://example.com/hit.wav'
+            'shake': 'tamburin/toburi02t.mp3' // เช่น 'sounds/tambourine_shake.mp3'
+        };
+
+        // Audio & Logic Variables
         let audioCtx;
-        let isAudioInit = false;
         let masterGain;
-        let compressor;
-        let mediaDest, mediaRecorder, audioChunks = [];
-        let jingleBuffer;
-        let activeShakeSource = null;
+        let audioBuffers = { hit: null, shake: null };
 
-        function createNoiseBuffer(duration) {
-            const bufferSize = audioCtx.sampleRate * duration;
-            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-            return buffer;
-        }
+        // Recording Variables
+        let mediaRecorder;
+        let audioChunks = [];
+        let destNode; 
+        let isRecording = false;
 
-        function initAudio() {
-            if (isAudioInit) return;
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            audioCtx = new AudioContext();
+        // Motion Variables
+        let lastX=0, lastY=0, lastZ=0, lastTime=0, lastShakeTime=0;
+        const SHAKE_THRESHOLD = 300;
 
-            masterGain = audioCtx.createGain();
-            masterGain.gain.value = 1.0;
-
-            compressor = audioCtx.createDynamicsCompressor();
-            compressor.threshold.setValueAtTime(-12, audioCtx.currentTime);
-            compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
-            masterGain.connect(compressor);
-            compressor.connect(audioCtx.destination);
-
-            mediaDest = audioCtx.createMediaStreamDestination();
-            compressor.connect(mediaDest);
-
-            jingleBuffer = createNoiseBuffer(0.8);
-            isAudioInit = true;
-        }
-
-        // 1. เสียงกระพรวน (Jingles)
-        function playJingles(intensity = 1.0, type = 'hit') {
-            if (!audioCtx) return;
-
-            if (type === 'shake' && activeShakeSource) {
-                try {
-                    activeShakeSource.gain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.01);
-                    activeShakeSource.source.stop(audioCtx.currentTime + 0.02);
-                } catch(e) {}
-            }
-
-            const t = audioCtx.currentTime;
-            const source = audioCtx.createBufferSource();
-            source.buffer = jingleBuffer;
-
-            const f1 = audioCtx.createBiquadFilter(); f1.type = "bandpass"; f1.frequency.value = 5000; f1.Q.value = 1;
-            const f2 = audioCtx.createBiquadFilter(); f2.type = "highpass"; f2.frequency.value = 7000; f2.Q.value = 1;
-
-            const gain = audioCtx.createGain();
-            gain.gain.setValueAtTime(0, t);
-            
-            if (type === 'shake') {
-                gain.gain.linearRampToValueAtTime(intensity * 0.8, t + 0.01);
-                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2); 
-            } else {
-                gain.gain.linearRampToValueAtTime(intensity * 0.6, t + 0.01);
-                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-            }
-
-            source.connect(f1); f1.connect(gain);
-            source.connect(f2); f2.connect(gain);
-            gain.connect(masterGain);
-            
-            source.start(t);
-            if (type === 'shake') activeShakeSource = { source: source, gain: gain };
-        }
-
-        // 2. เสียงไม้ (Wood Skin Sound)
-        function playSkin(intensity = 1.0) {
-            if (!audioCtx) return;
-            const t = audioCtx.currentTime;
-            
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            const filter = audioCtx.createBiquadFilter();
-            
-            // ไม้: ทุ้ม นุ่ม (Low frequency, Low filter)
-            osc.frequency.setValueAtTime(180, t);
-            osc.frequency.exponentialRampToValueAtTime(80, t + 0.1);
-            filter.type = "lowpass";
-            filter.frequency.value = 400; // ตัดเสียงแหลมออก ให้เหลือแต่ความอุ่น
-            gain.gain.setValueAtTime(intensity * 1.2, t);
-            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15); // Decay ปานกลาง
-
-            osc.connect(filter);
-            filter.connect(gain);
-            gain.connect(masterGain);
-            osc.start(t);
-            osc.stop(t + 0.4);
-        }
-
-        // Main Trigger
-        function hitTambourine(intensity = 1.0, type = 'full') {
-            if (!isAudioInit) return;
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-
-            if (type === 'shake') {
-                playJingles(intensity, 'shake');
-            } else {
-                playSkin(intensity); 
-                setTimeout(() => playJingles(intensity * 0.9, 'hit'), 15); 
-            }
-
-            const tamb = document.getElementById('tambourine');
-            tamb.classList.remove('shake-anim');
-            void tamb.offsetWidth; 
-            tamb.classList.add('shake-anim');
-
-            if(type !== 'shake') {
-                const skin = document.querySelector('.skin');
-                skin.classList.add('hit-anim');
-                setTimeout(() => skin.classList.remove('hit-anim'), 80);
-            }
-        }
-
-        // Draw Zils
         function createZils() {
             const container = document.getElementById('zils-layer');
             const numberOfZils = 6; 
@@ -291,65 +212,153 @@
             }
         }
 
-        // --- Event Handlers ---
-        document.getElementById('start-btn').addEventListener('click', async () => {
-            initAudio();
+        async function loadSound(key, url) {
+            try {
+                // ตรวจสอบว่าเป็น URL จำลองหรือไม่ ถ้าใช่ให้ข้ามไปใช้เสียง Beep
+                if (url.includes('INSERT_YOUR')) throw new Error("URL ยังไม่ได้ตั้งค่า");
+
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                audioBuffers[key] = audioBuffer;
+                console.log(`Loaded ${key}`);
+            } catch (error) {
+                console.warn(`ไม่สามารถโหลดเสียง ${key}: ${url} (จะใช้เสียงสังเคราะห์สำรอง)`);
+            }
+        }
+
+        async function initAudio() {
+            const btnStart = document.getElementById('btn-start-init');
+            btnStart.innerText = "กำลังโหลด...";
+            btnStart.disabled = true;
+            
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+
+            // Master Gain
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 1.0;
+            masterGain.connect(audioCtx.destination);
+
+            // Setup Recorder Node
+            destNode = audioCtx.createMediaStreamDestination();
+            masterGain.connect(destNode);
+
+            setupRecorder();
             createZils();
+            startMotionSensor();
+
+            // โหลดเสียงจาก URL ที่ตั้งค่าไว้
+            await Promise.all([
+                loadSound('hit', soundUrls.hit),
+                loadSound('shake', soundUrls.shake)
+            ]);
+
+            // Hide Overlay
+            const overlay = document.getElementById('start-overlay');
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 500);
+        }
+
+        // --- Playback Logic ---
+
+        function playBackupBeep(type) {
+            // เสียงสำรองกรณีโหลดไฟล์ไม่ได้
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            if (type === 'hit') {
+                osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
+            } else {
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime); // สูงกว่าสำหรับ Shake
+                osc.type = 'triangle';
+            }
+
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+            
+            osc.connect(gain);
+            gain.connect(masterGain);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            if (audioBuffers[type]) {
+                const source = audioCtx.createBufferSource();
+                source.buffer = audioBuffers[type];
+                source.connect(masterGain);
+                source.start(0);
+            } else {
+                playBackupBeep(type);
+            }
+        }
+
+        // Visual Effects
+        function triggerVisual(type) {
+            const tamb = document.getElementById('tambourine');
+            const skin = document.querySelector('.skin');
+
+            // Reset animations
+            tamb.classList.remove('shake-anim');
+            skin.classList.remove('hit-anim');
+            void tamb.offsetWidth; // Trigger reflow
+
+            if (type === 'shake') {
+                tamb.classList.add('shake-anim');
+            } else {
+                skin.classList.add('hit-anim');
+            }
+        }
+
+        // --- Interaction Handlers ---
+
+        function handleInput(e) {
+            if (e.target.closest('.controls')) return;
+
+            e.preventDefault();
+            
+            if (e.type === 'touchstart') {
+                for(let i=0; i<e.changedTouches.length; i++) {
+                    playSound('hit');
+                    triggerVisual('hit');
+                }
+            } else {
+                playSound('hit');
+                triggerVisual('hit');
+            }
+        }
+
+        document.body.addEventListener('mousedown', handleInput);
+        document.body.addEventListener('touchstart', handleInput, { passive: false });
+        
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && audioCtx) {
+                playSound('hit');
+                triggerVisual('hit');
+            }
+        });
+
+        // --- Motion Sensor (Shake) ---
+        function startMotionSensor() {
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-                try {
-                    const ps = await DeviceMotionEvent.requestPermission();
-                    if (ps === 'granted') window.addEventListener('devicemotion', handleMotion);
-                } catch (e) {}
+                DeviceMotionEvent.requestPermission()
+                    .then(response => {
+                        if (response === 'granted') {
+                            window.addEventListener('devicemotion', handleMotion);
+                        }
+                    })
+                    .catch(console.error);
             } else {
                 window.addEventListener('devicemotion', handleMotion);
             }
-            document.getElementById('start-overlay').style.opacity = '0';
-            setTimeout(() => document.getElementById('start-overlay').style.display = 'none', 500);
-        });
+        }
 
-        // Recording
-        document.getElementById('rec-btn').addEventListener('click', () => {
-            if (!isAudioInit) return;
-            audioChunks = [];
-            let options = { mimeType: 'audio/webm' };
-            if (!MediaRecorder.isTypeSupported('audio/webm')) options = { mimeType: 'audio/mp4' }; 
-            try { mediaRecorder = new MediaRecorder(mediaDest.stream, options); } 
-            catch (e) { mediaRecorder = new MediaRecorder(mediaDest.stream); }
-            
-            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url;
-                a.download = `tambourine_wood_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.webm`;
-                document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                
-                const recBtn = document.getElementById('rec-btn');
-                recBtn.style.display = 'flex'; recBtn.classList.remove('recording'); recBtn.innerHTML = '● บันทึก';
-                document.getElementById('stop-btn').style.display = 'none';
-            };
-            mediaRecorder.start();
-            const recBtn = document.getElementById('rec-btn');
-            recBtn.innerHTML = 'กำลังบันทึก...'; recBtn.classList.add('recording');
-            setTimeout(() => { recBtn.style.display = 'none'; document.getElementById('stop-btn').style.display = 'flex'; }, 200);
-        });
-        document.getElementById('stop-btn').addEventListener('click', () => { if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop(); });
-
-        // Touch/Mouse Input
-        const tamb = document.getElementById('tambourine');
-        const handleInput = (e) => {
-            e.preventDefault();
-            if (e.target.closest('#record-controls')) return;
-            if (e.type === 'touchstart') {
-                for(let i=0; i<e.changedTouches.length; i++) hitTambourine(1.0, 'hit');
-            } else hitTambourine(1.0, 'hit');
-        };
-        tamb.addEventListener('mousedown', handleInput);
-        tamb.addEventListener('touchstart', handleInput, {passive:false});
-        window.addEventListener('keydown', e => { if(e.code==='Space' && isAudioInit) hitTambourine(1.0, 'hit'); });
-
-        // Motion Logic
-        let lastX=0, lastY=0, lastZ=0, lastTime=0, lastShakeTime=0;
         function handleMotion(event) {
             const acc = event.accelerationIncludingGravity;
             if (!acc) return;
@@ -360,13 +369,66 @@
                 const deltaZ = acc.z - lastZ;
                 const speed = Math.sqrt(deltaX**2 + deltaY**2 + deltaZ**2) / (now - lastTime) * 1000;
 
-                if (speed > 300 && (now - lastShakeTime > 60)) {
-                    let vol = Math.min(speed / 1000, 1.2);
-                    if (vol < 0.4) vol = 0.4;
-                    hitTambourine(vol, 'shake');
+                if (speed > SHAKE_THRESHOLD && (now - lastShakeTime > 150)) {
+                    playSound('shake');
+                    triggerVisual('shake');
                     lastShakeTime = now;
                 }
                 lastX=acc.x; lastY=acc.y; lastZ=acc.z; lastTime=now;
+            }
+        }
+
+        // --- Recorder Logic ---
+        function setupRecorder() {
+            try {
+                mediaRecorder = new MediaRecorder(destNode.stream);
+                mediaRecorder.ondataavailable = (event) => audioChunks.push(event.data);
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = audioUrl;
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                    a.download = `tambourine_rec_${timestamp}.webm`; 
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(audioUrl);
+                    }, 100);
+                    audioChunks = [];
+                    alert('บันทึกเสียงเรียบร้อย!');
+                };
+            } catch (e) {
+                console.error("MediaRecorder Error:", e);
+                document.getElementById('btn-record').disabled = true;
+            }
+        }
+
+        function toggleRecord() {
+            if (!audioCtx) { alert('กรุณากดเริ่มใช้งานก่อน'); return; }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            if (!isRecording) {
+                audioChunks = [];
+                mediaRecorder.start();
+                isRecording = true;
+                document.getElementById('btn-record').classList.add('recording');
+                document.getElementById('btn-record').innerHTML = '<span class="icon">●</span> กำลังอัด...';
+                document.getElementById('btn-stop').disabled = false;
+                document.getElementById('record-status').style.display = 'flex';
+            }
+        }
+
+        function stopRecord() {
+            if (isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                document.getElementById('btn-record').classList.remove('recording');
+                document.getElementById('btn-record').innerHTML = '<span class="icon">●</span> บันทึก';
+                document.getElementById('btn-stop').disabled = true;
+                document.getElementById('record-status').style.display = 'none';
             }
         }
     </script>
