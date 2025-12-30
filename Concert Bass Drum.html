@@ -3,23 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>กลองใหญ่ (Lunar Short Spiral)</title>
+    <title>Marching Bass Drum (Unified Sound)</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&family=Black+Ops+One&display=swap');
 
         :root {
             --primary-red: #c92a2a;
             --dark-red: #8a1c1c;
             --gold: #ffd43b;
-            --wood: #4a3728; /* Darker wood for Lunar style */
-            --skin: #f4e4bc;
+            --silver: #e0e0e0;
+            --hoop-color: #111111;
+            --head-color: #fcfcfc;
             --bg-color: #121212;
         }
 
         body {
             font-family: 'Sarabun', sans-serif;
             background-color: var(--bg-color);
-            background-image: radial-gradient(circle at center, #252525 0%, #000000 100%);
+            background-image: radial-gradient(circle at center, #2c3e50 0%, #000000 100%);
             color: white;
             margin: 0;
             height: 100dvh;
@@ -33,10 +34,10 @@
         header {
             text-align: center;
             padding: 15px;
-            background: linear-gradient(to bottom, var(--dark-red), var(--primary-red));
+            background: linear-gradient(to bottom, #2b2b2b, #1a1a1a);
             width: 100%;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
-            border-bottom: 2px solid var(--gold);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+            border-bottom: 3px solid var(--primary-red);
             z-index: 10;
             flex-shrink: 0;
         }
@@ -44,11 +45,42 @@
         h1 {
             margin: 0;
             font-size: 1.5rem;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-            color: var(--gold);
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            color: white;
+            font-family: 'Black Ops One', cursive;
+            letter-spacing: 2px;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+        }
+
+        /* Status Area */
+        .status-bar {
+            background: rgba(0,0,0,0.7);
+            width: 100%;
+            padding: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid #444;
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #555;
+        }
+
+        .status-dot.active {
+            background-color: #4caf50;
+            box-shadow: 0 0 5px #4caf50;
         }
 
         .drum-container {
@@ -61,22 +93,20 @@
             position: relative;
         }
 
-        /* Drum Pad Styling - Lunar Style (More Modern/Sleek) */
+        /* Marching Bass Drum Styling */
         .drum-pad {
             width: min(70vw, 40vh);
             height: min(70vw, 40vh);
             max-width: 450px;
             max-height: 450px;
-            
             border-radius: 50%;
-            /* ผิวหน้ากลองแบบเรียบเนียนขึ้น */
-            background: radial-gradient(circle at 35% 35%, #fffbf0, #eaddcf 50%, #d4b895 100%);
-            border: min(2vw, 15px) solid var(--wood);
-            
+            background: radial-gradient(circle at 30% 30%, #ffffff, #f0f0f0 60%, #e0e0e0 100%);
+            border: min(3vw, 25px) solid var(--hoop-color);
             box-shadow: 
                 0 20px 60px rgba(0,0,0,0.9),
-                inset 0 0 50px rgba(0,0,0,0.3);
-            
+                inset 0 0 20px rgba(0,0,0,0.2),
+                0 0 0 4px #888,
+                0 0 0 6px #333;
             cursor: pointer;
             position: relative;
             transition: transform 0.05s cubic-bezier(0.1, 0.7, 1.0, 0.1);
@@ -87,14 +117,24 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-        /* Lunar often has distinct rims/lugs visual, represented simply here */
+        .drum-pad::before {
+            content: '';
+            position: absolute;
+            top: -14px; left: -14px; right: -14px; bottom: -14px;
+            border-radius: 50%;
+            border: 3px dashed #aaaaaa;
+            z-index: -1;
+            opacity: 0.8;
+        }
+
         .drum-pad::after {
             content: '';
             position: absolute;
-            width: 94%;
-            height: 94%;
+            width: 80%;
+            height: 80%;
             border-radius: 50%;
-            border: 2px solid rgba(100, 100, 100, 0.1);
+            box-shadow: inset 0 0 0 20px rgba(255,255,255,0.5); 
+            border: 1px solid rgba(0,0,0,0.05);
             pointer-events: none;
         }
 
@@ -102,30 +142,32 @@
             transform: scale(0.97);
             box-shadow: 
                 0 10px 30px rgba(0,0,0,0.8),
-                inset 0 0 70px rgba(0,0,0,0.5);
+                inset 0 0 40px rgba(0,0,0,0.1),
+                0 0 0 4px #888,
+                0 0 0 6px #333;
         }
 
         .drum-label {
-            margin-top: 30px;
-            font-size: 1.3rem;
-            color: var(--gold);
-            background: rgba(0,0,0,0.8);
-            padding: 8px 25px;
+            margin-top: 35px;
+            font-size: 1.5rem;
+            color: white;
+            font-family: 'Black Ops One', cursive;
+            background: rgba(255,255,255,0.1);
+            padding: 5px 20px;
             border-radius: 4px;
-            border-bottom: 2px solid var(--gold);
+            border: 1px solid rgba(255,255,255,0.3);
             pointer-events: none;
-            font-weight: bold;
             text-shadow: 0 2px 4px rgba(0,0,0,1);
-            letter-spacing: 2px;
-            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .ripple {
             position: absolute;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.3);
+            background: rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(0,0,0,0.2);
             transform: scale(0);
-            animation: ripple-anim 0.25s ease-out; /* Fast, tight ripple */
+            animation: ripple-anim 0.25s ease-out;
             pointer-events: none;
         }
 
@@ -141,21 +183,21 @@
             gap: 15px;
             padding: 25px;
             justify-content: center;
-            background: rgba(0,0,0,0.6);
+            background: rgba(0,0,0,0.8);
             width: 100%;
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(5px);
             position: absolute;
             bottom: 0;
             box-sizing: border-box;
-            border-top: 1px solid rgba(255,212,59,0.1);
+            border-top: 2px solid var(--primary-red);
         }
 
         button.ctrl-btn {
             padding: 12px 24px;
-            border: 1px solid var(--gold);
-            background: rgba(0,0,0,0.5);
-            color: var(--gold);
-            border-radius: 4px; /* More square/modern buttons */
+            border: 1px solid #666;
+            background: linear-gradient(to bottom, #333, #222);
+            color: white;
+            border-radius: 2px;
             font-family: 'Sarabun', sans-serif;
             font-weight: bold;
             cursor: pointer;
@@ -165,27 +207,23 @@
             gap: 8px;
             font-size: 1rem;
             text-transform: uppercase;
-            letter-spacing: 1px;
         }
 
         button.ctrl-btn:active {
             transform: scale(0.95);
-            background: rgba(255,212,59,0.1);
+            background: #111;
         }
         
         button.ctrl-btn:disabled {
-            opacity: 0.4;
+            opacity: 0.5;
             cursor: not-allowed;
-            border-color: #555;
-            color: #999;
-            background: transparent;
+            color: #888;
         }
 
         button.ctrl-btn.recording {
             background: var(--primary-red);
-            color: white;
-            border-color: #ff6b6b;
-            box-shadow: 0 0 15px rgba(201, 42, 42, 0.5);
+            border-color: #ff0000;
+            box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
             animation: pulse 1.5s infinite;
         }
 
@@ -200,46 +238,55 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.95);
-            color: var(--gold);
+            background: rgba(0,0,0,0.9);
+            color: white;
             padding: 25px 50px;
-            border-radius: 8px;
+            border-radius: 4px;
             font-size: 1.2rem;
-            border: 1px solid var(--gold);
+            border: 1px solid var(--primary-red);
             opacity: 0;
             transition: opacity 0.2s;
             pointer-events: none;
             z-index: 100;
             text-align: center;
             font-weight: bold;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            font-family: 'Black Ops One', cursive;
         }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>🥁 Lunar Short Spiral</h1>
+        <h1>MARCHING BASS</h1>
     </header>
+
+    <!-- Status Bar & Config -->
+    <div class="status-bar">
+        <div class="status-indicator">
+            <div id="sourceDot" class="status-dot"></div>
+            <span id="sourceText">Synthesizer (Ready)</span>
+        </div>
+    </div>
 
     <div class="drum-container">
         <div class="drum-pad" id="bigDrum">
+            <!-- <div class="rim-zone"></div> -->
         </div>
-        <div class="drum-label">LUNAR SERIES</div>
+        <div class="drum-label">CORPS SERIES 28"</div>
     </div>
 
     <div class="controls">
         <button id="recordBtn" class="ctrl-btn">
-            <span>●</span> อัด
+            <span>●</span> REC
         </button>
         <button id="stopBtn" class="ctrl-btn" disabled>
-            <span>■</span> หยุด
+            <span>■</span> STOP
         </button>
         <button id="playBtn" class="ctrl-btn" disabled>
-            <span>▶</span> ฟัง
+            <span>▶</span> PLAY
         </button>
         <button id="downloadBtn" class="ctrl-btn" disabled>
-            <span>⬇</span> โหลด
+            <span>⬇</span> SAVE
         </button>
     </div>
 
@@ -247,6 +294,13 @@
     <audio id="playbackAudio" style="display:none;"></audio>
 
     <script>
+        // --- Sound Configuration ---
+        // ใส่ URL ไฟล์เสียงได้ที่นี่
+        const soundUrls = {
+           'hit': 'basdrum/bassdrum.mp3', // เสียงตีตรงกลาง (Bass)
+           'rim': 'basdrum/bassdrumkob.mp3'  // เสียงตีขอบ (Rim - ถ้าใส่จะใช้ไฟล์ ถ้าไม่ใส่จะใช้เสียง hit แบบเบาลง)
+        };
+
         // --- Audio Engine (Web Audio API) ---
         let audioCtx;
         let masterGain;
@@ -256,28 +310,30 @@
         let audioChunks = [];
         let audioBlob;
         let audioUrl;
+        
+        let loadedBuffers = {};
 
         function initAudio() {
             if (!audioCtx) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 audioCtx = new AudioContext();
                 
-                // Dynamics Compressor - Tight & Punchy settings
+                // Dynamics Compressor
                 compressor = audioCtx.createDynamicsCompressor();
                 compressor.threshold.value = -12; 
                 compressor.knee.value = 30; 
-                compressor.ratio.value = 15; // High ratio for punch
+                compressor.ratio.value = 15; 
                 compressor.attack.value = 0.003; 
-                compressor.release.value = 0.15; // Fast release
+                compressor.release.value = 0.15;
 
-                // Master Volume - Powerful
+                // Master Volume
                 masterGain = audioCtx.createGain();
                 masterGain.gain.value = 3.5; 
                 
-                // Final EQ - Clean up mud
+                // Final EQ
                 const lowpass = audioCtx.createBiquadFilter();
                 lowpass.type = 'lowpass';
-                lowpass.frequency.value = 280; 
+                lowpass.frequency.value = 2000; 
 
                 masterGain.connect(lowpass);
                 lowpass.connect(compressor);
@@ -285,57 +341,119 @@
                 
                 dest = audioCtx.createMediaStreamDestination();
                 compressor.connect(dest);
+
+                preloadSounds();
             }
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
         }
 
-        // --- Bass Drum Synthesis Logic (Lunar Short Spiral) ---
-        function playBassDrum() {
-            initAudio();
-            
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume().then(() => {
-                    generateSound(audioCtx.currentTime);
-                });
-            } else {
-                generateSound(audioCtx.currentTime);
+        // --- Resource Loading ---
+        async function preloadSounds() {
+            for (const key in soundUrls) {
+                const url = soundUrls[key];
+                if (url && url.length > 0) {
+                    try {
+                        const response = await fetch(url);
+                        const arrayBuffer = await response.arrayBuffer();
+                        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                        loadedBuffers[key] = audioBuffer;
+                        
+                        updateStatus(true, "URL Loaded: " + key);
+                    } catch (error) {
+                        console.warn(`Failed to load sound for ${key}:`, error);
+                    }
+                }
             }
         }
 
-        function generateSound(t) {
+        function updateStatus(active, text) {
+            const dot = document.getElementById('sourceDot');
+            const txt = document.getElementById('sourceText');
+            if (active) {
+                dot.classList.add('active');
+                txt.textContent = text;
+                txt.style.color = "#4caf50";
+            }
+        }
+
+        // --- Play Logic (Bass & Rim) ---
+        function playDrumSound(type, intensity = 1.0) {
+            initAudio();
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            
+            // 1. Priority: Custom Sample from URL (if available)
+            if (loadedBuffers[type]) {
+                // If specific rim sample exists, use it.
+                // If only hit sample exists and rim requested, play hit sample quieter.
+                if (type === 'rim' && !loadedBuffers['rim'] && loadedBuffers['hit']) {
+                     playSample(loadedBuffers['hit'], intensity * 0.25); // Rim = Hit * 25% vol
+                } else {
+                     playSample(loadedBuffers[type], intensity);
+                }
+            } 
+            // 2. Fallback: Synthesis
+            else {
+                if (type === 'hit') {
+                    // Full volume bass
+                    generateBassSound(audioCtx.currentTime, 1.0);
+                } else if (type === 'rim') {
+                    // Rim shot = Main Sound but VERY QUIET
+                    // User requested: "Use sound from main, just reduce level to quietest"
+                    // Base volume 25% * intensity
+                    const rimVolume = 0.25 * intensity;
+                    generateBassSound(audioCtx.currentTime, rimVolume);
+                }
+            }
+        }
+
+        // 1. Sample Player
+        function playSample(buffer, intensity) {
+            const t = audioCtx.currentTime;
+            const source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+            
+            const sampleGain = audioCtx.createGain();
+            sampleGain.gain.value = 0.8 * intensity; 
+            
+            source.connect(sampleGain);
+            sampleGain.connect(masterGain);
+            source.start(t);
+        }
+
+        // 2. Synthesis: Bass Sound (Lunar Short Spiral)
+        // Modified to accept volumeScale
+        function generateBassSound(t, volumeScale = 1.0) {
             const gainNode = audioCtx.createGain();
             gainNode.connect(masterGain);
 
-            // 1. Main Tone ("Short Spiral" Characteristic)
+            // Main Tone
             const osc = audioCtx.createOscillator();
             osc.type = 'sine';
-            
-            // Pitch Envelope: Drop faster to simulate tighter head/short shell
-            // Starts slightly higher (110Hz) to give a bit more "knock" impact
             osc.frequency.setValueAtTime(110, t); 
-            osc.frequency.exponentialRampToValueAtTime(45, t + 0.15); // Fast drop (Spiral effect)
+            osc.frequency.exponentialRampToValueAtTime(45, t + 0.15); 
             
-            // Gain Envelope: "Tum" impact, but shorter tail
             gainNode.gain.setValueAtTime(0, t);
-            gainNode.gain.linearRampToValueAtTime(1.2, t + 0.015); // Fast, soft attack
-            // Tail ends firmly at ~0.65s (Short Spiral)
+            // Apply volumeScale to peak gain
+            gainNode.gain.linearRampToValueAtTime(1.2 * volumeScale, t + 0.015);
             gainNode.gain.exponentialRampToValueAtTime(0.001, t + 0.65); 
             
             osc.connect(gainNode);
             osc.start(t);
             osc.stop(t + 0.7);
 
-            // 2. Sub-Bass (Body/Weight)
+            // Sub-Bass
             const subOsc = audioCtx.createOscillator();
             subOsc.type = 'sine';
-            subOsc.frequency.setValueAtTime(40, t); // Solid low end
+            subOsc.frequency.setValueAtTime(40, t); 
             
             const subGain = audioCtx.createGain();
             subGain.gain.setValueAtTime(0, t);
-            subGain.gain.linearRampToValueAtTime(1.3, t + 0.015);
-            // Matches main envelope tightly
+            // Apply volumeScale to sub peak gain
+            subGain.gain.linearRampToValueAtTime(1.3 * volumeScale, t + 0.015);
             subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
             
             subOsc.connect(subGain);
@@ -344,51 +462,87 @@
             subOsc.stop(t + 0.7);
         }
 
-        // --- Interaction Logic ---
+        // --- Interaction Logic (Rim vs Center) ---
         const bigDrum = document.getElementById('bigDrum');
 
-        function triggerDrum(element) {
-            playBassDrum(); 
-
-            element.classList.add('active');
-            createRipple(element);
+        function triggerDrum(e, isTouch = false) {
+            e.preventDefault(); // Prevent ghost clicks
             
-            setTimeout(() => {
-                element.classList.remove('active');
-            }, 80); // Faster visual feedback for "Short" feel
+            const rect = bigDrum.getBoundingClientRect();
+            if (isTouch && e.changedTouches) {
+                // Handle multi-touch
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    processHit(e.changedTouches[i].clientX, e.changedTouches[i].clientY, rect);
+                }
+            } else {
+                processHit(e.clientX, e.clientY, rect);
+            }
         }
 
-        function createRipple(element) {
+        function processHit(x, y, rect) {
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            // คำนวณระยะห่างจากจุดศูนย์กลาง
+            const dist = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+            const radius = rect.width / 2;
+            const normalizedDist = dist / radius; // 0.0 (กลาง) ถึง 1.0 (ขอบ)
+
+            // กำหนดโซน: ถ้าห่างจากศูนย์กลางเกิน 75% ถือว่าเป็นขอบ (Rim)
+            if (normalizedDist > 0.75) {
+                // Rim Logic: Use main sound but quieter
+                // Map range 0.75-1.0 to intensity 1.0-0.5 (further out = quieter)
+                const intensity = Math.max(0.2, 1 - ((normalizedDist - 0.75) / 0.5));
+                playDrumSound('rim', intensity);
+            } else {
+                // Hit Logic
+                playDrumSound('hit');
+            }
+
+            // Visual feedback
+            bigDrum.classList.add('active');
+            createRipple(x - rect.left, y - rect.top);
+            
+            setTimeout(() => {
+                bigDrum.classList.remove('active');
+            }, 80);
+        }
+
+        function createRipple(x, y) {
             const ripple = document.createElement('div');
             ripple.classList.add('ripple');
-            const size = element.offsetWidth;
+            // Ripple เกิดตรงจุดที่ตี
+            const size = 100;
             ripple.style.width = size + 'px';
             ripple.style.height = size + 'px';
-            ripple.style.left = '0px'; 
-            ripple.style.top = '0px';
+            ripple.style.left = (x - size/2) + 'px'; 
+            ripple.style.top = (y - size/2) + 'px';
             
-            element.appendChild(ripple);
+            bigDrum.appendChild(ripple);
             setTimeout(() => ripple.remove(), 300);
         }
 
         // Event Listeners
-        bigDrum.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            triggerDrum(bigDrum);
-        });
+        bigDrum.addEventListener('mousedown', (e) => triggerDrum(e, false));
+        bigDrum.addEventListener('touchstart', (e) => triggerDrum(e, true), { passive: false });
 
-        bigDrum.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            initAudio(); 
-            for (let i = 0; i < e.changedTouches.length; i++) {
-                triggerDrum(bigDrum);
-            }
-        }, { passive: false });
-
+        // Keyboard: Space = Bass, R = Rim
         window.addEventListener('keydown', (e) => {
             if (e.repeat) return;
             if (e.code === 'Space' || e.key === ' ') {
-                triggerDrum(bigDrum);
+                playDrumSound('hit');
+                // Simulate visual center hit
+                const rect = bigDrum.getBoundingClientRect();
+                bigDrum.classList.add('active');
+                createRipple(rect.width/2, rect.height/2);
+                setTimeout(() => bigDrum.classList.remove('active'), 80);
+            } else if (e.key.toLowerCase() === 'r') {
+                playDrumSound('rim', 0.8);
+                 // Simulate visual rim hit
+                 const rect = bigDrum.getBoundingClientRect();
+                 bigDrum.classList.add('active');
+                 createRipple(rect.width/2, 20); // Top edge
+                 setTimeout(() => bigDrum.classList.remove('active'), 80);
             }
         });
 
@@ -435,7 +589,7 @@
 
             mediaRecorder.start();
             recordBtn.classList.add('recording');
-            recordBtn.innerHTML = "<span>●</span> กำลังอัด...";
+            recordBtn.innerHTML = "<span>●</span> REC...";
             recordBtn.disabled = true;
             stopBtn.disabled = false;
             playBtn.disabled = true;
@@ -448,7 +602,7 @@
             if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                 mediaRecorder.stop();
                 recordBtn.classList.remove('recording');
-                recordBtn.innerHTML = "<span>●</span> อัด";
+                recordBtn.innerHTML = "<span>●</span> REC";
                 recordBtn.disabled = false;
                 stopBtn.disabled = true;
             }
@@ -457,7 +611,7 @@
         function playRecording() {
             if (audioUrl) {
                 playbackAudio.play();
-                showToast("กำลังเล่นเสียงที่อัด...");
+                showToast("กำลังเล่น...");
             }
         }
 
@@ -465,7 +619,7 @@
             if (audioUrl) {
                 const a = document.createElement('a');
                 a.href = audioUrl;
-                a.download = `lunar_spiral_short_${new Date().getTime()}.wav`;
+                a.download = `marching_bass_${new Date().getTime()}.wav`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
