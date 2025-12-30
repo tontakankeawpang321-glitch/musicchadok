@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Marching Bass Drum (De-clicked)</title>
+    <title>Marching Bass Drum (Smooth Tail)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&family=Black+Ops+One&display=swap');
 
@@ -254,10 +254,10 @@
 
     <script>
         // --- Sound Configuration ---
-        // ใส่ URL ไฟล์เสียงที่นี่ได้เลยครับ
+        // ใส่ URL ไฟล์เสียงที่นี่
         const soundUrls = {
-            'hit': 'basdrum/bassdrum.mp3', // เสียงตีตรงกลาง (Bass)
-            'rim': 'basdrum/bassdrumkob.mp3' // เสียงตีขอบ
+            'hit': 'basdrum/bassdrum.mp3', 
+            'rim': 'basdrum/bassdrumkob.mp3' 
         };
 
         // --- Audio Engine (Web Audio API) ---
@@ -277,19 +277,18 @@
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 audioCtx = new AudioContext();
                 
-                // Dynamics Compressor - ตั้งค่าให้รองรับการตีซ้ำแบบดังขึ้นเรื่อยๆ
+                // Dynamics Compressor
                 compressor = audioCtx.createDynamicsCompressor();
-                compressor.threshold.value = -8; // ให้เพดานเสียงสูงขึ้นอีกนิด ก่อนจะกด
+                compressor.threshold.value = -8; 
                 compressor.knee.value = 30; 
                 compressor.ratio.value = 12; 
                 compressor.attack.value = 0.003; 
                 compressor.release.value = 0.25;
 
-                // Master Volume - ตั้งค่าให้ดังชัดเจน
+                // Master Volume
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 4.0; // Boost Volume
+                masterGain.gain.value = 4.0; 
                 
-                // Chain: Master -> Compressor -> Dest
                 masterGain.connect(compressor);
                 compressor.connect(audioCtx.destination);
                 
@@ -298,7 +297,6 @@
 
                 preloadSounds();
             }
-            // ปลุก AudioContext ทันที
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
@@ -322,42 +320,46 @@
             }
         }
 
-        // --- Play Logic (Sample Only) ---
+        // --- Play Logic ---
         function playDrumSound(type, intensity = 1.0) {
-            // เรียก initAudio ทุกครั้งที่ตี เพื่อรับประกันว่า Context ทำงาน
             initAudio();
             
-            // ถ้าไฟล์โหลดเสร็จแล้ว ให้เล่นเลย
             if (loadedBuffers[type]) {
                  playSample(loadedBuffers[type], intensity);
             } 
-            // กรณีไม่มีไฟล์ Rim ให้ใช้ไฟล์ Hit แต่เบาลง
             else if (type === 'rim' && loadedBuffers['hit']) {
                  playSample(loadedBuffers['hit'], intensity * 0.25);
             }
         }
 
-        // Function เล่นไฟล์เสียง (ปรับให้สมูทและดังขึ้นเรื่อยๆ ตามการตีซ้อน)
+        // Function เล่นไฟล์เสียง (Micro-fade Start & End)
         function playSample(buffer, intensity) {
             const t = audioCtx.currentTime;
             const source = audioCtx.createBufferSource();
             source.buffer = buffer;
             
             const sampleGain = audioCtx.createGain();
-            
-            // ปรับระดับความดังตามตำแหน่งที่ตี (Intensity)
             const vol = 1.0 * intensity;
+            const duration = buffer.duration;
             
-            // แก้ไขเสียง "ตื้ด" (Pop/Click) ที่หัวเสียง
-            // ต้องเริ่มจาก 0 แล้วเร่งขึ้นทันที (0.001 วินาที) เพื่อลบเสียงกระชากที่เกิดจาก Digital Clipping
+            // 1. Fade-In ที่หัวเสียง (แก้ Click ตอนเริ่ม) - เร็วมาก 2ms
             sampleGain.gain.setValueAtTime(0, t);
-            sampleGain.gain.linearRampToValueAtTime(vol, t + 0.001); // 1ms fade-in (เร็วมากจนหูไม่ได้ยินดีเลย์ แต่ลบเสียงตื้ดได้)
+            sampleGain.gain.linearRampToValueAtTime(vol, t + 0.002);
             
-            // เชื่อมต่อระบบ
+            // 2. Fade-Out ที่หางเสียง (แก้ Click ตอนจบ) - เริ่มเฟดลง 50ms ก่อนจบไฟล์
+            if (duration > 0.05) {
+                // คงระดับเสียงไว้จนถึงช่วงท้าย
+                sampleGain.gain.setValueAtTime(vol, t + duration - 0.05);
+                // เฟดลงจนเงียบสนิทที่จุดจบ
+                sampleGain.gain.linearRampToValueAtTime(0, t + duration);
+            } else {
+                // ถ้าไฟล์สั้นมาก เฟดลงทั้งไฟล์
+                sampleGain.gain.linearRampToValueAtTime(0, t + duration);
+            }
+            
             source.connect(sampleGain);
             sampleGain.connect(masterGain);
             
-            // เล่นทันที
             source.start(t);
         }
 
@@ -385,17 +387,15 @@
             const radius = rect.width / 2;
             const normalizedDist = dist / radius; 
 
-            // Rim Zone > 75%
             if (normalizedDist > 0.75) {
-                // ตีขอบ: ความดังลดหลั่นตามระยะ
+                // Rim Logic
                 const intensity = Math.max(0.2, 1 - ((normalizedDist - 0.75) / 0.5));
                 playDrumSound('rim', intensity);
             } else {
-                // ตีกลาง: ดังเต็มที่
+                // Hit Logic
                 playDrumSound('hit', 1.0);
             }
 
-            // Visual feedback
             bigDrum.classList.add('active');
             createRipple(x - rect.left, y - rect.top);
             
