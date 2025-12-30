@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>กลองเทเนอร์จำลอง (S: Dry / 1-4: Snare)</title>
+    <title>กลองเทเนอร์จำลอง (Sample Playback)</title>
     <style>
         :root {
             --bg-color: #1a1a1a;
@@ -61,7 +61,6 @@
             font-weight: bold;
         }
 
-        /* Controls Panel */
         .controls {
             position: absolute;
             top: 20px;
@@ -115,7 +114,6 @@
             100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
         }
 
-        /* Container จัดวางกลองเป็นรูปโค้ง */
         .drum-container {
             position: relative;
             width: 95vw;
@@ -129,7 +127,6 @@
         .drum {
             position: absolute;
             border-radius: 50%;
-            /* Texture หน้ากลองแบบสว่าง */
             background: radial-gradient(circle at 30% 30%, #ffffff, #eceff1);
             border: 8px solid var(--drum-shell);
             box-shadow: 
@@ -162,7 +159,6 @@
             left: 50%; top: 5%;
             transform: translateX(-50%);
             z-index: 3;
-            /* Spock สีเข้ม */
             background: radial-gradient(circle at 30% 30%, #455a64, #263238); 
             border-color: #000;
             color: rgba(255,255,255,0.3);
@@ -190,6 +186,12 @@
             font-size: 0.8rem;
         }
 
+        #loading-text {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
         @media (orientation: portrait) {
             .drum-container { height: 50vh; width: 100vw; }
             #drum-1 { right: 28%; top: 20%; }
@@ -206,8 +208,9 @@
 
     <div id="start-overlay">
         <h1>กลองเทเนอร์จำลอง</h1>
-        <p>S: Dry & Short | 1-4: Snare</p>
-        <button class="btn-start" onclick="initAudio()">แตะเพื่อเริ่มใช้งาน</button>
+        <p>Real Audio Files Version</p>
+        <button id="btn-start-init" class="btn-start" onclick="initAudio()">แตะเพื่อเริ่มและโหลดเสียง</button>
+        <div id="loading-text">กรุณาเตรียมไฟล์เสียง spock.mp3, drum1.mp3... ไว้ในโฟลเดอร์เดียวกัน</div>
     </div>
 
     <div class="controls">
@@ -222,74 +225,93 @@
 
     <div class="drum-container">
         <!-- Spock (S) -->
-        <div id="drum-spock" class="drum" data-note="spock" data-pitch="580">S</div>
+        <div id="drum-spock" class="drum" data-note="spock">S</div>
         <!-- Drum 2 -->
-        <div id="drum-2" class="drum" data-note="2" data-pitch="311.13">2</div>
+        <div id="drum-2" class="drum" data-note="2">2</div>
         <!-- Drum 1 -->
-        <div id="drum-1" class="drum" data-note="1" data-pitch="370.00">1</div>
+        <div id="drum-1" class="drum" data-note="1">1</div>
         <!-- Drum 4 -->
-        <div id="drum-4" class="drum" data-note="4" data-pitch="207.65">4</div>
+        <div id="drum-4" class="drum" data-note="4">4</div>
         <!-- Drum 3 -->
-        <div id="drum-3" class="drum" data-note="3" data-pitch="261.63">3</div>
+        <div id="drum-3" class="drum" data-note="3">3</div>
     </div>
     
     <div class="rim-hit-zone">
-        <p>Mixed Engine: Dry Spock & Snare Tenors</p>
+        <p>Sample Engine: Real Audio Playback</p>
     </div>
 
     <div class="footer">สร้างโดย AI (Gemini)</div>
 
     <script>
+        // ==========================================
+        // ตั้งค่าชื่อไฟล์เสียงที่นี่ (แก้ไขชื่อไฟล์ได้ตามต้องการ)
+        // ==========================================
+        const soundFiles = {
+            'spock': 'spock.mp3',
+            '1': 'gg.mp3',
+            '2': 'drum2.mp3',
+            '3': 'drum3.mp3',
+            '4': 'drum4.mp3'
+        };
+
         let audioCtx;
-        let compressor;
         let masterGain;
-        let noiseBuffer;
-        
+        let audioBuffers = {}; // ที่เก็บข้อมูลเสียงที่โหลดแล้ว
+
         // Recording Variables
         let mediaRecorder;
         let audioChunks = [];
         let destNode; 
         let isRecording = false;
 
-        function createNoiseBuffer() {
-            if (!audioCtx) return;
-            const bufferSize = audioCtx.sampleRate * 2.0; 
-            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                data[i] = Math.random() * 2 - 1;
+        async function loadSound(note, url) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                audioBuffers[note] = audioBuffer;
+                console.log(`Loaded ${note} from ${url}`);
+            } catch (error) {
+                console.warn(`ไม่สามารถโหลดไฟล์เสียง: ${url} (จะใช้เสียง Beep สำรองแทน)`);
+                console.error(error);
+                // ไม่ต้องทำอะไร ถ้าโหลดไม่ได้ เดี๋ยวระบบจะไปใช้ Beep สำรองใน playDrumSound
             }
-            noiseBuffer = buffer;
         }
 
-        function initAudio() {
-            const overlay = document.getElementById('start-overlay');
-            overlay.style.opacity = '0';
-            setTimeout(() => overlay.remove(), 500);
+        async function initAudio() {
+            const btnStart = document.getElementById('btn-start-init');
+            btnStart.innerText = "กำลังโหลด...";
+            btnStart.disabled = true;
 
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             audioCtx = new AudioContext();
 
             // Master Gain
             masterGain = audioCtx.createGain();
-            
-            // Compressor: ตั้งค่ากลางๆ เพื่อให้รองรับทั้งสองแบบ
-            compressor = audioCtx.createDynamicsCompressor();
-            compressor.threshold.setValueAtTime(-12, audioCtx.currentTime); 
-            compressor.knee.setValueAtTime(5, audioCtx.currentTime); 
-            compressor.ratio.setValueAtTime(12, audioCtx.currentTime); 
-            compressor.attack.setValueAtTime(0.001, audioCtx.currentTime);
-            compressor.release.setValueAtTime(0.1, audioCtx.currentTime); 
+            masterGain.gain.value = 1.0;
+            masterGain.connect(audioCtx.destination);
 
-            masterGain.connect(compressor);
-            compressor.connect(audioCtx.destination);
-
-            createNoiseBuffer();
-
-            // Setup Recorder
+            // Setup Recorder Node
             destNode = audioCtx.createMediaStreamDestination();
-            compressor.connect(destNode);
+            masterGain.connect(destNode);
 
+            setupRecorder();
+
+            // โหลดไฟล์เสียงทั้งหมด
+            const loadPromises = Object.keys(soundFiles).map(note => 
+                loadSound(note, soundFiles[note])
+            );
+
+            await Promise.all(loadPromises);
+
+            // ซ่อน Overlay เมื่อโหลดเสร็จ
+            const overlay = document.getElementById('start-overlay');
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 500);
+        }
+
+        function setupRecorder() {
             try {
                 mediaRecorder = new MediaRecorder(destNode.stream);
                 mediaRecorder.ondataavailable = (event) => audioChunks.push(event.data);
@@ -300,7 +322,7 @@
                     a.style.display = 'none';
                     a.href = audioUrl;
                     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                    a.download = `tenor_mix_${timestamp}.webm`; 
+                    a.download = `tenor_recording_${timestamp}.webm`; 
                     document.body.appendChild(a);
                     a.click();
                     setTimeout(() => {
@@ -343,137 +365,41 @@
             }
         }
 
-        function playDrumSound(frequency, note) {
+        function playBackupBeep() {
+            // เสียงสำรองกรณีหาไฟล์ mp3 ไม่เจอ (เสียง Beep สั้นๆ)
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+            osc.type = 'square';
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+            osc.connect(gain);
+            gain.connect(masterGain);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        function playDrumSound(note) {
             if (!audioCtx) return;
             if (audioCtx.state === 'suspended') audioCtx.resume();
 
-            const t = audioCtx.currentTime;
-
-            if (note === 'spock') {
-                // ============================================================
-                // SPOCK (S) -> แห้ง สั้น ไม่มีกังวาน (Dry & Short)
-                // ============================================================
-                
-                // Highpass Filter (No Bass)
-                const highpass = audioCtx.createBiquadFilter();
-                highpass.type = 'highpass';
-                highpass.frequency.value = 800; 
-                highpass.connect(masterGain);
-
-                // 1. Sharp "Tick" Attack (หัวเสียงแหลมสั้น)
-                const bufferSize = audioCtx.sampleRate * 0.005; // 5ms
-                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-                const data = buffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1);
-
-                const click = audioCtx.createBufferSource();
-                click.buffer = buffer;
-                const clickGain = audioCtx.createGain();
-                
-                const clickFilter = audioCtx.createBiquadFilter();
-                clickFilter.type = 'highpass';
-                clickFilter.frequency.value = 5000; 
-
-                clickGain.gain.setValueAtTime(1.0, t); 
-                clickGain.gain.exponentialRampToValueAtTime(0.01, t + 0.01); // สั้นมาก
-
-                click.connect(clickFilter);
-                clickFilter.connect(clickGain);
-                clickGain.connect(highpass); 
-                click.start(t);
-
-                // 2. Short Dry Body (เนื้อเสียงสั้นกุด)
-                const osc = audioCtx.createOscillator();
-                const gainOsc = audioCtx.createGain();
-                
-                osc.frequency.setValueAtTime(frequency * 1.5, t); 
-                osc.frequency.exponentialRampToValueAtTime(frequency, t + 0.02);
-
-                gainOsc.gain.setValueAtTime(0, t);
-                gainOsc.gain.linearRampToValueAtTime(0.8, t + 0.001);
-                // *สำคัญ* ตัดหางเสียงทิ้งทันที (0.05 วินาที)
-                gainOsc.gain.exponentialRampToValueAtTime(0.001, t + 0.05); 
-
-                osc.connect(gainOsc);
-                gainOsc.connect(highpass);
-                osc.start(t);
-                osc.stop(t + 0.06);
-
+            // ตรวจสอบว่ามีไฟล์เสียงที่โหลดไว้หรือไม่
+            if (audioBuffers[note]) {
+                const source = audioCtx.createBufferSource();
+                source.buffer = audioBuffers[note];
+                source.connect(masterGain);
+                // ถ้าอยากปรับ Pitch สามารถทำได้ที่นี่ เช่น source.playbackRate.value = 1.0;
+                source.start(0);
             } else {
-                // ============================================================
-                // 1-4 -> ใช้เสียงจากโค้ด "Dry & Tight Snare" (มีเสียงโซ่ซ่าๆ สั้นๆ)
-                // ============================================================
-                
-                const soundGain = audioCtx.createGain();
-                soundGain.connect(masterGain);
-
-                const baseFreq = frequency;
-                const stickFreq = frequency * 2.5;
-
-                // Layer 1: Stick Impact (Square Wave)
-                const stickOsc = audioCtx.createOscillator();
-                const stickGain = audioCtx.createGain();
-                stickOsc.type = 'square'; 
-
-                const stickFilter = audioCtx.createBiquadFilter();
-                stickFilter.type = 'lowpass';
-                stickFilter.frequency.value = 8000; 
-
-                stickOsc.frequency.setValueAtTime(stickFreq, t); 
-                stickOsc.frequency.exponentialRampToValueAtTime(stickFreq * 0.1, t + 0.02); 
-
-                stickGain.gain.setValueAtTime(0, t);
-                stickGain.gain.linearRampToValueAtTime(1.2, t + 0.001); 
-                stickGain.gain.exponentialRampToValueAtTime(0.01, t + 0.04); 
-
-                stickOsc.connect(stickFilter);
-                stickFilter.connect(stickGain);
-                stickGain.connect(soundGain);
-                stickOsc.start(t);
-                stickOsc.stop(t + 0.04);
-
-                // Layer 2: Main Tone (Sine Body)
-                const osc = audioCtx.createOscillator();
-                const oscGain = audioCtx.createGain();
-                osc.type = 'sine'; 
-
-                osc.frequency.setValueAtTime(baseFreq, t); 
-                osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.5, t + 0.05); 
-
-                oscGain.gain.setValueAtTime(0, t);
-                oscGain.gain.linearRampToValueAtTime(0.5, t + 0.002);
-                oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.08); 
-
-                osc.connect(oscGain);
-                oscGain.connect(soundGain);
-                osc.start(t);
-                osc.stop(t + 0.1);
-
-                // Layer 3: Snare Wires (Noise)
-                const noise = audioCtx.createBufferSource();
-                noise.buffer = noiseBuffer;
-
-                const noiseFilter = audioCtx.createBiquadFilter();
-                noiseFilter.type = 'highpass';
-                noiseFilter.frequency.value = 3000; 
-
-                const noiseGain = audioCtx.createGain();
-                noiseGain.gain.setValueAtTime(0, t);
-                noiseGain.gain.linearRampToValueAtTime(0.9, t + 0.002);
-                noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.12); 
-
-                noise.connect(noiseFilter);
-                noiseFilter.connect(noiseGain);
-                noiseGain.connect(soundGain);
-                noise.start(t);
-                noise.stop(t + 0.15);
+                // ถ้าไม่มีไฟล์เสียง ให้เล่นเสียง Beep แทน
+                console.log("File not found for note: " + note);
+                playBackupBeep();
             }
         }
 
         // Event Handling
         const drums = document.querySelectorAll('.drum');
         drums.forEach(drum => {
-            const pitch = parseFloat(drum.dataset.pitch);
             const note = drum.dataset.note;
 
             const hit = (e) => {
@@ -482,7 +408,7 @@
                 // Spock สั้นกว่าเพื่อน
                 const animTime = (note === 'spock') ? 50 : 80;
                 setTimeout(() => drum.classList.remove('hit'), animTime);
-                playDrumSound(pitch, note);
+                playDrumSound(note);
             };
 
             drum.addEventListener('touchstart', hit, { passive: false });
