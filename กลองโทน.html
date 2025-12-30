@@ -199,6 +199,38 @@
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const audioCtx = new AudioContext();
         
+        // --- Configuration: External Sound URLs (ตั้งค่าลิงก์เสียง) ---
+        // หากต้องการใช้ไฟล์เสียงจริง (mp3/wav) ให้ใส่ URL ในเครื่องหมายคำพูดด้านล่าง
+        // หากปล่อยว่างไว้ ("") จะใช้ระบบเสียงสังเคราะห์ (Synth) เดิม
+        const soundUrls = {
+            low: "thone/thonekang",   // ใส่ลิงก์เสียงจโจ๊ะ (ทุ้ม) ตรงนี้
+            high: "thone/thonekob"   // ใส่ลิงก์เสียงติง (แหลม) ตรงนี้
+        };
+
+        const audioBuffers = {
+            low: null,
+            high: null
+        };
+
+        async function loadSounds() {
+            for (const [key, url] of Object.entries(soundUrls)) {
+                if (url && url.trim() !== "") {
+                    try {
+                        const response = await fetch(url);
+                        const arrayBuffer = await response.arrayBuffer();
+                        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                        audioBuffers[key] = audioBuffer;
+                        console.log(`Loaded ${key} sound from URL`);
+                    } catch (e) {
+                        console.warn(`Could not load ${key} sound (using synth fallback):`, e);
+                    }
+                }
+            }
+        }
+        
+        // Load sounds immediately
+        loadSounds();
+
         // Master Gain Node (Volume Control)
         const masterGain = audioCtx.createGain();
         masterGain.gain.value = 0.8;
@@ -220,6 +252,17 @@
         // เสียงทุ้ม (Center/Low) - เสียง "จโจ๊ะ"
         function playLowSound() {
             ensureAudioContext();
+
+            // 1. Try playing from loaded file (Priority)
+            if (audioBuffers.low) {
+                const source = audioCtx.createBufferSource();
+                source.buffer = audioBuffers.low;
+                source.connect(masterGain);
+                source.start(0);
+                return;
+            }
+
+            // 2. Fallback to Synthesis
             const t = audioCtx.currentTime;
             
             const osc = audioCtx.createOscillator();
@@ -245,39 +288,50 @@
         // เสียงแหลม (Rim/High) - เสียง "ติง"
         function playHighSound() {
             ensureAudioContext();
-            const t = audioCtx.currentTime;
 
-            // 1. Tonal part (เสียงกังวาน)
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'sine'; // เปลี่ยนเป็น sine เพื่อความใส
-            osc.connect(gain);
-            gain.connect(masterGain);
+            // 1. Try playing from loaded file (Priority)
+            if (audioBuffers.high) {
+                const source = audioCtx.createBufferSource();
+                source.buffer = audioBuffers.high;
+                source.connect(masterGain);
+                source.start(0);
+                return;
+        // --- Sound Synthesis Functions (ฟังก์ชันเล่นเสียง) ---
 
-            osc.frequency.setValueAtTime(450, t); // สูงกว่า
-            
-            // สั้นและกระชับ
-            gain.gain.setValueAtTime(0, t);
-            gain.gain.linearRampToValueAtTime(0.8, t + 0.005);
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+        // เสียงทุ้ม (Center/Low) - เสียง "จโจ๊ะ"
+        function playLowSound() {
+            ensureAudioContext();
 
-            osc.start(t);
-            osc.stop(t + 0.15);
+            // เล่นเสียงจากไฟล์ที่โหลดไว้ (Play from loaded file)
+            if (audioBuffers.low) {
+                const source = audioCtx.createBufferSource();
+                source.buffer = audioBuffers.low;
+                source.connect(masterGain);
+                source.start(0);
+            } else {
+                console.warn("Low sound URL not provided or not loaded yet.");
+                // แจ้งเตือนถ้ายังไม่ได้ใส่ลิงก์
+                const statusBar = document.getElementById('status-bar');
+                if(statusBar) statusBar.innerText = "ยังไม่มีเสียง: กรุณาใส่ลิงก์ใน soundUrls.low";
+            }
+        }
 
-            // 2. Click/Slap part (เสียงกระทบขอบแข็งๆ)
-            const osc2 = audioCtx.createOscillator();
-            const gain2 = audioCtx.createGain();
-            osc2.type = 'triangle';
-            osc2.connect(gain2);
-            gain2.connect(masterGain);
+        // เสียงแหลม (Rim/High) - เสียง "ติง"
+        function playHighSound() {
+            ensureAudioContext();
 
-            osc2.frequency.setValueAtTime(800, t);
-            gain2.gain.setValueAtTime(0, t);
-            gain2.gain.linearRampToValueAtTime(0.3, t + 0.005);
-            gain2.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
-
-            osc2.start(t);
-            osc2.stop(t + 0.05);
+            // เล่นเสียงจากไฟล์ที่โหลดไว้ (Play from loaded file)
+            if (audioBuffers.high) {
+                const source = audioCtx.createBufferSource();
+                source.buffer = audioBuffers.high;
+                source.connect(masterGain);
+                source.start(0);
+            } else {
+                console.warn("High sound URL not provided or not loaded yet.");
+                // แจ้งเตือนถ้ายังไม่ได้ใส่ลิงก์
+                const statusBar = document.getElementById('status-bar');
+                if(statusBar) statusBar.innerText = "ยังไม่มีเสียง: กรุณาใส่ลิงก์ใน soundUrls.high";
+            }
         }
 
         function ensureAudioContext() {
