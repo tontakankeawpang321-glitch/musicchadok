@@ -3,20 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>แทมบูรีนจำลอง V.4 (Rhythm Shake)</title>
+    <title>แทมบูรีนไม้ (Wood Tambourine)</title>
     <style>
-        /* รีเซ็ตค่าเริ่มต้นและตั้งค่าพื้นฐาน */
+        /* รีเซ็ตค่าเริ่มต้น */
         * {
             box-sizing: border-box;
-            touch-action: none; /* ป้องกันการซูมและการเลื่อนหน้าจอขณะเล่น */
-            user-select: none; /* ป้องกันการเลือกข้อความ */
+            touch-action: none;
+            user-select: none;
             -webkit-user-select: none;
         }
 
         body {
             margin: 0;
             padding: 0;
-            background-color: #2c3e50;
+            background-color: #3e2723; /* พื้นหลังสีไม้เข้ม */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -24,218 +24,127 @@
             height: 100vh;
             overflow: hidden;
             font-family: 'Sarabun', sans-serif;
-            color: white;
+            color: #ffe0b2;
         }
 
-        /* พื้นที่แสดงคำแนะนำ */
         #info {
             position: absolute;
             top: 20px;
             text-align: center;
-            opacity: 0.8;
+            opacity: 0.9;
             pointer-events: none;
             z-index: 10;
         }
 
-        h1 {
-            margin: 0 0 10px 0;
-            font-size: 1.5rem;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        }
+        h1 { margin: 0; font-size: 1.5rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        p { margin: 5px 0; font-size: 0.9rem; }
 
-        p {
-            margin: 5px 0;
-            font-size: 0.9rem;
-        }
-
-        /* ปุ่มเริ่มใช้งาน (จำเป็นสำหรับ iOS Audio & Motion) */
-        #start-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.85);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-            transition: opacity 0.5s;
-        }
-
-        #start-btn {
-            padding: 15px 40px;
-            font-size: 1.5rem;
-            background: #e67e22;
-            color: white;
-            border: none;
-            border-radius: 50px;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(230, 126, 34, 0.4);
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
-
-        /* แผงควบคุมการบันทึกเสียง */
-        #record-controls {
-            position: absolute;
-            bottom: 30px;
-            z-index: 20;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-
-        .ctrl-btn {
-            padding: 10px 20px;
-            border-radius: 25px;
-            border: none;
-            font-size: 1rem;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.1s, background-color 0.2s;
-        }
-
-        .ctrl-btn:active {
-            transform: scale(0.95);
-        }
-
-        #rec-btn {
-            background-color: #e74c3c;
-            color: white;
-        }
-
-        #rec-btn.recording {
-            background-color: #c0392b;
-            animation: blinkRed 1s infinite;
-        }
-
-        #stop-btn {
-            background-color: #95a5a6;
-            color: white;
-            display: none; /* ซ่อนตอนแรก */
-        }
-
-        @keyframes blinkRed {
-            0% { box-shadow: 0 0 5px #e74c3c; }
-            50% { box-shadow: 0 0 20px #e74c3c; }
-            100% { box-shadow: 0 0 5px #e74c3c; }
-        }
-
-        /* ตัวแทมบูรีน */
+        /* Wood Tambourine Style */
         #tambourine {
             position: relative;
-            width: 80vmin; /* ปรับขนาดตามหน้าจออัตโนมัติ */
+            width: 80vmin;
             height: 80vmin;
             max-width: 400px;
             max-height: 400px;
             border-radius: 50%;
-            background: #d35400; /* สีขอบไม้ */
-            box-shadow: 
-                0 10px 20px rgba(0,0,0,0.5),
-                inset 0 0 30px rgba(0,0,0,0.3);
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: transform 0.05s;
+            box-shadow: 
+                0 15px 30px rgba(0,0,0,0.6),
+                inset 0 0 20px rgba(0,0,0,0.4);
             -webkit-tap-highlight-color: transparent;
+            
+            /* ลายไม้ */
+            background: repeating-linear-gradient(45deg, #5d4037, #5d4037 10px, #4e342e 10px, #4e342e 20px);
+            border: 15px solid #3e2723;
         }
 
-        /* หน้ากลอง (Skin) */
+        /* Head (Skin) - หนังแท้สีนวล */
         .skin {
             width: 85%;
             height: 85%;
             border-radius: 50%;
-            background: radial-gradient(circle, #fdf6e3 30%, #eee8d5 100%);
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
             position: relative;
             z-index: 2;
+            background: radial-gradient(circle, #fff8e1 30%, #ffecb3 100%);
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.2);
+            transition: transform 0.05s;
         }
 
-        /* เอฟเฟกต์ตอนตี */
-        .skin:active, .skin.hit-anim {
-            background: radial-gradient(circle, #eee8d5 30%, #e0d6c0 100%);
-            transform: scale(0.98);
-        }
+        .skin:active, .skin.hit-anim { transform: scale(0.98); background: radial-gradient(circle, #ffecb3 30%, #ffe0b2 100%); }
 
-        /* แผ่นโลหะ (Jingles/Zils) - สร้างด้วย CSS */
+        /* Jingles (Common) */
         .zils-container {
             position: absolute;
             width: 100%;
             height: 100%;
             border-radius: 50%;
             pointer-events: none;
-            animation: spin 60s linear infinite; /* หมุนช้าๆ ให้ดูมีมิติ */
+            animation: spin 60s linear infinite;
         }
 
         .zil {
             position: absolute;
-            width: 12%; /* ขนาดสัมพัทธ์ */
-            height: 12%;
-            background: radial-gradient(circle, #ecf0f1 10%, #bdc3c7 60%, #7f8c8d 100%);
+            width: 14%;
+            height: 14%;
             border-radius: 50%;
-            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-            top: 50%;
-            left: 50%;
-            transform-origin: 0 0; /* จุดหมุนอยู่ที่มุมซ้ายบนของตัวเอง แต่อยู่กลาง div แม่ */
+            top: 50%; left: 50%;
+            transform-origin: 0 0;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.4);
         }
-
-        /* สร้างรอยบากให้ดูเหมือนโลหะคู่ */
+        
+        /* Brass Jingles (ทองเหลือง) */
+        .zil { background: radial-gradient(circle, #f1c40f 10%, #d4ac0d 60%, #9a7d0a 100%); }
         .zil::after {
-            content: '';
-            position: absolute;
-            top: 20%;
-            left: 20%;
-            width: 60%;
-            height: 60%;
-            border-radius: 50%;
-            border: 1px solid #95a5a6;
-            box-sizing: border-box;
+            content: ''; position: absolute; top: 25%; left: 25%; width: 50%; height: 50%;
+            border-radius: 50%; border: 1px solid rgba(0,0,0,0.2);
         }
 
-        /* แอนิเมชันการสั่น */
-        .shake-anim {
-            animation: shake 0.08s ease-in-out; /* ทำให้กระชับขึ้นอีก */
-        }
-
+        .shake-anim { animation: shake 0.1s ease-in-out; }
         @keyframes shake {
-            0% { transform: rotate(0deg) translate(0, 0); }
-            25% { transform: rotate(3deg) translate(1px, 1px); }
-            50% { transform: rotate(0deg) translate(0, 0); }
-            75% { transform: rotate(-3deg) translate(-1px, -1px); }
-            100% { transform: rotate(0deg) translate(0, 0); }
+            0% { transform: rotate(0deg); } 25% { transform: rotate(5deg); }
+            75% { transform: rotate(-5deg); } 100% { transform: rotate(0deg); }
         }
+
+        #start-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 100; transition: opacity 0.5s;
+        }
+        #start-btn {
+            padding: 15px 40px; font-size: 1.5rem; background: #8d6e63; color: white;
+            border: none; border-radius: 50px; cursor: pointer; animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        
+        #record-controls { position: absolute; bottom: 30px; z-index: 20; display: flex; gap: 15px; }
+        .ctrl-btn {
+            padding: 10px 20px; border-radius: 25px; border: none; font-size: 1rem;
+            font-weight: bold; cursor: pointer; color: white;
+        }
+        #rec-btn { background-color: #d84315; }
+        #rec-btn.recording { background-color: #bf360c; animation: blinkRed 1s infinite; }
+        #stop-btn { background-color: #8d6e63; display: none; }
+        @keyframes blinkRed { 0%, 100% { box-shadow: 0 0 5px #d84315; } 50% { box-shadow: 0 0 20px #d84315; } }
 
     </style>
 </head>
 <body>
 
     <div id="info">
-        <h1>แทมบูรีนจำลอง V.4</h1>
-        <p>แตะเพื่อตี (เสียงเต็ม) | เขย่า (จังหวะ)</p>
-        <p style="font-size: 0.8em; color: #bdc3c7;">(เสียงเขย่ากระชับ ไม่รวมเสียงหนัง)</p>
+        <h1>แทมบูรีนไม้ (Wood Tambourine)</h1>
+        <p>เสียงอบอุ่น ธรรมชาติ | เขย่า = กระพรวน | ตี = หนัง</p>
     </div>
 
     <div id="start-overlay">
         <button id="start-btn">แตะเพื่อเริ่มใช้งาน</button>
-        <p style="margin-top: 15px; color: #ddd;">(จำเป็นเพื่อเปิดระบบเสียงและการเขย่า)</p>
+        <p style="margin-top: 15px; color: #ddd;">(เสียงไม้แท้)</p>
     </div>
 
     <div id="tambourine">
-        <div class="zils-container" id="zils-layer">
-            <!-- Zils จะถูกสร้างด้วย JS -->
-        </div>
+        <div class="zils-container" id="zils-layer"></div>
         <div class="skin"></div>
     </div>
 
@@ -245,133 +154,115 @@
     </div>
 
     <script>
-        // --- ส่วนการจัดการ Audio (Web Audio API) ---
+        // --- Web Audio API ---
         let audioCtx;
-        let jingleBuffer;
-        let skinBuffer;
         let isAudioInit = false;
-        
         let masterGain;
         let compressor;
-        let mediaDest;
-        let mediaRecorder;
-        let audioChunks = [];
+        let mediaDest, mediaRecorder, audioChunks = [];
+        let jingleBuffer;
+        let activeShakeSource = null;
 
         function createNoiseBuffer(duration) {
             const bufferSize = audioCtx.sampleRate * duration;
             const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
             const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                data[i] = Math.random() * 2 - 1;
-            }
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
             return buffer;
         }
 
         function initAudio() {
             if (isAudioInit) return;
-            
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             audioCtx = new AudioContext();
 
             masterGain = audioCtx.createGain();
-            masterGain.gain.value = 1.0; 
+            masterGain.gain.value = 1.0;
 
             compressor = audioCtx.createDynamicsCompressor();
             compressor.threshold.setValueAtTime(-12, audioCtx.currentTime);
-            compressor.knee.setValueAtTime(40, audioCtx.currentTime);
             compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
-            compressor.attack.setValueAtTime(0, audioCtx.currentTime);
-            compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
-
             masterGain.connect(compressor);
             compressor.connect(audioCtx.destination);
 
             mediaDest = audioCtx.createMediaStreamDestination();
-            compressor.connect(mediaDest); 
+            compressor.connect(mediaDest);
 
-            // เสียง Jingle (โลหะ)
-            jingleBuffer = createNoiseBuffer(0.4); 
-            // เสียง Skin (หนัง)
-            skinBuffer = createNoiseBuffer(0.1);
-
+            jingleBuffer = createNoiseBuffer(0.8);
             isAudioInit = true;
         }
 
-        // เพิ่มพารามิเตอร์ durationMultiplier เพื่อคุมหางเสียง
-        function playJingle(intensity = 1.0, durationMultiplier = 1.0) {
+        // 1. เสียงกระพรวน (Jingles)
+        function playJingles(intensity = 1.0, type = 'hit') {
             if (!audioCtx) return;
 
+            if (type === 'shake' && activeShakeSource) {
+                try {
+                    activeShakeSource.gain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.01);
+                    activeShakeSource.source.stop(audioCtx.currentTime + 0.02);
+                } catch(e) {}
+            }
+
+            const t = audioCtx.currentTime;
             const source = audioCtx.createBufferSource();
             source.buffer = jingleBuffer;
 
-            const filter = audioCtx.createBiquadFilter();
-            filter.type = "highpass";
-            filter.frequency.value = 4000 + (Math.random() * 2000); 
-            filter.Q.value = 1;
+            const f1 = audioCtx.createBiquadFilter(); f1.type = "bandpass"; f1.frequency.value = 5000; f1.Q.value = 1;
+            const f2 = audioCtx.createBiquadFilter(); f2.type = "highpass"; f2.frequency.value = 7000; f2.Q.value = 1;
 
-            const gainNode = audioCtx.createGain();
-            const volume = intensity * 1.5; 
-            gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0, t);
             
-            // ปรับ Decay ตาม durationMultiplier: ถ้าเขย่ารัวๆ หางเสียงจะสั้นลงเพื่อความกระชับ
-            const decayTime = 0.3 * durationMultiplier; 
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + decayTime);
-
-            source.connect(filter);
-            filter.connect(gainNode);
-            gainNode.connect(masterGain); 
-
-            source.start();
-        }
-
-        function playSkin(intensity = 1.0) {
-            if (!audioCtx) return;
-
-            const source = audioCtx.createBufferSource();
-            source.buffer = skinBuffer;
-
-            const filter = audioCtx.createBiquadFilter();
-            filter.type = "lowpass";
-            filter.frequency.value = 350;
-
-            const gainNode = audioCtx.createGain();
-            gainNode.gain.setValueAtTime(intensity * 1.2, audioCtx.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-
-            source.connect(filter);
-            filter.connect(gainNode);
-            gainNode.connect(masterGain);
-
-            source.start();
-
-            const osc = audioCtx.createOscillator();
-            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(90, audioCtx.currentTime + 0.1);
-            
-            const oscGain = audioCtx.createGain();
-            oscGain.gain.setValueAtTime(intensity * 0.7, audioCtx.currentTime);
-            oscGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
-
-            osc.connect(oscGain);
-            oscGain.connect(masterGain); 
-            osc.start();
-        }
-
-        function hitTambourine(intensity = 1.0, type = 'full') {
-            if (!isAudioInit) return;
-            
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
+            if (type === 'shake') {
+                gain.gain.linearRampToValueAtTime(intensity * 0.8, t + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2); 
+            } else {
+                gain.gain.linearRampToValueAtTime(intensity * 0.6, t + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
             }
 
+            source.connect(f1); f1.connect(gain);
+            source.connect(f2); f2.connect(gain);
+            gain.connect(masterGain);
+            
+            source.start(t);
+            if (type === 'shake') activeShakeSource = { source: source, gain: gain };
+        }
+
+        // 2. เสียงไม้ (Wood Skin Sound)
+        function playSkin(intensity = 1.0) {
+            if (!audioCtx) return;
+            const t = audioCtx.currentTime;
+            
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+            
+            // ไม้: ทุ้ม นุ่ม (Low frequency, Low filter)
+            osc.frequency.setValueAtTime(180, t);
+            osc.frequency.exponentialRampToValueAtTime(80, t + 0.1);
+            filter.type = "lowpass";
+            filter.frequency.value = 400; // ตัดเสียงแหลมออก ให้เหลือแต่ความอุ่น
+            gain.gain.setValueAtTime(intensity * 1.2, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15); // Decay ปานกลาง
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(masterGain);
+            osc.start(t);
+            osc.stop(t + 0.4);
+        }
+
+        // Main Trigger
+        function hitTambourine(intensity = 1.0, type = 'full') {
+            if (!isAudioInit) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
             if (type === 'shake') {
-                // เขย่า: **เอาเสียงคลิก (Skin) ออกแล้ว** เหลือแต่ Jingle
-                // ปรับเสียงให้สั้นลง (0.4) เพื่อให้ "เป็นจังหวะ" คมชัด
-                playJingle(intensity, 0.4); 
+                playJingles(intensity, 'shake');
             } else {
-                // ตีหน้าจอ: ยังคงมีเสียงเต็ม (Skin + Jingle)
-                playSkin(intensity);
-                setTimeout(() => playJingle(intensity * 0.9, 1.0), 10);
+                playSkin(intensity); 
+                setTimeout(() => playJingles(intensity * 0.9, 'hit'), 15); 
             }
 
             const tamb = document.getElementById('tambourine');
@@ -386,156 +277,98 @@
             }
         }
 
+        // Draw Zils
         function createZils() {
             const container = document.getElementById('zils-layer');
             const numberOfZils = 6; 
+            container.innerHTML = '';
             for (let i = 0; i < numberOfZils; i++) {
                 const zil = document.createElement('div');
                 zil.className = 'zil';
                 const angle = (i / numberOfZils) * 360;
-                zil.style.transform = `rotate(${angle}deg) translate(350%, 0)`; 
+                zil.style.transform = `rotate(${angle}deg) translate(280%, 0)`; 
                 container.appendChild(zil);
             }
         }
 
         // --- Event Handlers ---
-        const startBtn = document.getElementById('start-btn');
-        const startOverlay = document.getElementById('start-overlay');
-        const tambourine = document.getElementById('tambourine');
-        const recBtn = document.getElementById('rec-btn');
-        const stopBtn = document.getElementById('stop-btn');
-
-        startBtn.addEventListener('click', async () => {
+        document.getElementById('start-btn').addEventListener('click', async () => {
             initAudio();
             createZils();
-            
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                 try {
-                    const permissionState = await DeviceMotionEvent.requestPermission();
-                    if (permissionState === 'granted') {
-                        window.addEventListener('devicemotion', handleMotion);
-                    }
-                } catch (e) { console.error(e); }
+                    const ps = await DeviceMotionEvent.requestPermission();
+                    if (ps === 'granted') window.addEventListener('devicemotion', handleMotion);
+                } catch (e) {}
             } else {
                 window.addEventListener('devicemotion', handleMotion);
             }
-
-            startOverlay.style.opacity = '0';
-            setTimeout(() => startOverlay.style.display = 'none', 500);
+            document.getElementById('start-overlay').style.opacity = '0';
+            setTimeout(() => document.getElementById('start-overlay').style.display = 'none', 500);
         });
 
-        // Recording Logic
-        recBtn.addEventListener('click', () => {
+        // Recording
+        document.getElementById('rec-btn').addEventListener('click', () => {
             if (!isAudioInit) return;
             audioChunks = [];
-            
             let options = { mimeType: 'audio/webm' };
-            if (!MediaRecorder.isTypeSupported('audio/webm')) {
-                 options = { mimeType: 'audio/mp4' }; 
-            }
-
-            try {
-                mediaRecorder = new MediaRecorder(mediaDest.stream, options);
-            } catch (e) {
-                mediaRecorder = new MediaRecorder(mediaDest.stream);
-            }
+            if (!MediaRecorder.isTypeSupported('audio/webm')) options = { mimeType: 'audio/mp4' }; 
+            try { mediaRecorder = new MediaRecorder(mediaDest.stream, options); } 
+            catch (e) { mediaRecorder = new MediaRecorder(mediaDest.stream); }
             
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) audioChunks.push(event.data);
-            };
-
+            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
             mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
-                const audioUrl = URL.createObjectURL(audioBlob);
+                const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url;
+                a.download = `tambourine_wood_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.webm`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
                 
-                const a = document.createElement('a');
-                a.href = audioUrl;
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                a.download = `tambourine_${timestamp}.webm`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                
-                recBtn.style.display = 'flex';
-                recBtn.classList.remove('recording');
-                recBtn.innerHTML = '● บันทึก';
-                stopBtn.style.display = 'none';
+                const recBtn = document.getElementById('rec-btn');
+                recBtn.style.display = 'flex'; recBtn.classList.remove('recording'); recBtn.innerHTML = '● บันทึก';
+                document.getElementById('stop-btn').style.display = 'none';
             };
-
             mediaRecorder.start();
-            recBtn.innerHTML = 'กำลังบันทึก...';
-            recBtn.classList.add('recording');
-            recBtn.style.pointerEvents = 'none'; 
-            setTimeout(() => {
-                recBtn.style.display = 'none'; 
-                recBtn.style.pointerEvents = 'auto';
-                stopBtn.style.display = 'flex'; 
-            }, 200); 
+            const recBtn = document.getElementById('rec-btn');
+            recBtn.innerHTML = 'กำลังบันทึก...'; recBtn.classList.add('recording');
+            setTimeout(() => { recBtn.style.display = 'none'; document.getElementById('stop-btn').style.display = 'flex'; }, 200);
         });
+        document.getElementById('stop-btn').addEventListener('click', () => { if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop(); });
 
-        stopBtn.addEventListener('click', () => {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-        });
-
-        function handleInput(e) {
+        // Touch/Mouse Input
+        const tamb = document.getElementById('tambourine');
+        const handleInput = (e) => {
             e.preventDefault();
-            if (e.target.closest('#record-controls')) return; 
-
+            if (e.target.closest('#record-controls')) return;
             if (e.type === 'touchstart') {
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                   hitTambourine(1.0, 'hit');
-                }
-            } else {
-                hitTambourine(1.0, 'hit');
-            }
-        }
+                for(let i=0; i<e.changedTouches.length; i++) hitTambourine(1.0, 'hit');
+            } else hitTambourine(1.0, 'hit');
+        };
+        tamb.addEventListener('mousedown', handleInput);
+        tamb.addEventListener('touchstart', handleInput, {passive:false});
+        window.addEventListener('keydown', e => { if(e.code==='Space' && isAudioInit) hitTambourine(1.0, 'hit'); });
 
-        tambourine.addEventListener('mousedown', handleInput);
-        tambourine.addEventListener('touchstart', handleInput, { passive: false });
-        
-        window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space' && isAudioInit) hitTambourine(1.0, 'hit');
-        });
-
-        // --- ระบบตรวจจับการเขย่า ---
-        let lastX = 0, lastY = 0, lastZ = 0;
-        let lastTime = 0;
-        let lastShakeTime = 0;
-        
+        // Motion Logic
+        let lastX=0, lastY=0, lastZ=0, lastTime=0, lastShakeTime=0;
         function handleMotion(event) {
             const acc = event.accelerationIncludingGravity;
             if (!acc) return;
-
-            const currentTime = Date.now();
-            const dt = currentTime - lastTime;
-            
-            if (dt > 20) { 
+            const now = Date.now();
+            if ((now - lastTime) > 20) {
                 const deltaX = acc.x - lastX;
                 const deltaY = acc.y - lastY;
                 const deltaZ = acc.z - lastZ;
-                
-                const speed = Math.sqrt(deltaX*deltaX + deltaY*deltaY + deltaZ*deltaZ) / dt * 1000;
+                const speed = Math.sqrt(deltaX**2 + deltaY**2 + deltaZ**2) / (now - lastTime) * 1000;
 
-                // เขย่าแรงๆ ถึงจะดัง
-                if (speed > 300) { 
-                    if (currentTime - lastShakeTime > 50) { 
-                        let vol = Math.min(speed / 1000, 1.2);
-                        if (vol < 0.3) vol = 0.3; 
-                        
-                        // กลับมาใช้โหมด 'shake' (เสียงกระดิ่งอย่างเดียว กระชับๆ)
-                        hitTambourine(vol, 'shake');
-                        
-                        lastShakeTime = currentTime;
-                    }
+                if (speed > 300 && (now - lastShakeTime > 60)) {
+                    let vol = Math.min(speed / 1000, 1.2);
+                    if (vol < 0.4) vol = 0.4;
+                    hitTambourine(vol, 'shake');
+                    lastShakeTime = now;
                 }
-                
-                lastX = acc.x;
-                lastY = acc.y;
-                lastZ = acc.z;
-                lastTime = currentTime;
+                lastX=acc.x; lastY=acc.y; lastZ=acc.z; lastTime=now;
             }
         }
-
     </script>
 </body>
 </html>
