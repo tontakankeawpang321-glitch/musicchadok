@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Marching Bass Drum (Unified Sound)</title>
+    <title>Marching Bass Drum (Stable Audio)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&family=Black+Ops+One&display=swap');
 
@@ -51,37 +51,7 @@
             text-shadow: 0 2px 5px rgba(0,0,0,0.8);
         }
 
-        /* Status Area */
-        .status-bar {
-            background: rgba(0,0,0,0.7);
-            width: 100%;
-            padding: 8px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 15px;
-            border-bottom: 1px solid #444;
-            font-size: 0.85rem;
-            color: #aaa;
-        }
-        
-        .status-indicator {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: #555;
-        }
-
-        .status-dot.active {
-            background-color: #4caf50;
-            box-shadow: 0 0 5px #4caf50;
-        }
+        /* Status Bar removed as requested */
 
         .drum-container {
             flex-grow: 1;
@@ -260,17 +230,8 @@
         <h1>MARCHING BASS</h1>
     </header>
 
-    <!-- Status Bar & Config -->
-    <div class="status-bar">
-        <div class="status-indicator">
-            <div id="sourceDot" class="status-dot"></div>
-            <span id="sourceText">Synthesizer (Ready)</span>
-        </div>
-    </div>
-
     <div class="drum-container">
         <div class="drum-pad" id="bigDrum">
-            <!-- <div class="rim-zone"></div> -->
         </div>
         <div class="drum-label">CORPS SERIES 28"</div>
     </div>
@@ -295,10 +256,9 @@
 
     <script>
         // --- Sound Configuration ---
-        // ใส่ URL ไฟล์เสียงได้ที่นี่
         const soundUrls = {
-           'hit': 'basdrum/bassdrum.mp3', // เสียงตีตรงกลาง (Bass)
-           'rim': 'basdrum/bassdrumkob.mp3'  // เสียงตีขอบ (Rim - ถ้าใส่จะใช้ไฟล์ ถ้าไม่ใส่จะใช้เสียง hit แบบเบาลง)
+            'hit': 'basdrum/bassdrum.mp3', // เสียงตีตรงกลาง (Bass)
+           'rim': 'basdrum/bassdrumkob.mp3' 
         };
 
         // --- Audio Engine (Web Audio API) ---
@@ -318,7 +278,7 @@
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 audioCtx = new AudioContext();
                 
-                // Dynamics Compressor
+                // Dynamics Compressor - Stabilized
                 compressor = audioCtx.createDynamicsCompressor();
                 compressor.threshold.value = -12; 
                 compressor.knee.value = 30; 
@@ -326,17 +286,14 @@
                 compressor.attack.value = 0.003; 
                 compressor.release.value = 0.15;
 
-                // Master Volume
+                // Master Volume - Adjusted to avoid distortion with loaded files
                 masterGain = audioCtx.createGain();
                 masterGain.gain.value = 3.5; 
                 
-                // Final EQ
-                const lowpass = audioCtx.createBiquadFilter();
-                lowpass.type = 'lowpass';
-                lowpass.frequency.value = 2000; 
-
-                masterGain.connect(lowpass);
-                lowpass.connect(compressor);
+                // Removed Master Lowpass Filter to allow full fidelity for loaded sounds
+                
+                // Chain: Master -> Compressor -> Dest
+                masterGain.connect(compressor);
                 compressor.connect(audioCtx.destination);
                 
                 dest = audioCtx.createMediaStreamDestination();
@@ -359,22 +316,11 @@
                         const arrayBuffer = await response.arrayBuffer();
                         const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                         loadedBuffers[key] = audioBuffer;
-                        
-                        updateStatus(true, "URL Loaded: " + key);
+                        // No UI update/alert as requested
                     } catch (error) {
                         console.warn(`Failed to load sound for ${key}:`, error);
                     }
                 }
-            }
-        }
-
-        function updateStatus(active, text) {
-            const dot = document.getElementById('sourceDot');
-            const txt = document.getElementById('sourceText');
-            if (active) {
-                dot.classList.add('active');
-                txt.textContent = text;
-                txt.style.color = "#4caf50";
             }
         }
 
@@ -385,10 +331,8 @@
                 audioCtx.resume();
             }
             
-            // 1. Priority: Custom Sample from URL (if available)
+            // 1. Priority: Custom Sample from URL
             if (loadedBuffers[type]) {
-                // If specific rim sample exists, use it.
-                // If only hit sample exists and rim requested, play hit sample quieter.
                 if (type === 'rim' && !loadedBuffers['rim'] && loadedBuffers['hit']) {
                      playSample(loadedBuffers['hit'], intensity * 0.25); // Rim = Hit * 25% vol
                 } else {
@@ -398,26 +342,27 @@
             // 2. Fallback: Synthesis
             else {
                 if (type === 'hit') {
-                    // Full volume bass
                     generateBassSound(audioCtx.currentTime, 1.0);
                 } else if (type === 'rim') {
-                    // Rim shot = Main Sound but VERY QUIET
-                    // User requested: "Use sound from main, just reduce level to quietest"
-                    // Base volume 25% * intensity
                     const rimVolume = 0.25 * intensity;
                     generateBassSound(audioCtx.currentTime, rimVolume);
                 }
             }
         }
 
-        // 1. Sample Player
+        // 1. Sample Player (Improved Stability)
         function playSample(buffer, intensity) {
             const t = audioCtx.currentTime;
             const source = audioCtx.createBufferSource();
             source.buffer = buffer;
             
             const sampleGain = audioCtx.createGain();
-            sampleGain.gain.value = 0.8 * intensity; 
+            // Micro-fade in/out to prevent popping/clicks (Stable playback)
+            const vol = 0.8 * intensity;
+            sampleGain.gain.setValueAtTime(0, t);
+            sampleGain.gain.linearRampToValueAtTime(vol, t + 0.002); // 2ms attack
+            // Let sample play fully, fade out at end if buffer duration is known
+            // But usually just let it play. The clean start is most important.
             
             source.connect(sampleGain);
             sampleGain.connect(masterGain);
@@ -425,7 +370,6 @@
         }
 
         // 2. Synthesis: Bass Sound (Lunar Short Spiral)
-        // Modified to accept volumeScale
         function generateBassSound(t, volumeScale = 1.0) {
             const gainNode = audioCtx.createGain();
             gainNode.connect(masterGain);
@@ -437,7 +381,6 @@
             osc.frequency.exponentialRampToValueAtTime(45, t + 0.15); 
             
             gainNode.gain.setValueAtTime(0, t);
-            // Apply volumeScale to peak gain
             gainNode.gain.linearRampToValueAtTime(1.2 * volumeScale, t + 0.015);
             gainNode.gain.exponentialRampToValueAtTime(0.001, t + 0.65); 
             
@@ -452,7 +395,6 @@
             
             const subGain = audioCtx.createGain();
             subGain.gain.setValueAtTime(0, t);
-            // Apply volumeScale to sub peak gain
             subGain.gain.linearRampToValueAtTime(1.3 * volumeScale, t + 0.015);
             subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
             
@@ -466,11 +408,10 @@
         const bigDrum = document.getElementById('bigDrum');
 
         function triggerDrum(e, isTouch = false) {
-            e.preventDefault(); // Prevent ghost clicks
+            e.preventDefault(); 
             
             const rect = bigDrum.getBoundingClientRect();
             if (isTouch && e.changedTouches) {
-                // Handle multi-touch
                 for (let i = 0; i < e.changedTouches.length; i++) {
                     processHit(e.changedTouches[i].clientX, e.changedTouches[i].clientY, rect);
                 }
@@ -483,19 +424,15 @@
             const centerX = rect.left + rect.width / 2;
             const centerY = rect.top + rect.height / 2;
             
-            // คำนวณระยะห่างจากจุดศูนย์กลาง
             const dist = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
             const radius = rect.width / 2;
-            const normalizedDist = dist / radius; // 0.0 (กลาง) ถึง 1.0 (ขอบ)
+            const normalizedDist = dist / radius; 
 
-            // กำหนดโซน: ถ้าห่างจากศูนย์กลางเกิน 75% ถือว่าเป็นขอบ (Rim)
+            // Rim Zone > 75%
             if (normalizedDist > 0.75) {
-                // Rim Logic: Use main sound but quieter
-                // Map range 0.75-1.0 to intensity 1.0-0.5 (further out = quieter)
                 const intensity = Math.max(0.2, 1 - ((normalizedDist - 0.75) / 0.5));
                 playDrumSound('rim', intensity);
             } else {
-                // Hit Logic
                 playDrumSound('hit');
             }
 
@@ -511,7 +448,6 @@
         function createRipple(x, y) {
             const ripple = document.createElement('div');
             ripple.classList.add('ripple');
-            // Ripple เกิดตรงจุดที่ตี
             const size = 100;
             ripple.style.width = size + 'px';
             ripple.style.height = size + 'px';
@@ -526,22 +462,19 @@
         bigDrum.addEventListener('mousedown', (e) => triggerDrum(e, false));
         bigDrum.addEventListener('touchstart', (e) => triggerDrum(e, true), { passive: false });
 
-        // Keyboard: Space = Bass, R = Rim
         window.addEventListener('keydown', (e) => {
             if (e.repeat) return;
             if (e.code === 'Space' || e.key === ' ') {
                 playDrumSound('hit');
-                // Simulate visual center hit
                 const rect = bigDrum.getBoundingClientRect();
                 bigDrum.classList.add('active');
                 createRipple(rect.width/2, rect.height/2);
                 setTimeout(() => bigDrum.classList.remove('active'), 80);
             } else if (e.key.toLowerCase() === 'r') {
                 playDrumSound('rim', 0.8);
-                 // Simulate visual rim hit
                  const rect = bigDrum.getBoundingClientRect();
                  bigDrum.classList.add('active');
-                 createRipple(rect.width/2, 20); // Top edge
+                 createRipple(rect.width/2, 20); 
                  setTimeout(() => bigDrum.classList.remove('active'), 80);
             }
         });
