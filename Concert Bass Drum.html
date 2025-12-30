@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Marching Bass Drum (Sample Only)</title>
+    <title>Marching Bass Drum (Instant & Build-up)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&family=Black+Ops+One&display=swap');
 
@@ -50,8 +50,6 @@
             letter-spacing: 2px;
             text-shadow: 0 2px 5px rgba(0,0,0,0.8);
         }
-
-        /* Status Bar removed as requested */
 
         .drum-container {
             flex-grow: 1;
@@ -256,9 +254,10 @@
 
     <script>
         // --- Sound Configuration ---
+        // ใส่ URL ไฟล์เสียงที่นี่ได้เลยครับ
         const soundUrls = {
             'hit': 'basdrum/bassdrum.mp3', // เสียงตีตรงกลาง (Bass)
-           'rim': 'basdrum/bassdrumkob.mp3' 
+            'rim': 'basdrum/bassdrumkob.mp3' // เสียงตีขอบ
         };
 
         // --- Audio Engine (Web Audio API) ---
@@ -278,19 +277,17 @@
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 audioCtx = new AudioContext();
                 
-                // Dynamics Compressor - Stabilized
+                // Dynamics Compressor - ตั้งค่าให้รองรับการตีซ้ำแบบดังขึ้นเรื่อยๆ
                 compressor = audioCtx.createDynamicsCompressor();
-                compressor.threshold.value = -12; 
+                compressor.threshold.value = -8; // ให้เพดานเสียงสูงขึ้นอีกนิด ก่อนจะกด
                 compressor.knee.value = 30; 
-                compressor.ratio.value = 15; 
+                compressor.ratio.value = 12; 
                 compressor.attack.value = 0.003; 
-                compressor.release.value = 0.15;
+                compressor.release.value = 0.25;
 
-                // Master Volume - Adjusted to avoid distortion with loaded files
+                // Master Volume - ตั้งค่าให้ดังชัดเจน
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 3.5; 
-                
-                // Removed Master Lowpass Filter to allow full fidelity for loaded sounds
+                masterGain.gain.value = 4.0; // Boost Volume
                 
                 // Chain: Master -> Compressor -> Dest
                 masterGain.connect(compressor);
@@ -301,6 +298,7 @@
 
                 preloadSounds();
             }
+            // ปลุก AudioContext ทันที
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
@@ -316,7 +314,7 @@
                         const arrayBuffer = await response.arrayBuffer();
                         const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                         loadedBuffers[key] = audioBuffer;
-                        // No UI update/alert as requested
+                        console.log("Loaded: " + key);
                     } catch (error) {
                         console.warn(`Failed to load sound for ${key}:`, error);
                     }
@@ -324,36 +322,40 @@
             }
         }
 
-        // --- Play Logic (Bass & Rim) ---
+        // --- Play Logic (Sample Only) ---
         function playDrumSound(type, intensity = 1.0) {
+            // เรียก initAudio ทุกครั้งที่ตี เพื่อรับประกันว่า Context ทำงาน
             initAudio();
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
             
-            // Only play if buffer is loaded (No Synthesis Fallback)
+            // ถ้าไฟล์โหลดเสร็จแล้ว ให้เล่นเลย
             if (loadedBuffers[type]) {
                  playSample(loadedBuffers[type], intensity);
-            } else if (type === 'rim' && loadedBuffers['hit']) {
-                 // Fallback for rim if only hit is loaded (using hit sample at lower volume)
+            } 
+            // กรณีไม่มีไฟล์ Rim ให้ใช้ไฟล์ Hit แต่เบาลง
+            else if (type === 'rim' && loadedBuffers['hit']) {
                  playSample(loadedBuffers['hit'], intensity * 0.25);
             }
         }
 
-        // 1. Sample Player (Improved Stability)
+        // Function เล่นไฟล์เสียง (ปรับให้สมูทและดังขึ้นเรื่อยๆ ตามการตีซ้อน)
         function playSample(buffer, intensity) {
             const t = audioCtx.currentTime;
             const source = audioCtx.createBufferSource();
             source.buffer = buffer;
             
             const sampleGain = audioCtx.createGain();
-            // Micro-fade in/out to prevent popping/clicks (Stable playback)
-            const vol = 0.8 * intensity;
-            sampleGain.gain.setValueAtTime(0, t);
-            sampleGain.gain.linearRampToValueAtTime(vol, t + 0.002); // 2ms attack
             
+            // ปรับระดับความดังตามตำแหน่งที่ตี (Intensity)
+            const vol = 1.0 * intensity;
+            
+            // INSTANT ATTACK: ตั้งค่า Gain ทันที ไม่มีการ Fade-in เพื่อให้เสียงพุ่ง "ปึง" ทันทีที่แตะ
+            sampleGain.gain.setValueAtTime(vol, t);
+            
+            // เชื่อมต่อระบบ
             source.connect(sampleGain);
             sampleGain.connect(masterGain);
+            
+            // เล่นทันที
             source.start(t);
         }
 
@@ -383,10 +385,12 @@
 
             // Rim Zone > 75%
             if (normalizedDist > 0.75) {
+                // ตีขอบ: ความดังลดหลั่นตามระยะ
                 const intensity = Math.max(0.2, 1 - ((normalizedDist - 0.75) / 0.5));
                 playDrumSound('rim', intensity);
             } else {
-                playDrumSound('hit');
+                // ตีกลาง: ดังเต็มที่
+                playDrumSound('hit', 1.0);
             }
 
             // Visual feedback
