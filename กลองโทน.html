@@ -199,8 +199,7 @@
         const audioCtx = new AudioContext();
         
         // --- Configuration: External Sound URLs (ตั้งค่าลิงก์เสียง) ---
-        // ข้อควรระวัง: ลิงก์ต้องเป็น https:// และอนุญาตให้เข้าถึงได้ (CORS)
-        // ไฟล์ในเครื่อง (เช่น C:/... หรือ thone/...) จะเล่นไม่ได้ในหน้าเว็บจำลองนี้
+        // ใส่ลิงก์ไฟล์เสียงของคุณที่นี่
         const soundUrls = {
             low: "thone/thonekang.mp3",
             high: "thone/thonkob.mp3"
@@ -211,7 +210,7 @@
             high: null
         };
 
-        // ฟังก์ชันโหลดเสียงที่ปรับปรุงแล้ว
+        // ฟังก์ชันโหลดเสียง
         async function loadSounds() {
             const statusBar = document.getElementById('status-bar');
             
@@ -221,7 +220,6 @@
                         statusBar.innerText = `กำลังโหลดเสียง ${key}...`;
                         const response = await fetch(url);
                         
-                        // เช็คว่าเจอไฟล์หรือไม่
                         if (!response.ok) {
                             throw new Error(`HTTP error! status: ${response.status}`);
                         }
@@ -232,8 +230,8 @@
                         console.log(`Loaded ${key} sound from URL`);
                         statusBar.innerText = `โหลดเสียง ${key} สำเร็จ`;
                     } catch (e) {
-                        console.warn(`Could not load ${key} sound (using synth fallback):`, e);
-                        statusBar.innerText = `ไม่พบไฟล์เสียง ${key} (ใช้เสียงจำลองแทน)`;
+                        console.warn(`Could not load ${key} sound:`, e);
+                        statusBar.innerText = `ไม่พบไฟล์เสียง ${key} (เงียบ)`;
                     }
                 }
             }
@@ -243,7 +241,7 @@
 
         // Master Gain Node (Volume Control)
         const masterGain = audioCtx.createGain();
-        masterGain.gain.value = 0.8;
+        masterGain.gain.value = 1.0; 
         masterGain.connect(audioCtx.destination);
 
         // Recording Stream Setup
@@ -257,88 +255,62 @@
         let playbackAudio = new Audio();
         let isRecording = false;
 
-        // --- Sound Logic ---
+        // --- Sound Logic (Clean Version & Noise Reduction) ---
 
         // เสียงทุ้ม (Center/Low) - เสียง "จโจ๊ะ"
         function playLowSound() {
             ensureAudioContext();
 
-            // 1. เล่นไฟล์เสียงถ้ามี (Priority)
             if (audioBuffers.low) {
                 const source = audioCtx.createBufferSource();
                 source.buffer = audioBuffers.low;
-                source.connect(masterGain);
+                
+                // 1. สร้าง Gain เพื่อทำ Fade-out (ตัดหางเสียงซ่า)
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime);
+                // ค่อยๆ ลดเสียงลงจนเงียบก่อนจบไฟล์ 0.1 วินาที
+                const fadeOutTime = Math.max(0, source.buffer.duration - 0.1);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + fadeOutTime);
+
+                // 2. สร้าง Low-pass Filter เพื่อกรองเสียงแหลม (Hiss/Air noise)
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 3000; // ตัดย่านเสียงสูงเกิน 3000Hz ออก (เสียงจโจ๊ะเป็นเสียงต่ำ ไม่กระทบมาก แต่ตัดเสียงซ่าได้ดี)
+
+                // เชื่อมต่อ: Source -> Filter -> Gain -> Master
+                source.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(masterGain);
+                
                 source.start(0);
-                return;
+            } else {
+                console.log("No low sound loaded.");
             }
-
-            // 2. ถ้าไม่มีไฟล์ ให้ใช้เสียงสังเคราะห์แทน (Backup)
-            // เพื่อป้องกันปัญหาเงียบกริบ
-            const t = audioCtx.currentTime;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-
-            osc.connect(gain);
-            gain.connect(masterGain);
-
-            // Frequency envelope (Pitch Drop)
-            osc.frequency.setValueAtTime(200, t);
-            osc.frequency.exponentialRampToValueAtTime(80, t + 0.15);
-
-            // Amplitude envelope
-            gain.gain.setValueAtTime(0, t);
-            gain.gain.linearRampToValueAtTime(2.5, t + 0.01); // ดังขึ้นเป็น 2.5
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
-
-            osc.start(t);
-            osc.stop(t + 0.4);
         }
 
         // เสียงแหลม (Rim/High) - เสียง "ติง"
         function playHighSound() {
             ensureAudioContext();
 
-            // 1. เล่นไฟล์เสียงถ้ามี (Priority)
             if (audioBuffers.high) {
                 const source = audioCtx.createBufferSource();
                 source.buffer = audioBuffers.high;
-                source.connect(masterGain);
+                
+                // 1. สร้าง Gain เพื่อทำ Fade-out (ตัดหางเสียงซ่า)
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime);
+                // ตัดหางเสียงให้กระชับขึ้น เพื่อไม่ให้มี Noise ค้าง
+                const fadeOutTime = Math.max(0, source.buffer.duration - 0.05);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + fadeOutTime);
+
+                // เชื่อมต่อ: Source -> Gain -> Master (เสียงติงต้องการความใส ไม่ใส่ Low-pass filter)
+                source.connect(gainNode);
+                gainNode.connect(masterGain);
+                
                 source.start(0);
-                return;
+            } else {
+                console.log("No high sound loaded.");
             }
-
-            // 2. ถ้าไม่มีไฟล์ ให้ใช้เสียงสังเคราะห์แทน (Backup)
-            const t = audioCtx.currentTime;
-
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'sine';
-            osc.connect(gain);
-            gain.connect(masterGain);
-
-            osc.frequency.setValueAtTime(450, t);
-            
-            gain.gain.setValueAtTime(0, t);
-            gain.gain.linearRampToValueAtTime(0.8, t + 0.005);
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
-
-            osc.start(t);
-            osc.stop(t + 0.15);
-
-            // Click part
-            const osc2 = audioCtx.createOscillator();
-            const gain2 = audioCtx.createGain();
-            osc2.type = 'triangle';
-            osc2.connect(gain2);
-            gain2.connect(masterGain);
-
-            osc2.frequency.setValueAtTime(800, t);
-            gain2.gain.setValueAtTime(0, t);
-            gain2.gain.linearRampToValueAtTime(0.3, t + 0.005);
-            gain2.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
-
-            osc2.start(t);
-            osc2.stop(t + 0.05);
         }
 
         function ensureAudioContext() {
