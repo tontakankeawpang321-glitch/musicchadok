@@ -1,414 +1,279 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>กลองเทเนอร์จำลอง (Sample Playback)</title>
-    <style>
-        :root {
-            --bg-color: #1a1a1a;
-            --drum-rim: #e0e0e0; 
-            --drum-head: #ffffff; 
-            --drum-shell: #263238; 
-            --highlight: #00bcd4; 
-            --record-color: #ff5252;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>กลองเทเนอร์จำลอง (Sample Playback)</title>
 
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: var(--bg-color);
-            height: 100vh;
-            width: 100vw;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Sarabun', sans-serif;
-            touch-action: none;
-            user-select: none;
-            -webkit-user-select: none;
-        }
+<style>
+:root {
+    --bg-color:#1a1a1a;
+    --drum-rim:#e0e0e0;
+    --drum-head:#ffffff;
+    --drum-shell:#263238;
+    --highlight:#00bcd4;
+    --record-color:#ff5252;
+}
 
-        #start-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.9);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-            color: white;
-            text-align: center;
-            transition: opacity 0.5s;
-        }
+body{
+    margin:0;
+    background:var(--bg-color);
+    height:100vh;
+    overflow:hidden;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-family:'Sarabun',sans-serif;
+    user-select:none;
+    touch-action:none;
+}
 
-        .btn-start {
-            padding: 15px 30px;
-            font-size: 1.5rem;
-            background: var(--highlight);
-            border: none;
-            color: white;
-            border-radius: 50px;
-            cursor: pointer;
-            margin-top: 20px;
-            box-shadow: 0 0 20px rgba(0, 188, 212, 0.5);
-            font-weight: bold;
-        }
+#start-overlay{
+    position:absolute;
+    inset:0;
+    background:rgba(0,0,0,.9);
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    z-index:100;
+    color:#fff;
+    transition:.4s;
+}
 
-        .controls {
-            position: absolute;
-            top: 20px;
-            display: flex;
-            gap: 15px;
-            z-index: 50;
-            background: rgba(0,0,0,0.5);
-            padding: 10px 20px;
-            border-radius: 30px;
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255,255,255,0.1);
-        }
+.btn-start{
+    padding:15px 32px;
+    font-size:1.5rem;
+    background:var(--highlight);
+    border:none;
+    border-radius:50px;
+    color:#fff;
+    cursor:pointer;
+    font-weight:bold;
+    box-shadow:0 0 20px rgba(0,188,212,.6);
+}
 
-        .btn-control {
-            padding: 8px 16px;
-            border-radius: 20px;
-            border: 1px solid rgba(255,255,255,0.2);
-            background: rgba(255,255,255,0.1);
-            color: white;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
+#loading-text{
+    margin-top:12px;
+    color:#aaa;
+    font-size:.9rem;
+}
 
-        .btn-control:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
+.controls{
+    position:absolute;
+    top:15px;
+    display:flex;
+    gap:12px;
+    z-index:20;
+}
 
-        .btn-record.recording {
-            background-color: var(--record-color);
-            border-color: var(--record-color);
-            animation: pulse 1.5s infinite;
-        }
+.btn-control{
+    padding:8px 16px;
+    border-radius:20px;
+    background:rgba(255,255,255,.1);
+    border:1px solid rgba(255,255,255,.2);
+    color:#fff;
+    cursor:pointer;
+}
 
-        .status-text {
-            color: var(--record-color);
-            font-weight: bold;
-            display: none;
-            align-items: center;
-            margin-left: 10px;
-            font-size: 0.9rem;
-        }
+.btn-record.recording{
+    background:var(--record-color);
+    border-color:var(--record-color);
+    animation:pulse 1.4s infinite;
+}
 
-        @keyframes pulse {
-            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); }
-            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
-            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
-        }
+@keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(255,82,82,.7)}
+    70%{box-shadow:0 0 0 12px rgba(255,82,82,0)}
+    100%{box-shadow:0 0 0 0 rgba(255,82,82,0)}
+}
 
-        .drum-container {
-            position: relative;
-            width: 95vw;
-            height: 60vh;
-            max-width: 800px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
+.status-text{
+    color:var(--record-color);
+    font-weight:bold;
+    display:none;
+}
 
-        .drum {
-            position: absolute;
-            border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #ffffff, #eceff1);
-            border: 8px solid var(--drum-shell);
-            box-shadow: 
-                0 0 0 4px var(--drum-rim),
-                0 15px 25px rgba(0,0,0,0.6),
-                inset 0 0 20px rgba(0,0,0,0.1);
-            cursor: pointer;
-            transition: transform 0.05s, border-color 0.05s;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-weight: bold;
-            color: rgba(0,0,0,0.4);
-            font-size: 1.5rem;
-            -webkit-tap-highlight-color: transparent;
-        }
+.drum-container{
+    position:relative;
+    width:95vw;
+    height:60vh;
+    max-width:800px;
+}
 
-        .drum:active, .drum.hit {
-            transform: scale(0.96);
-            background: radial-gradient(circle at 30% 30%, #fff, #fafafa);
-            border-color: var(--highlight);
-        }
+.drum{
+    position:absolute;
+    border-radius:50%;
+    background:radial-gradient(circle at 30% 30%,#fff,#eceff1);
+    border:8px solid var(--drum-shell);
+    box-shadow:
+        0 0 0 4px var(--drum-rim),
+        0 15px 25px rgba(0,0,0,.6),
+        inset 0 0 20px rgba(0,0,0,.1);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-weight:bold;
+    font-size:1.4rem;
+    cursor:pointer;
+}
 
-        #drum-1 { width: 18vmin; height: 18vmin; right: 32%; top: 15%; z-index: 2; }
-        #drum-2 { width: 20vmin; height: 20vmin; left: 30%; top: 15%; z-index: 2; }
-        #drum-3 { width: 24vmin; height: 24vmin; right: 5%; top: 25%; z-index: 1; }
-        #drum-4 { width: 26vmin; height: 26vmin; left: 2%; top: 25%; z-index: 1; }
-        #drum-spock {
-            width: 14vmin; height: 14vmin;
-            left: 50%; top: 5%;
-            transform: translateX(-50%);
-            z-index: 3;
-            background: radial-gradient(circle at 30% 30%, #455a64, #263238); 
-            border-color: #000;
-            color: rgba(255,255,255,0.3);
-        }
-        #drum-spock:active, #drum-spock.hit {
-            transform: translateX(-50%) scale(0.95);
-        }
+.drum.hit{
+    transform:scale(.96);
+    border-color:var(--highlight);
+}
 
-        .rim-hit-zone {
-            position: absolute;
-            bottom: 12%;
-            width: 100%;
-            text-align: center;
-            color: #aaa;
-            pointer-events: none;
-            font-size: 0.9rem;
-            letter-spacing: 1px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
+#drum-1{width:18vmin;height:18vmin;right:32%;top:15%}
+#drum-2{width:20vmin;height:20vmin;left:30%;top:15%}
+#drum-3{width:24vmin;height:24vmin;right:5%;top:25%}
+#drum-4{width:26vmin;height:26vmin;left:2%;top:25%}
 
-        .footer {
-            position: absolute;
-            bottom: 20px;
-            color: #666;
-            font-size: 0.8rem;
-        }
-
-        #loading-text {
-            margin-top: 10px;
-            font-size: 0.9rem;
-            color: #aaa;
-        }
-
-        @media (orientation: portrait) {
-            .drum-container { height: 50vh; width: 100vw; }
-            #drum-1 { right: 28%; top: 20%; }
-            #drum-2 { left: 28%; top: 20%; }
-            #drum-3 { right: 2%; top: 35%; }
-            #drum-4 { left: 2%; top: 35%; }
-            #drum-spock { top: 8%; }
-            .controls { top: 10px; flex-wrap: wrap; justify-content: center; }
-        }
-
-    </style>
+#drum-spock{
+    width:14vmin;height:14vmin;
+    left:50%;top:5%;
+    transform:translateX(-50%);
+    background:radial-gradient(circle at 30% 30%,#455a64,#263238);
+    border-color:#000;
+    color:#ccc;
+}
+</style>
 </head>
+
 <body>
 
-    <div id="start-overlay">
-        <h1>กลองเทเนอร์จำลอง</h1>
-        <div class="controls">
-        <button id="btn-record" class="btn-control btn-record" onclick="toggleRecord()">
-            <span class="icon">●</span> บันทึก
-        </button>
-        <button id="btn-stop" class="btn-control" onclick="stopRecord()" disabled>
-            <span class="icon">■</span> หยุด & โหลด
-        </button>
-        <span id="record-status" class="status-text">กำลังบันทึก...</span>
-    </div>
+<div id="start-overlay">
+    <h1>กลองเทเนอร์จำลอง</h1>
+    <button id="btn-start-init" class="btn-start">▶ เริ่มใช้งาน</button>
+    <div id="loading-text"></div>
+</div>
 
-    <div class="drum-container">
-        <!-- Spock (S) -->
-        <div id="drum-spock" class="drum" data-note="spock">S</div>
-        <!-- Drum 2 -->
-        <div id="drum-2" class="drum" data-note="2">2</div>
-        <!-- Drum 1 -->
-        <div id="drum-1" class="drum" data-note="1">1</div>
-        <!-- Drum 4 -->
-        <div id="drum-4" class="drum" data-note="4">4</div>
-        <!-- Drum 3 -->
-        <div id="drum-3" class="drum" data-note="3">3</div>
-    </div>
-    
+<div class="controls">
+    <button id="btn-record" class="btn-control btn-record" onclick="toggleRecord()">● บันทึก</button>
+    <button id="btn-stop" class="btn-control" onclick="stopRecord()" disabled>■ หยุด & โหลด</button>
+    <span id="record-status" class="status-text">กำลังบันทึก...</span>
+</div>
 
+<div class="drum-container">
+    <div id="drum-spock" class="drum" data-note="spock">S</div>
+    <div id="drum-2" class="drum" data-note="2">2</div>
+    <div id="drum-1" class="drum" data-note="1">1</div>
+    <div id="drum-4" class="drum" data-note="4">4</div>
+    <div id="drum-3" class="drum" data-note="3">3</div>
+</div>
 
- 
+<script>
+const soundFiles={
+    spock:'tenors/stenor.mp3',
+    1:'tenors/1tenor.mp3',
+    2:'tenors/tenors.mp3',
+    3:'tenors/tenors.mp3',
+    4:'tenors/4tenors.mp3'
+};
 
-    <script>
-        // ==========================================
-        // ตั้งค่าชื่อไฟล์เสียงที่นี่ (แก้ไขชื่อไฟล์ได้ตามต้องการ)
-        // ==========================================
-        const soundFiles = {
-            'spock': 'tenors/stenor.mp3',
-            '1': 'tenors/1tenor.mp3',
-            '2': 'tenors/tenors.mp3',
-            '3': 'tenors/tenors.mp3',
-            '4': 'tenors/4tenors.mp3'
-        };
+let audioCtx,masterGain,destNode;
+let audioBuffers={};
+let mediaRecorder,audioChunks=[],isRecording=false;
 
-        let audioCtx;
-        let masterGain;
-        let audioBuffers = {}; // ที่เก็บข้อมูลเสียงที่โหลดแล้ว
+async function initAudio(){
+    const btn=document.getElementById('btn-start-init');
+    btn.disabled=true;
+    btn.innerText='กำลังโหลด...';
 
-        // Recording Variables
-        let mediaRecorder;
-        let audioChunks = [];
-        let destNode; 
-        let isRecording = false;
+    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
 
-        async function loadSound(note, url) {
-            try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const arrayBuffer = await response.arrayBuffer();
-                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-                audioBuffers[note] = audioBuffer;
-                console.log(`Loaded ${note} from ${url}`);
-            } catch (error) {
-                console.warn(`ไม่สามารถโหลดไฟล์เสียง: ${url} (จะใช้เสียง Beep สำรองแทน)`);
-                console.error(error);
-                // ไม่ต้องทำอะไร ถ้าโหลดไม่ได้ เดี๋ยวระบบจะไปใช้ Beep สำรองใน playDrumSound
-            }
-        }
+    masterGain=audioCtx.createGain();
+    masterGain.connect(audioCtx.destination);
 
-        async function initAudio() {
-            const btnStart = document.getElementById('btn-start-init');
-            btnStart.innerText = "กำลังโหลด...";
-            btnStart.disabled = true;
+    destNode=audioCtx.createMediaStreamDestination();
+    masterGain.connect(destNode);
 
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            audioCtx = new AudioContext();
+    setupRecorder();
 
-            // Master Gain
-            masterGain = audioCtx.createGain();
-            masterGain.gain.value = 1.0;
-            masterGain.connect(audioCtx.destination);
+    await Promise.all(
+        Object.keys(soundFiles).map(n=>loadSound(n,soundFiles[n]))
+    );
 
-            // Setup Recorder Node
-            destNode = audioCtx.createMediaStreamDestination();
-            masterGain.connect(destNode);
+    document.getElementById('start-overlay').style.opacity=0;
+    setTimeout(()=>startOverlay.remove(),400);
+}
 
-            setupRecorder();
+async function loadSound(note,url){
+    try{
+        const r=await fetch(url);
+        const b=await r.arrayBuffer();
+        audioBuffers[note]=await audioCtx.decodeAudioData(b);
+    }catch(e){
+        console.warn('โหลดเสียงไม่ได้',url);
+    }
+}
 
-            // โหลดไฟล์เสียงทั้งหมด
-            const loadPromises = Object.keys(soundFiles).map(note => 
-                loadSound(note, soundFiles[note])
-            );
+function playDrumSound(note){
+    if(audioBuffers[note]){
+        const s=audioCtx.createBufferSource();
+        s.buffer=audioBuffers[note];
+        s.connect(masterGain);
+        s.start();
+    }else{
+        const o=audioCtx.createOscillator();
+        const g=audioCtx.createGain();
+        o.frequency.value=440;
+        g.gain.value=.1;
+        o.connect(g);
+        g.connect(masterGain);
+        o.start();
+        o.stop(audioCtx.currentTime+.1);
+    }
+}
 
-            await Promise.all(loadPromises);
+function setupRecorder(){
+    mediaRecorder=new MediaRecorder(destNode.stream);
+    mediaRecorder.ondataavailable=e=>audioChunks.push(e.data);
+    mediaRecorder.onstop=()=>{
+        const blob=new Blob(audioChunks,{type:'audio/webm'});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url;
+        a.download='tenor_recording.webm';
+        a.click();
+        audioChunks=[];
+    };
+}
 
-            // ซ่อน Overlay เมื่อโหลดเสร็จ
-            const overlay = document.getElementById('start-overlay');
-            overlay.style.opacity = '0';
-            setTimeout(() => overlay.remove(), 500);
-        }
+function toggleRecord(){
+    if(!isRecording){
+        audioChunks=[];
+        mediaRecorder.start();
+        isRecording=true;
+        btnRecord.classList.add('recording');
+        recordStatus.style.display='inline';
+        btnStop.disabled=false;
+    }
+}
 
-        function setupRecorder() {
-            try {
-                mediaRecorder = new MediaRecorder(destNode.stream);
-                mediaRecorder.ondataavailable = (event) => audioChunks.push(event.data);
-                mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    const audioUrl = URL.createObjectURL(audioBlob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = audioUrl;
-                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                    a.download = `tenor_recording_${timestamp}.webm`; 
-                    document.body.appendChild(a);
-                    a.click();
-                    setTimeout(() => {
-                        document.body.removeChild(a);
-                        window.URL.revokeObjectURL(audioUrl);
-                    }, 100);
-                    audioChunks = [];
-                    alert('บันทึกเสียงเรียบร้อย! ไฟล์จะถูกดาวน์โหลดลงเครื่อง');
-                };
-            } catch (e) {
-                console.error("MediaRecorder Error:", e);
-                document.getElementById('btn-record').disabled = true;
-                document.getElementById('btn-record').innerText = "ไม่รองรับการอัด";
-            }
-        }
+function stopRecord(){
+    if(isRecording){
+        mediaRecorder.stop();
+        isRecording=false;
+        btnRecord.classList.remove('recording');
+        recordStatus.style.display='none';
+        btnStop.disabled=true;
+    }
+}
 
-        function toggleRecord() {
-            if (!audioCtx) { alert('กรุณากดเริ่มใช้งานก่อน'); return; }
-            if (audioCtx.state === 'suspended') audioCtx.resume();
+document.querySelectorAll('.drum').forEach(d=>{
+    const note=d.dataset.note;
+    const hit=e=>{
+        e.preventDefault();
+        d.classList.add('hit');
+        setTimeout(()=>d.classList.remove('hit'),80);
+        playDrumSound(note);
+    };
+    d.addEventListener('touchstart',hit,{passive:false});
+    d.addEventListener('mousedown',hit);
+});
 
-            if (!isRecording) {
-                audioChunks = [];
-                mediaRecorder.start();
-                isRecording = true;
-                document.getElementById('btn-record').classList.add('recording');
-                document.getElementById('btn-record').innerHTML = '<span class="icon">●</span> กำลังอัด...';
-                document.getElementById('btn-stop').disabled = false;
-                document.getElementById('record-status').style.display = 'flex';
-            }
-        }
+document.getElementById('btn-start-init').addEventListener('click',initAudio);
+</script>
 
-        function stopRecord() {
-            if (isRecording) {
-                mediaRecorder.stop();
-                isRecording = false;
-                document.getElementById('btn-record').classList.remove('recording');
-                document.getElementById('btn-record').innerHTML = '<span class="icon">●</span> บันทึก';
-                document.getElementById('btn-stop').disabled = true;
-                document.getElementById('record-status').style.display = 'none';
-            }
-        }
-
-        function playBackupBeep() {
-            // เสียงสำรองกรณีหาไฟล์ mp3 ไม่เจอ (เสียง Beep สั้นๆ)
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.frequency.setValueAtTime(440, audioCtx.currentTime);
-            osc.type = 'square';
-            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-            osc.connect(gain);
-            gain.connect(masterGain);
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.1);
-        }
-
-        function playDrumSound(note) {
-            if (!audioCtx) return;
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-
-            // ตรวจสอบว่ามีไฟล์เสียงที่โหลดไว้หรือไม่
-            if (audioBuffers[note]) {
-                const source = audioCtx.createBufferSource();
-                source.buffer = audioBuffers[note];
-                source.connect(masterGain);
-                // ถ้าอยากปรับ Pitch สามารถทำได้ที่นี่ เช่น source.playbackRate.value = 1.0;
-                source.start(0);
-            } else {
-                // ถ้าไม่มีไฟล์เสียง ให้เล่นเสียง Beep แทน
-                console.log("File not found for note: " + note);
-                playBackupBeep();
-            }
-        }
-
-        // Event Handling
-        const drums = document.querySelectorAll('.drum');
-        drums.forEach(drum => {
-            const note = drum.dataset.note;
-
-            const hit = (e) => {
-                if(e.cancelable) e.preventDefault();
-                drum.classList.add('hit');
-                // Spock สั้นกว่าเพื่อน
-                const animTime = (note === 'spock') ? 50 : 80;
-                setTimeout(() => drum.classList.remove('hit'), animTime);
-                playDrumSound(note);
-            };
-
-            drum.addEventListener('touchstart', hit, { passive: false });
-            drum.addEventListener('mousedown', hit);
-        });
-
-        document.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
-    </script>
 </body>
 </html>
