@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Marching Bass Drum (Smooth Tail)</title>
+    <title>Marching Bass Drum (Noise Filtered)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&family=Black+Ops+One&display=swap');
 
@@ -285,11 +285,18 @@
                 compressor.attack.value = 0.003; 
                 compressor.release.value = 0.25;
 
+                // Noise Filter (ลดเสียงซ่า/อากาศ)
+                const noiseFilter = audioCtx.createBiquadFilter();
+                noiseFilter.type = 'lowpass';
+                noiseFilter.frequency.value = 3000; // ตัดย่านแหลม (เสียงซ่า) ออก แต่ยังเก็บหัวไม้ไว้ได้
+
                 // Master Volume
                 masterGain = audioCtx.createGain();
                 masterGain.gain.value = 4.0; 
                 
-                masterGain.connect(compressor);
+                // Chain: Master -> NoiseFilter -> Compressor -> Dest
+                masterGain.connect(noiseFilter);
+                noiseFilter.connect(compressor);
                 compressor.connect(audioCtx.destination);
                 
                 dest = audioCtx.createMediaStreamDestination();
@@ -332,7 +339,7 @@
             }
         }
 
-        // Function เล่นไฟล์เสียง (Micro-fade Start & End)
+        // Function เล่นไฟล์เสียง
         function playSample(buffer, intensity) {
             const t = audioCtx.currentTime;
             const source = audioCtx.createBufferSource();
@@ -342,18 +349,15 @@
             const vol = 1.0 * intensity;
             const duration = buffer.duration;
             
-            // 1. Fade-In ที่หัวเสียง (แก้ Click ตอนเริ่ม) - เร็วมาก 2ms
+            // 1. Fade-In (แก้ Click ตอนเริ่ม) - เร็วมาก 1ms
             sampleGain.gain.setValueAtTime(0, t);
-            sampleGain.gain.linearRampToValueAtTime(vol, t + 0.002);
+            sampleGain.gain.linearRampToValueAtTime(vol, t + 0.001);
             
-            // 2. Fade-Out ที่หางเสียง (แก้ Click ตอนจบ) - เริ่มเฟดลง 50ms ก่อนจบไฟล์
+            // 2. Fade-Out (แก้ Click ตอนจบ) - เริ่มเฟดลง 50ms ก่อนจบไฟล์
             if (duration > 0.05) {
-                // คงระดับเสียงไว้จนถึงช่วงท้าย
                 sampleGain.gain.setValueAtTime(vol, t + duration - 0.05);
-                // เฟดลงจนเงียบสนิทที่จุดจบ
                 sampleGain.gain.linearRampToValueAtTime(0, t + duration);
             } else {
-                // ถ้าไฟล์สั้นมาก เฟดลงทั้งไฟล์
                 sampleGain.gain.linearRampToValueAtTime(0, t + duration);
             }
             
