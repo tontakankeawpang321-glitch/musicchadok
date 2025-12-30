@@ -154,7 +154,8 @@
     <div id="start-overlay">
         <h1>แทมบูรีนไม้-เหล็ก</h1>
         <p>Embedded Audio Version</p>
-        <button id="btn-start-init" class="btn-start" onclick="initAudio()">แตะเพื่อเริ่มและโหลดเสียง</button>
+        <!-- เพิ่ม ontouchstart เพื่อความชัวร์บนมือถือ -->
+        <button id="btn-start-init" class="btn-start" onclick="initAudio()" ontouchstart="initAudio()">แตะเพื่อเริ่มและโหลดเสียง</button>
         <div id="loading-text">ระบบจะโหลดเสียงจาก URL ที่ระบุในโค้ด</div>
     </div>
 
@@ -173,15 +174,14 @@
         <div class="skin"></div>
     </div>
 
-    <div class="footer">สร้างโดย AI (Gemini)</div>
 
     <script>
         // ==========================================
         // 🛠️ ตั้งค่า URL ไฟล์เสียงที่นี่ (แก้ไขลิงก์ได้เลย)
         // ==========================================
         const soundUrls = {
-            'hit': 'tamburin/toburi01.mp3',    // เช่น 'sounds/tambourine_hit.mp3' หรือ 'https://example.com/hit.wav'
-            'shake': 'tamburin/toburi02t.mp3' // เช่น 'sounds/tambourine_shake.mp3'
+           'hit': 'tamburin/toburi01.mp3',    // เช่น 'sounds/tambourine_hit.mp3' หรือ 'https://example.com/hit.wav'
+            'shake': 'tamburin/toburi02t.mp3'  
         };
 
         // Audio & Logic Variables
@@ -215,7 +215,7 @@
         async function loadSound(key, url) {
             try {
                 // ตรวจสอบว่าเป็น URL จำลองหรือไม่ ถ้าใช่ให้ข้ามไปใช้เสียง Beep
-                if (url.includes('INSERT_YOUR')) throw new Error("URL ยังไม่ได้ตั้งค่า");
+                if (url.includes('INSERT_YOUR')) throw new Error("URL ยังไม่ได้ตั้งค่า (จะใช้เสียง Beep)");
 
                 const response = await fetch(url);
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -224,17 +224,27 @@
                 audioBuffers[key] = audioBuffer;
                 console.log(`Loaded ${key}`);
             } catch (error) {
+                // แก้ไข: ไม่ throw error ออกไป เพื่อให้โปรแกรมทำงานต่อได้แม้โหลดเสียงไม่สำเร็จ
                 console.warn(`ไม่สามารถโหลดเสียง ${key}: ${url} (จะใช้เสียงสังเคราะห์สำรอง)`);
+                // ไม่ต้องทำอะไรเพิ่ม ระบบจะไปใช้ playBackupBeep เอง
             }
         }
 
         async function initAudio() {
+            // ป้องกันการกดซ้ำ (เช่น touchstart และ click ทำงานพร้อมกัน)
+            if (audioCtx) return;
+
             const btnStart = document.getElementById('btn-start-init');
             btnStart.innerText = "กำลังโหลด...";
             btnStart.disabled = true;
             
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             audioCtx = new AudioContext();
+
+            // Resume context ทันทีเพื่อแก้ปัญหา iOS
+            if (audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+            }
 
             // Master Gain
             masterGain = audioCtx.createGain();
@@ -249,13 +259,17 @@
             createZils();
             startMotionSensor();
 
-            // โหลดเสียงจาก URL ที่ตั้งค่าไว้
-            await Promise.all([
-                loadSound('hit', soundUrls.hit),
-                loadSound('shake', soundUrls.shake)
-            ]);
+            // โหลดเสียงจาก URL ที่ตั้งค่าไว้ (ใส่ try catch ครอบใหญ่กันเหนียว)
+            try {
+                await Promise.all([
+                    loadSound('hit', soundUrls.hit),
+                    loadSound('shake', soundUrls.shake)
+                ]);
+            } catch (err) {
+                console.error("Critical Loading Error:", err);
+            }
 
-            // Hide Overlay
+            // Hide Overlay (ซ่อนเสมอ ไม่ว่าจะโหลดผ่านหรือไม่)
             const overlay = document.getElementById('start-overlay');
             overlay.style.opacity = '0';
             setTimeout(() => overlay.remove(), 500);
