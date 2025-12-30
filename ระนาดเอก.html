@@ -17,7 +17,7 @@
 
         * {
             box-sizing: border-box;
-            touch-action: none; /* ป้องกันการซูมและเลื่อนบนมือถือ */
+            touch-action: none; /* ป้องกันการซูมและเลื่อนบนมือถือ สำคัญมากสำหรับการลากตี */
             user-select: none;
             -webkit-user-select: none;
         }
@@ -26,20 +26,20 @@
             margin: 0;
             padding: 0;
             width: 100vw;
-            height: 100vh; /* Fallback */
-            height: 100dvh; /* Dynamic height for mobile browsers */
+            height: 100vh;
+            height: 100dvh;
             background-color: var(--bg-color);
             font-family: 'Sarabun', sans-serif;
             display: flex;
             flex-direction: column;
-            overflow: hidden; /* ล็อคหน้าจอไม่ให้เลื่อน */
+            overflow: hidden;
             background: radial-gradient(circle at center, #2c1e1e 0%, #000000 100%);
-            padding-bottom: env(safe-area-inset-bottom); /* For iPhone notch/bar */
+            padding-bottom: env(safe-area-inset-bottom);
         }
 
         /* Control Panel */
         #controls {
-            height: 50px; /* Fixed compact height */
+            height: 50px;
             width: 100%;
             display: flex;
             justify-content: center;
@@ -94,29 +94,29 @@
             justify-content: center;
             align-items: center;
             position: relative;
-            padding: 10px; /* เพิ่ม Padding เพื่อไม่ให้ชนขอบ */
+            padding: 0;
             perspective: 1000px;
             overflow: hidden;
         }
 
         /* The Instrument Body (Rang Ranat) */
         #ranat-container {
-            width: 92%; /* ลดความกว้างลงจาก 98% ให้เหลือขอบมากขึ้น */
-            max-width: 1000px; /* จำกัดขนาดสูงสุดให้เล็กลง */
-            height: 55%; /* ลดความสูงลงเพื่อให้ปุ่มดูไม่ยืดเกินไป */
+            width: 98%;
+            max-width: none;
+            height: 65%;
             position: relative;
             display: flex;
             justify-content: center;
-            align-items: flex-end; /* Curve simulation */
-            margin-bottom: 20px;
+            align-items: flex-end;
+            margin-bottom: 10px;
         }
 
         /* The Base/Boat shape simulation */
         .rang-base {
             position: absolute;
-            bottom: -25px;
+            bottom: -20px;
             width: 100%;
-            height: 80px; /* ลดความสูงของฐานลงเล็กน้อย */
+            height: 70px; 
             background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPjxkZWZzPjxsaW5lYXJHcmFkaWVudCBpZD0iZ3JhZCIgeDE9IjAlIiB5MT0iMCUiIHgyPSIwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0eWxlPSJzdG9wLWNvbG9yOiM1ZDQwMzc7c3RvcC1vcGFjaXR5OjEiIC8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdHlsZT0ic3RvcC1jb2xvcjojM2UyNzIzO3N0b3Atb3BhY2l0eToxIiAvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JhZCkiIC8+PC9zdmc+');
             background-size: cover;
             border-bottom-left-radius: 50% 100%;
@@ -130,12 +130,14 @@
         #keys-wrapper {
             display: flex;
             justify-content: space-between;
-            align-items: flex-end; /* This aligns keys to form curve based on height */
-            width: 98%; /* ลดขอบเขตปุ่มลงเล็กน้อยไม่ให้หลุดขอบฐาน */
-            height: 140%; /* เพิ่มสัดส่วนความสูงของปุ่มเทียบกับฐานที่เล็กลง */
+            align-items: flex-end;
+            width: 99%;
+            height: 140%; 
             z-index: 10;
-            padding-bottom: 20px;
+            padding-bottom: 15px;
             position: relative;
+            /* เพิ่ม cursor แบบมือเมื่อเอาเมาส์ไปวาง */
+            cursor: pointer;
         }
 
         /* String (Roi Chueak) */
@@ -156,27 +158,25 @@
         .key {
             position: relative;
             background: linear-gradient(90deg, #5d4037 0%, #a1887f 20%, #8d6e63 50%, #a1887f 80%, #5d4037 100%);
-            border-radius: 4px; /* ปรับมุมมนให้เล็กลงนิดหน่อย */
-            cursor: pointer;
+            border-radius: 4px; 
+            /* ลบ cursor: pointer ออกจากตัวลูก เพราะเราจัดการที่ wrapper แล้ว */
             box-shadow: 2px 4px 6px rgba(0,0,0,0.4);
-            transition: transform 0.05s;
+            transition: transform 0.05s, background 0.05s;
             display: flex;
             justify-content: center;
             align-items: center;
             color: rgba(255, 255, 255, 0.9);
             font-weight: bold;
-            font-size: 0.8rem; /* ปรับขนาดฟอนต์ให้พอดี */
+            font-size: 0.9rem;
             text-shadow: 1px 1px 2px black;
             border-top: 1px solid rgba(255,255,255,0.3);
             border-bottom: 1px solid rgba(0,0,0,0.6);
-            /* Flex properties for sizing */
             flex: 1; 
-            margin: 0 2px; /* เพิ่มระยะห่างระหว่างปุ่มเล็กน้อยเพื่อให้แยกง่ายขึ้น */
+            margin: 0 1px;
             height: 100%; 
         }
 
         .key::after {
-            /* Simulate the node/mounting point */
             content: '';
             position: absolute;
             top: 25%;
@@ -184,10 +184,11 @@
             height: 50%;
             background: radial-gradient(rgba(255,255,255,0.15), transparent);
             border-radius: 50%;
-            pointer-events: none;
+            pointer-events: none; /* สำคัญมาก: เพื่อให้ elementFromPoint มองทะลุไปหาตัว key */
         }
 
-        .key:active, .key.active {
+        /* Active state controlled by JS now */
+        .key.active {
             transform: translateY(6px) scale(0.95);
             background: linear-gradient(90deg, #4e342e 0%, #8d6e63 50%, #4e342e 100%);
         }
@@ -197,23 +198,22 @@
             bottom: 10px;
             opacity: 0;
             transition: opacity 0.3s;
-            pointer-events: none;
-            font-size: 1em;
+            pointer-events: none; /* สำคัญ */
+            font-size: 1.1em;
         }
 
         .show-notes .note-label {
             opacity: 1;
         }
 
-        /* Mallet Animation Indicator (Visual Feedback) */
         .hit-effect {
             position: absolute;
-            width: 35px;
-            height: 35px;
+            width: 40px;
+            height: 40px;
             background: radial-gradient(circle, rgba(255,215,0,0.8) 0%, rgba(255,215,0,0) 70%);
             border-radius: 50%;
-            pointer-events: none;
-            animation: hitFade 0.3s ease-out forwards;
+            pointer-events: none; /* สำคัญ */
+            animation: hitFade 0.2s ease-out forwards; /* ทำให้เร็วขึ้นเล็กน้อยสำหรับการลากรัว */
             z-index: 20;
         }
 
@@ -238,27 +238,21 @@
             white-space: nowrap;
         }
 
-        /* Mobile Landscape Optimization */
         @media (orientation: portrait) {
             #stage {
-                /* ปรับตำแหน่งและขนาดในแนวตั้งให้กระชับยิ่งขึ้น */
                 position: absolute;
-                top: 48%;
+                top: 50%;
                 left: 50%;
-                /* ใช้ 90vh แทน 100vh เพื่อให้เหลือขอบหัวท้าย */
-                width: 88vh; 
-                /* ใช้ 88vw แทน 100vw เพื่อให้เหลือขอบซ้ายขวา */
-                height: 88vw; 
+                width: 98vh; 
+                height: 98vw; 
                 transform: translate(-50%, -50%) rotate(90deg);
                 transform-origin: center center;
                 padding: 0;
             }
-            
             #ranat-container {
-                height: 60%; /* ปรับความสูงปุ่มในแนวตั้ง */
-                width: 100%;
+                height: 65%; 
+                width: 98%;
             }
-
             #controls {
                 position: absolute;
                 bottom: 0;
@@ -269,6 +263,7 @@
                 border-top: 1px solid var(--gold);
                 border-bottom: none;
                 padding-bottom: env(safe-area-inset-bottom);
+                background: rgba(0, 0, 0, 0.85);
             }
         }
     </style>
@@ -304,10 +299,7 @@
 
     <script>
         // --- Configuration ---
-        const totalKeys = 21; // Standard Ranat Ek usually has 21-22 keys
-        // Thai Scale Logic: Equidistant 7-tone scale.
-        // Formula: Freq = Base * 2^(index/7)
-        // Starting roughly around Low So (Sol) ~ 240Hz for mobile speakers clarity
+        const totalKeys = 21; 
         const baseFreq = 240; 
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         
@@ -320,8 +312,13 @@
         let recordedAudio = new Audio();
         let showNotes = false;
 
-        // Thai Solfege (Sound names)
-        const thaiNotes = ['ซ', 'ล', 'ท', 'ด', 'ร', 'ม', 'ฟ']; // Sol, La, Ti, Do, Re, Mi, Fa
+        // State for Multi-touch & Glissando
+        // ใช้ Map เพื่อเก็บสถานะของนิ้วแต่ละนิ้ว (Key: Touch ID, Value: Index ของปุ่มล่าสุดที่นิ้วนั้นเล่น)
+        const activeTouches = new Map(); 
+        let isMouseDown = false;
+        let lastMouseKeyIndex = -1;
+
+        const thaiNotes = ['ซ', 'ล', 'ท', 'ด', 'ร', 'ม', 'ฟ']; 
 
         // --- Initialization ---
         function init() {
@@ -333,7 +330,6 @@
                 key.dataset.index = i;
                 
                 // Calculate Thai Frequency
-                // i=0 -> So (Low)
                 const freq = baseFreq * Math.pow(2, i / 7);
                 key.dataset.freq = freq;
 
@@ -344,30 +340,87 @@
                 label.innerText = noteName;
                 key.appendChild(label);
 
-                // Visual Styling: Curve Simulation
-                // Middle keys are shorter/lower, End keys are longer/higher visually (but in Ranat, middle is thickest)
-                // Actually, Ranat keys (Luk) length: Low pitch = Long/Big, High pitch = Short/Small
-                // Let's adjust Height based on pitch (Standard Xylophone physics)
-                // Longest (Left) -> Shortest (Right)
+                // Visual Styling
                 const heightPercent = 100 - (i * 2.5); 
-                key.style.height = `${Math.max(45, heightPercent)}%`; // Increased min height
+                key.style.height = `${Math.max(45, heightPercent)}%`; 
                 
-                // Add Touch Event
-                key.addEventListener('touchstart', (e) => {
-                    e.preventDefault(); // Stop scrolling
-                    playNote(freq, key);
-                }, { passive: false });
-
-                // Add Mouse Event for Desktop testing
-                key.addEventListener('mousedown', (e) => {
-                    playNote(freq, key);
-                });
-
+                // Note: เราลบ event listener รายตัวออก และใช้ระบบ Global Handler แทนด้านล่าง
+                
                 keysWrapper.appendChild(key);
             }
 
             // Init Recorder Destination
             audioDest = audioCtx.createMediaStreamDestination();
+
+            // --- ติดตั้งระบบสัมผัสขั้นสูง (Multitouch + Drag/Slide) ---
+            setupInputHandlers(keysWrapper);
+        }
+
+        function setupInputHandlers(container) {
+            // Touch Events (สำหรับมือถือ - รองรับหลายนิ้ว + ลาก)
+            container.addEventListener('touchstart', handleTouch, { passive: false });
+            container.addEventListener('touchmove', handleTouch, { passive: false });
+            container.addEventListener('touchend', handleTouchEnd);
+            container.addEventListener('touchcancel', handleTouchEnd);
+
+            // Mouse Events (สำหรับ PC - รองรับคลิก + ลาก)
+            container.addEventListener('mousedown', (e) => {
+                isMouseDown = true;
+                handleMouse(e);
+            });
+            // ใช้ window event สำหรับ mousemove/up เพื่อให้ลากหลุดขอบแล้วยังทำงานต่อได้
+            window.addEventListener('mousemove', (e) => {
+                if(isMouseDown) handleMouse(e);
+            });
+            window.addEventListener('mouseup', () => {
+                isMouseDown = false;
+                lastMouseKeyIndex = -1;
+            });
+        }
+
+        function handleTouch(e) {
+            e.preventDefault(); // ป้องกันการเลื่อนหน้าจอ
+            
+            // วนลูปตรวจสอบทุกนิ้วที่แตะหรือขยับ
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                // หา element ที่ตำแหน่งนิ้วนั้นๆ
+                const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                const key = target ? target.closest('.key') : null;
+
+                if (key) {
+                    const index = key.dataset.index;
+                    // เงื่อนไขการเล่นเสียง:
+                    // 1. ถ้านี่คือการแตะครั้งแรก (touchstart) -> เล่นเลย
+                    // 2. หรือ ถ้านี่คือการลาก (touchmove) และนิ้วย้ายไปปุ่มใหม่ (ไม่ซ้ำปุ่มเดิม) -> เล่น
+                    if (e.type === 'touchstart' || activeTouches.get(touch.identifier) !== index) {
+                        playNote(parseFloat(key.dataset.freq), key);
+                        activeTouches.set(touch.identifier, index); // จำว่านิ้วนี้เล่นปุ่มนี้ไปแล้ว
+                    }
+                }
+            }
+        }
+
+        function handleTouchEnd(e) {
+            // เมื่อยกนิ้วออก ให้ลบข้อมูลนิ้วนั้นออกจากระบบ
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                activeTouches.delete(e.changedTouches[i].identifier);
+            }
+        }
+
+        function handleMouse(e) {
+            // ระบบเมาส์ (จุดเดียว)
+            const target = document.elementFromPoint(e.clientX, e.clientY);
+            const key = target ? target.closest('.key') : null;
+            
+            if (key) {
+                const index = key.dataset.index;
+                // ถ้าเมาส์ย้ายไปปุ่มใหม่ ให้เล่นเสียง
+                if (lastMouseKeyIndex !== index) {
+                    playNote(parseFloat(key.dataset.freq), key);
+                    lastMouseKeyIndex = index;
+                }
+            }
         }
 
         // --- Audio Engine ---
@@ -378,50 +431,48 @@
 
             const t = audioCtx.currentTime;
 
-            // 1. Oscillator (The Sound)
+            // 1. Oscillator
             const osc = audioCtx.createOscillator();
-            // Thai Ranat has a woody sound. Sine is too pure. Triangle is too harsh.
-            // Let's use Sine but add a tiny bit of Triangle for "hit" texture or just Shape Envelope.
             osc.type = 'sine'; 
             osc.frequency.setValueAtTime(freq, t);
 
-            // 2. Gain Node (The Volume Envelope)
+            // 2. Gain Node (Envelope)
             const gain = audioCtx.createGain();
-            
-            // "Wood" Envelope: Very fast attack, fast decay
             gain.gain.setValueAtTime(0, t);
-            gain.gain.linearRampToValueAtTime(0.8, t + 0.01); // Attack (Hit)
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4); // Decay (Short sustain)
+            gain.gain.linearRampToValueAtTime(0.8, t + 0.01); // Attack
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4); // Decay
 
-            // Connect graph
+            // Connect
             osc.connect(gain);
-            gain.connect(audioCtx.destination); // Speaker
-            gain.connect(audioDest); // Recorder input
+            gain.connect(audioCtx.destination);
+            gain.connect(audioDest);
 
             // Start/Stop
             osc.start(t);
             osc.stop(t + 0.5);
 
             // Visual Feedback
+            // ใช้เทคนิค remove/add class เพื่อให้ animation รีเซ็ตถ้าเล่นรัวๆ
+            element.classList.remove('active');
+            void element.offsetWidth; // Trigger Reflow
             element.classList.add('active');
+            
             createHitEffect(element);
-            setTimeout(() => element.classList.remove('active'), 100);
+            
+            setTimeout(() => {
+                element.classList.remove('active');
+            }, 150);
         }
 
-        // --- Visual Effects ---
         function createHitEffect(element) {
             const effect = document.createElement('div');
             effect.className = 'hit-effect';
-            // Center effect on key
-            const rect = element.getBoundingClientRect();
-            // We need to account for stage rotation in portrait mode?
-            // Simple approach: append to element so coordinates are relative
             element.appendChild(effect); 
             effect.style.left = '50%';
             effect.style.top = '50%';
             effect.style.transform = 'translate(-50%, -50%)';
             
-            setTimeout(() => effect.remove(), 350);
+            setTimeout(() => effect.remove(), 200);
         }
 
         function toggleNotes() {
@@ -445,7 +496,6 @@
             const dlBtn = document.getElementById('dlBtn');
 
             if (!isRecording) {
-                // Start Recording
                 recordedChunks = [];
                 mediaRecorder = new MediaRecorder(audioDest.stream);
                 
@@ -469,12 +519,10 @@
                 playBtn.disabled = true;
                 dlBtn.disabled = true;
                 
-                // Ensure AudioCtx is running
                 if (audioCtx.state === 'suspended') audioCtx.resume();
                 showStatus("กำลังบันทึก...");
 
             } else {
-                // Stop Recording
                 mediaRecorder.stop();
                 isRecording = false;
                 btn.classList.remove('recording');
@@ -510,7 +558,6 @@
             }, 2000);
         }
 
-        // Run
         window.onload = init;
 
     </script>
