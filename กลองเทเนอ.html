@@ -1,279 +1,425 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>กลองเทเนอร์จำลอง (Sample Playback)</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>กลองเทเนอร์จำลอง (Real Samples)</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --drum-rim: #e0e0e0; 
+            --drum-head: #ffffff; 
+            --drum-shell: #263238; 
+            --highlight: #00bcd4; 
+            --record-color: #ff5252;
+        }
 
-<style>
-:root {
-    --bg-color:#1a1a1a;
-    --drum-rim:#e0e0e0;
-    --drum-head:#ffffff;
-    --drum-shell:#263238;
-    --highlight:#00bcd4;
-    --record-color:#ff5252;
-}
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Sarabun', sans-serif;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
 
-body{
-    margin:0;
-    background:var(--bg-color);
-    height:100vh;
-    overflow:hidden;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    font-family:'Sarabun',sans-serif;
-    user-select:none;
-    touch-action:none;
-}
+        #start-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: white;
+            text-align: center;
+            transition: opacity 0.5s;
+        }
 
-#start-overlay{
-    position:absolute;
-    inset:0;
-    background:rgba(0,0,0,.9);
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-    align-items:center;
-    z-index:100;
-    color:#fff;
-    transition:.4s;
-}
+        .btn-start {
+            padding: 15px 30px;
+            font-size: 1.5rem;
+            background: var(--highlight);
+            border: none;
+            color: white;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 0 20px rgba(0, 188, 212, 0.5);
+            font-weight: bold;
+        }
 
-.btn-start{
-    padding:15px 32px;
-    font-size:1.5rem;
-    background:var(--highlight);
-    border:none;
-    border-radius:50px;
-    color:#fff;
-    cursor:pointer;
-    font-weight:bold;
-    box-shadow:0 0 20px rgba(0,188,212,.6);
-}
+        .controls {
+            position: absolute;
+            top: 20px;
+            display: flex;
+            gap: 15px;
+            z-index: 50;
+            background: rgba(0,0,0,0.5);
+            padding: 10px 20px;
+            border-radius: 30px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
 
-#loading-text{
-    margin-top:12px;
-    color:#aaa;
-    font-size:.9rem;
-}
+        .btn-control {
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.1);
+            color: white;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
 
-.controls{
-    position:absolute;
-    top:15px;
-    display:flex;
-    gap:12px;
-    z-index:20;
-}
+        .btn-control:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
 
-.btn-control{
-    padding:8px 16px;
-    border-radius:20px;
-    background:rgba(255,255,255,.1);
-    border:1px solid rgba(255,255,255,.2);
-    color:#fff;
-    cursor:pointer;
-}
+        .btn-record.recording {
+            background-color: var(--record-color);
+            border-color: var(--record-color);
+            animation: pulse 1.5s infinite;
+        }
 
-.btn-record.recording{
-    background:var(--record-color);
-    border-color:var(--record-color);
-    animation:pulse 1.4s infinite;
-}
+        .status-text {
+            color: var(--record-color);
+            font-weight: bold;
+            display: none;
+            align-items: center;
+            margin-left: 10px;
+            font-size: 0.9rem;
+        }
 
-@keyframes pulse{
-    0%{box-shadow:0 0 0 0 rgba(255,82,82,.7)}
-    70%{box-shadow:0 0 0 12px rgba(255,82,82,0)}
-    100%{box-shadow:0 0 0 0 rgba(255,82,82,0)}
-}
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+        }
 
-.status-text{
-    color:var(--record-color);
-    font-weight:bold;
-    display:none;
-}
+        .drum-container {
+            position: relative;
+            width: 95vw;
+            height: 60vh;
+            max-width: 800px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
 
-.drum-container{
-    position:relative;
-    width:95vw;
-    height:60vh;
-    max-width:800px;
-}
+        .drum {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #ffffff, #eceff1);
+            border: 8px solid var(--drum-shell);
+            box-shadow: 
+                0 0 0 4px var(--drum-rim),
+                0 15px 25px rgba(0,0,0,0.6),
+                inset 0 0 20px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.05s, border-color 0.05s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: rgba(0,0,0,0.4);
+            font-size: 1.5rem;
+            -webkit-tap-highlight-color: transparent;
+        }
 
-.drum{
-    position:absolute;
-    border-radius:50%;
-    background:radial-gradient(circle at 30% 30%,#fff,#eceff1);
-    border:8px solid var(--drum-shell);
-    box-shadow:
-        0 0 0 4px var(--drum-rim),
-        0 15px 25px rgba(0,0,0,.6),
-        inset 0 0 20px rgba(0,0,0,.1);
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    font-weight:bold;
-    font-size:1.4rem;
-    cursor:pointer;
-}
+        .drum:active, .drum.hit {
+            transform: scale(0.96);
+            background: radial-gradient(circle at 30% 30%, #fff, #fafafa);
+            border-color: var(--highlight);
+        }
 
-.drum.hit{
-    transform:scale(.96);
-    border-color:var(--highlight);
-}
+        #drum-1 { width: 18vmin; height: 18vmin; right: 32%; top: 15%; z-index: 2; }
+        #drum-2 { width: 20vmin; height: 20vmin; left: 30%; top: 15%; z-index: 2; }
+        #drum-3 { width: 24vmin; height: 24vmin; right: 5%; top: 25%; z-index: 1; }
+        #drum-4 { width: 26vmin; height: 26vmin; left: 2%; top: 25%; z-index: 1; }
+        #drum-spock {
+            width: 14vmin; height: 14vmin;
+            left: 50%; top: 5%;
+            transform: translateX(-50%);
+            z-index: 3;
+            background: radial-gradient(circle at 30% 30%, #455a64, #263238); 
+            border-color: #000;
+            color: rgba(255,255,255,0.3);
+        }
+        #drum-spock:active, #drum-spock.hit {
+            transform: translateX(-50%) scale(0.95);
+        }
 
-#drum-1{width:18vmin;height:18vmin;right:32%;top:15%}
-#drum-2{width:20vmin;height:20vmin;left:30%;top:15%}
-#drum-3{width:24vmin;height:24vmin;right:5%;top:25%}
-#drum-4{width:26vmin;height:26vmin;left:2%;top:25%}
+        .footer {
+            position: absolute;
+            bottom: 20px;
+            color: #666;
+            font-size: 0.8rem;
+        }
+        
+        #loading-text {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
 
-#drum-spock{
-    width:14vmin;height:14vmin;
-    left:50%;top:5%;
-    transform:translateX(-50%);
-    background:radial-gradient(circle at 30% 30%,#455a64,#263238);
-    border-color:#000;
-    color:#ccc;
-}
-</style>
+        @media (orientation: portrait) {
+            .drum-container { height: 50vh; width: 100vw; }
+            #drum-1 { right: 28%; top: 20%; }
+            #drum-2 { left: 28%; top: 20%; }
+            #drum-3 { right: 2%; top: 35%; }
+            #drum-4 { left: 2%; top: 35%; }
+            #drum-spock { top: 8%; }
+            .controls { top: 10px; flex-wrap: wrap; justify-content: center; }
+        }
+
+    </style>
 </head>
-
 <body>
 
-<div id="start-overlay">
-    <h1>กลองเทเนอร์จำลอง</h1>
-    <button id="btn-start-init" class="btn-start">▶ เริ่มใช้งาน</button>
-    <div id="loading-text"></div>
-</div>
+    <div id="start-overlay">
+        <h1>กลองเทเนอร์จำลอง</h1>
+        <p style="color: #aaa; margin-bottom: 20px;">ใช้ไฟล์เสียงจริง (Samples)</p>
+        <button id="btn-start-init" class="btn-start" onclick="initAudio()">
+            ดาวน์โหลดไฟล์เสียง & เริ่ม
+        </button>
+        <div id="loading-text"></div>
+    </div>
 
-<div class="controls">
-    <button id="btn-record" class="btn-control btn-record" onclick="toggleRecord()">● บันทึก</button>
-    <button id="btn-stop" class="btn-control" onclick="stopRecord()" disabled>■ หยุด & โหลด</button>
-    <span id="record-status" class="status-text">กำลังบันทึก...</span>
-</div>
+    <div class="controls">
+        <button id="btn-record" class="btn-control btn-record" onclick="toggleRecord()">
+            <span class="icon">●</span> บันทึก
+        </button>
+        <button id="btn-stop" class="btn-control" onclick="stopRecord()" disabled>
+            <span class="icon">■</span> หยุด & โหลด
+        </button>
+        <span id="record-status" class="status-text">กำลังบันทึก...</span>
+    </div>
 
-<div class="drum-container">
-    <div id="drum-spock" class="drum" data-note="spock">S</div>
-    <div id="drum-2" class="drum" data-note="2">2</div>
-    <div id="drum-1" class="drum" data-note="1">1</div>
-    <div id="drum-4" class="drum" data-note="4">4</div>
-    <div id="drum-3" class="drum" data-note="3">3</div>
-</div>
+    <div class="drum-container">
+        <!-- Spock (S) -->
+        <div id="drum-spock" class="drum" data-note="spock">S</div>
+        <!-- Drum 2 -->
+        <div id="drum-2" class="drum" data-note="2">2</div>
+        <!-- Drum 1 -->
+        <div id="drum-1" class="drum" data-note="1">1</div>
+        <!-- Drum 4 -->
+        <div id="drum-4" class="drum" data-note="4">4</div>
+        <!-- Drum 3 -->
+        <div id="drum-3" class="drum" data-note="3">3</div>
+    </div>
+     
+    <script>
+        // ==========================================
+        // ตั้งค่าไฟล์เสียง (แก้ไขลิงก์ตรงนี้ถ้านำไปใช้จริงในเครื่อง)
+        // ใช้ลิงก์ออนไลน์เพื่อให้เสียงดังได้ทันทีในหน้าเว็บนี้
+        // ==========================================
+        const soundFiles = {
+            // Spock: ใช้เสียง Snare/Timbales pitch สูง
+            'spock': 'tenors/4tenor.mp3, 
+            // 1: High Tom
+            '1': 'tenors/1tenor.mp3', 
+            // 2: Mid Tom
+            '2': 'tenors/tenor.mp3', 
+            // 3: Low Tom
+            '3': 'tenors/tenor.mp3', 
+            // 4: Floor Tom
+            '4': 'tenors/tenor.mp3'
+        };
 
-<script>
-const soundFiles={
-    spock:'tenors/stenor.mp3',
-    1:'tenors/1tenor.mp3',
-    2:'tenors/tenors.mp3',
-    3:'tenors/tenors.mp3',
-    4:'tenors/4tenors.mp3'
-};
+        // การปรับจูนเสียง (Playback Rate) เพื่อให้เหมือน Tenor Set
+        // 1.0 = ปกติ, >1.0 = สูงขึ้น, <1.0 = ต่ำลง
+        const tuning = {
+            'spock': 1.5, // เร่งเสียงให้แหลมปรี๊ดเหมือน Spock
+            '1': 1.2,     // ปรับให้ตึง
+            '2': 1.0,     // ปกติ
+            '3': 1.0,     // ปกติ
+            '4': 0.9      // หย่อนลงให้ทุ้ม
+        };
 
-let audioCtx,masterGain,destNode;
-let audioBuffers={};
-let mediaRecorder,audioChunks=[],isRecording=false;
+        let audioCtx;
+        let masterGain;
+        let audioBuffers = {}; 
 
-async function initAudio(){
-    const btn=document.getElementById('btn-start-init');
-    btn.disabled=true;
-    btn.innerText='กำลังโหลด...';
+        // Recording Variables
+        let mediaRecorder;
+        let audioChunks = [];
+        let destNode; 
+        let isRecording = false;
 
-    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+        async function loadSound(note, url) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                audioBuffers[note] = audioBuffer;
+                return true;
+            } catch (error) {
+                console.warn(`ไม่สามารถโหลดไฟล์เสียง: ${url}`);
+                console.error(error);
+                return false;
+            }
+        }
 
-    masterGain=audioCtx.createGain();
-    masterGain.connect(audioCtx.destination);
+        async function initAudio() {
+            const btnStart = document.getElementById('btn-start-init');
+            const loadingText = document.getElementById('loading-text');
+            
+            btnStart.disabled = true;
+            btnStart.innerText = "กำลังดาวน์โหลด...";
+            loadingText.innerText = "กำลังโหลดไฟล์เสียงจาก Server...";
 
-    destNode=audioCtx.createMediaStreamDestination();
-    masterGain.connect(destNode);
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
 
-    setupRecorder();
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 1.0;
+                masterGain.connect(audioCtx.destination);
 
-    await Promise.all(
-        Object.keys(soundFiles).map(n=>loadSound(n,soundFiles[n]))
-    );
+                destNode = audioCtx.createMediaStreamDestination();
+                masterGain.connect(destNode);
 
-    document.getElementById('start-overlay').style.opacity=0;
-    setTimeout(()=>startOverlay.remove(),400);
-}
+                setupRecorder();
 
-async function loadSound(note,url){
-    try{
-        const r=await fetch(url);
-        const b=await r.arrayBuffer();
-        audioBuffers[note]=await audioCtx.decodeAudioData(b);
-    }catch(e){
-        console.warn('โหลดเสียงไม่ได้',url);
-    }
-}
+                // โหลดไฟล์เสียงทั้งหมด
+                const promises = Object.keys(soundFiles).map(note => loadSound(note, soundFiles[note]));
+                await Promise.all(promises);
 
-function playDrumSound(note){
-    if(audioBuffers[note]){
-        const s=audioCtx.createBufferSource();
-        s.buffer=audioBuffers[note];
-        s.connect(masterGain);
-        s.start();
-    }else{
-        const o=audioCtx.createOscillator();
-        const g=audioCtx.createGain();
-        o.frequency.value=440;
-        g.gain.value=.1;
-        o.connect(g);
-        g.connect(masterGain);
-        o.start();
-        o.stop(audioCtx.currentTime+.1);
-    }
-}
+                // ซ่อน Overlay
+                const overlay = document.getElementById('start-overlay');
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.remove(), 500);
 
-function setupRecorder(){
-    mediaRecorder=new MediaRecorder(destNode.stream);
-    mediaRecorder.ondataavailable=e=>audioChunks.push(e.data);
-    mediaRecorder.onstop=()=>{
-        const blob=new Blob(audioChunks,{type:'audio/webm'});
-        const url=URL.createObjectURL(blob);
-        const a=document.createElement('a');
-        a.href=url;
-        a.download='tenor_recording.webm';
-        a.click();
-        audioChunks=[];
-    };
-}
+            } catch (e) {
+                alert("เกิดข้อผิดพลาดในการโหลดเสียง หรือ Browser ไม่รองรับ");
+                console.error(e);
+                btnStart.innerText = "เกิดข้อผิดพลาด";
+            }
+        }
 
-function toggleRecord(){
-    if(!isRecording){
-        audioChunks=[];
-        mediaRecorder.start();
-        isRecording=true;
-        btnRecord.classList.add('recording');
-        recordStatus.style.display='inline';
-        btnStop.disabled=false;
-    }
-}
+        function setupRecorder() {
+            try {
+                mediaRecorder = new MediaRecorder(destNode.stream);
+                mediaRecorder.ondataavailable = (event) => audioChunks.push(event.data);
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = audioUrl;
+                    
+                    const now = new Date();
+                    const timestamp = `${now.getHours()}-${now.getMinutes()}-${now.getSeconds()}`;
+                    a.download = `tenor_rec_${timestamp}.webm`; 
+                    
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(audioUrl);
+                    }, 100);
+                    audioChunks = [];
+                    alert('บันทึกเสียงเรียบร้อย!');
+                };
+            } catch (e) {
+                console.error("MediaRecorder Error:", e);
+                const btnRec = document.getElementById('btn-record');
+                if(btnRec) {
+                    btnRec.disabled = true;
+                    btnRec.innerText = "ไม่รองรับการอัด";
+                }
+            }
+        }
 
-function stopRecord(){
-    if(isRecording){
-        mediaRecorder.stop();
-        isRecording=false;
-        btnRecord.classList.remove('recording');
-        recordStatus.style.display='none';
-        btnStop.disabled=true;
-    }
-}
+        function toggleRecord() {
+            if (!audioCtx) { alert('กรุณากดเริ่มใช้งานก่อน'); return; }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
 
-document.querySelectorAll('.drum').forEach(d=>{
-    const note=d.dataset.note;
-    const hit=e=>{
-        e.preventDefault();
-        d.classList.add('hit');
-        setTimeout(()=>d.classList.remove('hit'),80);
-        playDrumSound(note);
-    };
-    d.addEventListener('touchstart',hit,{passive:false});
-    d.addEventListener('mousedown',hit);
-});
+            if (!isRecording) {
+                audioChunks = [];
+                mediaRecorder.start();
+                isRecording = true;
+                document.getElementById('btn-record').classList.add('recording');
+                document.getElementById('btn-record').innerHTML = '<span class="icon">●</span> กำลังอัด...';
+                document.getElementById('btn-stop').disabled = false;
+                document.getElementById('record-status').style.display = 'flex';
+            }
+        }
 
-document.getElementById('btn-start-init').addEventListener('click',initAudio);
-</script>
+        function stopRecord() {
+            if (isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                document.getElementById('btn-record').classList.remove('recording');
+                document.getElementById('btn-record').innerHTML = '<span class="icon">●</span> บันทึก';
+                document.getElementById('btn-stop').disabled = true;
+                document.getElementById('record-status').style.display = 'none';
+            }
+        }
 
+        function playDrumSound(note) {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            if (audioBuffers[note]) {
+                const source = audioCtx.createBufferSource();
+                source.buffer = audioBuffers[note];
+                
+                // ปรับจูนเสียง (Pitch)
+                if (tuning[note]) {
+                    source.playbackRate.value = tuning[note];
+                }
+
+                source.connect(masterGain);
+                source.start(0);
+            } else {
+                console.log("Audio buffer not ready for: " + note);
+            }
+        }
+
+        // Event Handling
+        const drums = document.querySelectorAll('.drum');
+        drums.forEach(drum => {
+            const note = drum.dataset.note;
+
+            const hit = (e) => {
+                if(e.cancelable && e.type === 'touchstart') e.preventDefault();
+                
+                drum.classList.add('hit');
+                const animTime = (note === 'spock') ? 50 : 80;
+                setTimeout(() => drum.classList.remove('hit'), animTime);
+                
+                playDrumSound(note);
+            };
+
+            drum.addEventListener('touchstart', hit, { passive: false });
+            drum.addEventListener('mousedown', hit);
+        });
+
+        document.addEventListener('touchmove', function(e) { 
+            if (e.target.closest('.drum-container')) {
+                e.preventDefault(); 
+            }
+        }, { passive: false });
+    </script>
 </body>
 </html>
