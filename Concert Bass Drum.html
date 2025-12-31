@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Marching Bass Drum (Noise Filtered)</title>
+    <title>Marching Bass Drum (Pro Audio Engine)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&family=Black+Ops+One&display=swap');
 
@@ -254,10 +254,10 @@
 
     <script>
         // --- Sound Configuration ---
-        // ใส่ URL ไฟล์เสียงที่นี่
+        // ✅ 1. โหลดไฟล์ล่วงหน้า (Preload Configuration)
         const soundUrls = {
-            'hit': 'basdrum/bassdrum.mp3', 
-            'rim': 'basdrum/bassdrumkob.mp3' 
+            'hit': 'basdrum/bassdrum.wav', 
+            'rim': 'basdrum/bassdrumkob.wav' 
         };
 
         // --- Audio Engine (Web Audio API) ---
@@ -270,7 +270,7 @@
         let audioBlob;
         let audioUrl;
         
-        let loadedBuffers = {};
+        let loadedBuffers = {}; // เก็บ AudioBuffer ที่ Decode แล้ว
 
         function initAudio() {
             if (!audioCtx) {
@@ -285,10 +285,11 @@
                 compressor.attack.value = 0.003; 
                 compressor.release.value = 0.25;
 
-                // Noise Filter (ลดเสียงซ่า/อากาศ)
+                // ✅ 3. Noise Filter (ปิดเสียงอากาศ)
+                // ใช้ Lowpass ที่ 3000Hz ตัดเสียงซ่า (Hiss) ที่มักติดมากับไฟล์
                 const noiseFilter = audioCtx.createBiquadFilter();
                 noiseFilter.type = 'lowpass';
-                noiseFilter.frequency.value = 3000; // ตัดย่านแหลม (เสียงซ่า) ออก แต่ยังเก็บหัวไม้ไว้ได้
+                noiseFilter.frequency.value = 3000; 
 
                 // Master Volume
                 masterGain = audioCtx.createGain();
@@ -317,9 +318,10 @@
                     try {
                         const response = await fetch(url);
                         const arrayBuffer = await response.arrayBuffer();
+                        // ✅ 2. decode เป็น AudioBuffer ก่อนใช้งาน
                         const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                         loadedBuffers[key] = audioBuffer;
-                        console.log("Loaded: " + key);
+                        console.log("Loaded & Decoded: " + key);
                     } catch (error) {
                         console.warn(`Failed to load sound for ${key}:`, error);
                     }
@@ -342,6 +344,8 @@
         // Function เล่นไฟล์เสียง
         function playSample(buffer, intensity) {
             const t = audioCtx.currentTime;
+            
+            // ✅ 4. เล่นด้วย AudioBufferSourceNode (วิธีที่เสถียรที่สุด)
             const source = audioCtx.createBufferSource();
             source.buffer = buffer;
             
@@ -349,15 +353,18 @@
             const vol = 1.0 * intensity;
             const duration = buffer.duration;
             
-            // 1. Fade-In (แก้ Click ตอนเริ่ม) - เร็วมาก 1ms
+            // ✅ 5. Fade In/Out ระดับ ms (แก้เสียงคลิก/ตื้ด)
+            
+            // Fade-In: 1ms (0.001s) - แก้ Click ที่จุดเริ่มต้นของไฟล์
             sampleGain.gain.setValueAtTime(0, t);
             sampleGain.gain.linearRampToValueAtTime(vol, t + 0.001);
             
-            // 2. Fade-Out (แก้ Click ตอนจบ) - เริ่มเฟดลง 50ms ก่อนจบไฟล์
+            // Fade-Out: 50ms ก่อนจบไฟล์ - แก้ Click ที่จุดจบของไฟล์ (Trim Silence/Tail)
             if (duration > 0.05) {
                 sampleGain.gain.setValueAtTime(vol, t + duration - 0.05);
                 sampleGain.gain.linearRampToValueAtTime(0, t + duration);
             } else {
+                // กรณีไฟล์สั้นมาก
                 sampleGain.gain.linearRampToValueAtTime(0, t + duration);
             }
             
