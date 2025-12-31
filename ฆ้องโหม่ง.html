@@ -302,7 +302,6 @@
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
         let masterGain;
-        let echoNode; // เก็บ Echo Node ไว้ใช้
         let destination;
         let recorder;
         let audioChunks = [];
@@ -382,7 +381,7 @@
             if (!audioCtx) {
                 audioCtx = new AudioContext();
                 
-                // 1. ความดังหลัก
+                // 1. ความดังหลัก (Volume)
                 masterGain = audioCtx.createGain();
                 masterGain.gain.value = 2.5; 
                 
@@ -390,25 +389,8 @@
                 masterGain.connect(audioCtx.destination);
                 masterGain.connect(destination);
 
-                // 2. ปรับจูนระบบ Echo/Resonance (ลดลงไม่ให้เพี้ยน)
-                const delay = audioCtx.createDelay();
-                delay.delayTime.value = 0.25; // ลดลงเพื่อให้กระชับ (จาก 0.4)
-                
-                const feedback = audioCtx.createGain();
-                feedback.gain.value = 0.3; // ลดหางเสียง (จาก 0.5)
-
-                const filter = audioCtx.createBiquadFilter();
-                filter.type = 'lowpass';
-                filter.frequency.value = 600; // ตัดเสียงแหลมของ Echo ให้ทุ้มอุ่นอยู่ข้างหลัง
-
-                // เชื่อมต่อวงจร Echo
-                delay.connect(filter);
-                filter.connect(feedback);
-                feedback.connect(delay);
-                filter.connect(masterGain); 
-
-                // เก็บ Input ของ Echo ไว้เพื่อให้ Sample ส่งเสียงเข้ามาได้
-                echoNode = delay;
+                // --- REMOVED ECHO/DELAY NODES HERE ---
+                // ตัดเสียง Echo ออกทั้งหมด เพื่อให้เสียง Clean
 
                 // เริ่มโหลดเสียงเมื่อ User Interact ครั้งแรก
                 loadSounds();
@@ -440,23 +422,18 @@
             const source = audioCtx.createBufferSource();
             source.buffer = buffer;
             
-            // สร้าง Gain Node สำหรับ Fade In (ลบเสียงคลิก)
+            // สร้าง Gain Node สำหรับ Fade In (ลบเสียงคลิกหัวเสียง)
             const fadeGain = audioCtx.createGain();
             
-            // เชื่อมต่อ 1: ส่งเสียงตรงไปที่ Master (เสียงหลัก)
+            // เชื่อมต่อ: Source -> FadeGain -> Master
             source.connect(fadeGain);
             fadeGain.connect(masterGain);
 
-            // เชื่อมต่อ 2: ส่งเสียงไปที่ Echo (สร้างความกังวาลเพิ่ม)
-            if (echoNode) {
-                const echoSend = audioCtx.createGain();
-                echoSend.gain.value = 0.3; // ลด Send Level เหลือ 30% (จาก 60%) เพื่อไม่ให้กลบเสียงหลัก
-                fadeGain.connect(echoSend);
-                echoSend.connect(echoNode);
-            }
+            // --- REMOVED ECHO SEND ---
             
-            // Fade In Settings
-            const attackTime = 0.005; // 5ms
+            // Fade In Settings (Attack)
+            // เพิ่ม Attack Time เป็น 0.02s (20ms) เพื่อลบเสียง "คลิก" หรือเสียงกดปุ่มตอนเริ่มให้หายไป
+            const attackTime = 0.02; 
             
             fadeGain.gain.setValueAtTime(0, t);
             fadeGain.gain.linearRampToValueAtTime(1.0, t + attackTime);
