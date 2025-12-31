@@ -201,8 +201,8 @@
         // --- Configuration: External Sound URLs (ตั้งค่าลิงก์เสียง) ---
         // ใส่ลิงก์ไฟล์เสียงของคุณที่นี่
         const soundUrls = {
-            low: "thone/thonekang.mp3",
-            high: "thone/thonkob.mp3"
+            low: "thone/thonekang.wav",
+            high: "thone/thonkob.wav"
         };
 
         const audioBuffers = {
@@ -255,7 +255,7 @@
         let playbackAudio = new Audio();
         let isRecording = false;
 
-        // --- Sound Logic (Clean Version & Noise Reduction) ---
+        // --- Sound Logic (Clean Version & Audio Engineering Optimized) ---
 
         // เสียงทุ้ม (Center/Low) - เสียง "จโจ๊ะ"
         function playLowSound() {
@@ -264,20 +264,32 @@
             if (audioBuffers.low) {
                 const source = audioCtx.createBufferSource();
                 source.buffer = audioBuffers.low;
+                const duration = source.buffer.duration;
                 
-                // 1. สร้าง Gain เพื่อทำ Fade-out (ตัดหางเสียงซ่า)
+                // สร้าง Envelope Gain Node เพื่อจัดการ Fade In/Out
                 const gainNode = audioCtx.createGain();
-                gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime);
-                // ค่อยๆ ลดเสียงลงจนเงียบก่อนจบไฟล์ 0.1 วินาที
-                const fadeOutTime = Math.max(0, source.buffer.duration - 0.1);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + fadeOutTime);
+                
+                // 1. Attack (Fade In): 2ms (0.002s) 
+                // ช่วยป้องกันเสียง Click ถ้าไฟล์ไม่ได้เริ่มที่จุด 0 พอดี (Trim Silence หัวเสียงแบบ Soft)
+                gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(1.0, audioCtx.currentTime + 0.002);
 
-                // 2. สร้าง Low-pass Filter เพื่อกรองเสียงแหลม (Hiss/Air noise)
+                // 2. Release (Fade Out): Trim air noise
+                // เริ่ม Fade out ก่อนจบไฟล์เล็กน้อย (0.1s) เพื่อตัดหางเสียงซ่า
+                const fadeOutTime = 0.1;
+                const fadeStart = Math.max(0, duration - fadeOutTime);
+                
+                // คงระดับเสียงไว้จนถึงจุด fadeStart
+                gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime + fadeStart);
+                // ลดเสียงลงเหลือ 0.001 (เงียบสนิท) แบบ Exponential (ธรรมชาติกว่า Linear)
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+                // 3. Low-pass Filter (กรองเสียงซ่าความถี่สูง)
                 const filter = audioCtx.createBiquadFilter();
                 filter.type = 'lowpass';
-                filter.frequency.value = 3000; // ตัดย่านเสียงสูงเกิน 3000Hz ออก (เสียงจโจ๊ะเป็นเสียงต่ำ ไม่กระทบมาก แต่ตัดเสียงซ่าได้ดี)
+                filter.frequency.value = 2500; // ปรับลงมาที่ 2500Hz เพื่อความแน่นและตัด Noise
 
-                // เชื่อมต่อ: Source -> Filter -> Gain -> Master
+                // Routing: Source -> Filter -> Gain -> Master
                 source.connect(filter);
                 filter.connect(gainNode);
                 gainNode.connect(masterGain);
@@ -295,15 +307,24 @@
             if (audioBuffers.high) {
                 const source = audioCtx.createBufferSource();
                 source.buffer = audioBuffers.high;
+                const duration = source.buffer.duration;
                 
-                // 1. สร้าง Gain เพื่อทำ Fade-out (ตัดหางเสียงซ่า)
                 const gainNode = audioCtx.createGain();
-                gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime);
-                // ตัดหางเสียงให้กระชับขึ้น เพื่อไม่ให้มี Noise ค้าง
-                const fadeOutTime = Math.max(0, source.buffer.duration - 0.05);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + fadeOutTime);
+                
+                // 1. Attack (Fade In): 2ms
+                gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(1.0, audioCtx.currentTime + 0.002);
 
-                // เชื่อมต่อ: Source -> Gain -> Master (เสียงติงต้องการความใส ไม่ใส่ Low-pass filter)
+                // 2. Release (Fade Out): Trim air noise
+                // เสียงติงมักจะสั้นกว่า ปรับ Fade ให้กระชับ (0.05s)
+                const fadeOutTime = 0.05;
+                const fadeStart = Math.max(0, duration - fadeOutTime);
+
+                gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime + fadeStart);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+                // เสียงติงต้องการความใส ไม่ใส่ Low-pass filter (หรือใส่ที่ความถี่สูงมาก)
+                // Routing: Source -> Gain -> Master
                 source.connect(gainNode);
                 gainNode.connect(masterGain);
                 
