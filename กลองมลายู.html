@@ -178,7 +178,16 @@
     </div>
 
     <script>
-        // --- Audio Context & Synthesis Engine ---
+        // --- ส่วนการตั้งค่าลิงก์เสียง (Sound Configuration) ---
+        // คุณสามารถเปลี่ยนลิงก์ URL เป็นไฟล์ .mp3, .wav หรือ .ogg ของคุณเองได้ที่นี่
+        const soundUrls = {
+            // เสียงกลาง (ทุ้ม): ใช้เสียง Tom Drum แทนเสียงกลองมลายูตัวผู้/ทุ้ม
+            dung: "malayu/marayucen.wav", 
+            // เสียงขอบ (แหลม): ใช้เสียง Wood Block หรือ Rim Shot แทนเสียงกลองมลายูตัวเมีย/ขอบ
+            tak: "malayu/marayurim.wav"   
+        };
+
+        // --- Audio Context & Engine ---
         let audioCtx;
         let masterGain;
         let dest; // MediaStreamDestination for recording
@@ -187,8 +196,14 @@
         let audioBlob = null;
         let isRecording = false;
         let isPlaying = false;
+
+        // ตัวแปรเก็บ Buffer เสียงที่ Decode แล้ว
+        const audioBuffers = {
+            dung: null,
+            tak: null
+        };
         
-        // Initialize Audio Context on first interaction
+        // Initialize Audio Context
         function initAudio() {
             if (!audioCtx) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -198,114 +213,123 @@
                 dest = audioCtx.createMediaStreamDestination();
                 
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 0.8;
+                masterGain.gain.value = 0.9; // เพิ่ม Gain เล็กน้อยสำหรับ Samples
                 
                 // Connect Master -> Recording Dest
                 masterGain.connect(dest);
                 // Connect Master -> Speakers
                 masterGain.connect(audioCtx.destination);
+
+                // เริ่มโหลดเสียงทันทีที่ init
+                loadAllSounds();
             }
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
         }
 
-        // --- Sound Synthesis Functions ---
+        // --- Loader & Decoder Functions ---
+        async function loadSound(key, url) {
+            if (!url) return;
+            try {
+                const response = await fetch(url);
+                const arrayBuffer = await response.arrayBuffer();
+                const decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                audioBuffers[key] = decodedBuffer;
+                console.log(`Sound loaded: ${key}`);
+            } catch (error) {
+                console.warn(`Failed to load sound ${key}:`, error);
+            }
+        }
+
+        function loadAllSounds() {
+            if (!audioBuffers.dung) loadSound('dung', soundUrls.dung);
+            if (!audioBuffers.tak) loadSound('tak', soundUrls.tak);
+        }
+
+        // --- Playback Engine (Sample Based) ---
+        function playBuffer(buffer) {
+            if (!audioCtx) initAudio();
+            const t = audioCtx.currentTime;
+
+            const source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+
+            // Envelope Node for Fade In/Out (Trim Silence & Anti-Pop)
+            const gainNode = audioCtx.createGain();
+            
+            // Connect: Source -> Gain -> Master
+            source.connect(gainNode);
+            gainNode.connect(masterGain);
+
+            // 1. Fade In (5ms) - ป้องกันเสียงคลิกตอนเริ่ม (Anti-click start)
+            gainNode.gain.setValueAtTime(0, t);
+            gainNode.gain.linearRampToValueAtTime(1, t + 0.005); 
+
+            // 2. Fade Out (5ms before end) - ป้องกันเสียงคลิกตอนจบ (Anti-click end)
+            // คำนวณเวลาจบตามความยาว buffer
+            const duration = buffer.duration;
+            if (duration > 0.01) {
+                gainNode.gain.setValueAtTime(1, t + duration - 0.005);
+                gainNode.gain.linearRampToValueAtTime(0, t + duration);
+            }
+
+            source.start(t);
+        }
+
+        // --- Fallback Synthesis (สังเคราะห์เสียงกรณีโหลดไฟล์ไม่ทัน) ---
+        function playSynthDung() {
+            const t = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.frequency.setValueAtTime(150, t);
+            osc.frequency.exponentialRampToValueAtTime(40, t + 0.5);
+            gain.gain.setValueAtTime(1.0, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.6);
+            osc.connect(gain);
+            gain.connect(masterGain);
+            osc.start(t);
+            osc.stop(t + 0.6);
+        }
+
+        function playSynthTak() {
+            const t = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(400, t);
+            osc.frequency.exponentialRampToValueAtTime(200, t + 0.1);
+            gain.gain.setValueAtTime(0.6, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+            osc.connect(gain);
+            gain.connect(masterGain);
+            osc.start(t);
+            osc.stop(t + 0.15);
+        }
+
+        // --- Main Trigger Functions ---
         
         // Sound 1: "Dung" (Bass/Center)
         function playDung() {
             if(!audioCtx) initAudio();
-            const t = audioCtx.currentTime;
-
-            // Oscillator for deep resonance
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
             
-            osc.frequency.setValueAtTime(150, t);
-            osc.frequency.exponentialRampToValueAtTime(40, t + 0.5); // Pitch drop
-            
-            gain.gain.setValueAtTime(1.0, t);
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.6); // Long decay
-
-            osc.connect(gain);
-            gain.connect(masterGain);
-            
-            osc.start(t);
-            osc.stop(t + 0.6);
-
-            // Add slight thud (noise)
-            const bufferSize = audioCtx.sampleRate * 0.05; // 50ms
-            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                data[i] = Math.random() * 2 - 1;
+            if (audioBuffers.dung) {
+                playBuffer(audioBuffers.dung);
+            } else {
+                playSynthDung(); // Fallback
             }
-            const noise = audioCtx.createBufferSource();
-            noise.buffer = buffer;
-            const noiseGain = audioCtx.createGain();
-            
-            // Lowpass filter for thud
-            const filter = audioCtx.createBiquadFilter();
-            filter.type = 'lowpass';
-            filter.frequency.value = 200;
-
-            noiseGain.gain.setValueAtTime(0.5, t);
-            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
-
-            noise.connect(filter);
-            filter.connect(noiseGain);
-            noiseGain.connect(masterGain);
-            noise.start(t);
-
             showVisual('ตุง', 'dung');
         }
 
         // Sound 2: "Tak" (Rim/Edge)
         function playTak() {
             if(!audioCtx) initAudio();
-            const t = audioCtx.currentTime;
-
-            // Oscillator for tone (higher pitch)
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
             
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(400, t);
-            osc.frequency.exponentialRampToValueAtTime(200, t + 0.1);
-            
-            gain.gain.setValueAtTime(0.6, t);
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15); // Short decay
-
-            osc.connect(gain);
-            gain.connect(masterGain);
-            
-            osc.start(t);
-            osc.stop(t + 0.15);
-
-            // High frequency slap (noise)
-            const bufferSize = audioCtx.sampleRate * 0.05;
-            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                data[i] = Math.random() * 2 - 1;
+            if (audioBuffers.tak) {
+                playBuffer(audioBuffers.tak);
+            } else {
+                playSynthTak(); // Fallback
             }
-            const noise = audioCtx.createBufferSource();
-            noise.buffer = buffer;
-            const noiseGain = audioCtx.createGain();
-            
-            // Highpass filter for snap
-            const filter = audioCtx.createBiquadFilter();
-            filter.type = 'highpass';
-            filter.frequency.value = 1000;
-
-            noiseGain.gain.setValueAtTime(0.8, t);
-            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.08);
-
-            noise.connect(filter);
-            filter.connect(noiseGain);
-            noiseGain.connect(masterGain);
-            noise.start(t);
-
             showVisual('ตั๊ก', 'tak');
         }
 
