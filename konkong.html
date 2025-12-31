@@ -100,14 +100,14 @@ async function initAudio(){
     audioCtx = new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
 
     compressor = audioCtx.createDynamicsCompressor();
-    compressor.threshold.value = -20;
+    compressor.threshold.value = -22;
     compressor.knee.value = 24;
-    compressor.ratio.value = 3.5;
-    compressor.attack.value = 0.015;
-    compressor.release.value = 0.18;
+    compressor.ratio.value = 3.2;
+    compressor.attack.value = 0.02;
+    compressor.release.value = 0.22;
 
     masterGain = audioCtx.createGain();
-    masterGain.gain.value = 1.25;
+    masterGain.gain.value = 1.6; // 🔥 ดันทั้งระบบ
 
     compressor.connect(audioCtx.destination);
     masterGain.connect(compressor);
@@ -143,7 +143,7 @@ async function setupReverb(){
 }
 
 /* =======================
-   LOAD FILES
+   LOAD FILES (NO TRIM)
 ======================= */
 async function loadSoundFiles(){
     for(const k in soundUrls){
@@ -164,13 +164,19 @@ function playSound(type){
 
     const filter = audioCtx.createBiquadFilter();
     filter.type='lowpass';
-    filter.frequency.value = type==='bom'?4800:2200;
+    if(type==='bom'){
+        filter.frequency.value = 6500; // 🔥 เปิด harmonic เต็ม
+        filter.Q.value = 0.9;
+    }else{
+        filter.frequency.value = 2200;
+        filter.Q.value = 0.8;
+    }
 
     const gain = audioCtx.createGain();
     gain.gain.setValueAtTime(0,t);
 
-    const peak = type==='bom'?3.8:1.1;
-    const decay = type==='bom'?.85:.4;
+    const peak = type==='bom'?6.5:1.1;   // 🔥 บ่อมดังสุด
+    const decay = type==='bom'?1.0:0.4;
 
     gain.gain.linearRampToValueAtTime(peak,t+.01);
     gain.gain.exponentialRampToValueAtTime(.001,t+decay);
@@ -180,16 +186,18 @@ function playSound(type){
     gain.connect(masterGain);
     gain.connect(reverbGain);
 
+    /* SUB HARMONIC – สั่นลำโพงมือถือ */
     if(type==='bom'){
         const sub = audioCtx.createOscillator();
         const subGain = audioCtx.createGain();
+        sub.type='sine';
         sub.frequency.value=55;
-        subGain.gain.setValueAtTime(.9,t);
-        subGain.gain.exponentialRampToValueAtTime(.001,t+.45);
+        subGain.gain.setValueAtTime(1.4,t);
+        subGain.gain.exponentialRampToValueAtTime(.001,t+.6);
         sub.connect(subGain);
         subGain.connect(masterGain);
         sub.start(t);
-        sub.stop(t+.45);
+        sub.stop(t+.6);
     }
 
     src.start(t);
@@ -248,7 +256,7 @@ function playRecording(){
 function downloadRecording(){
     const a=document.createElement('a');
     a.href=audioUrl;
-    a.download='klong-yao.webm';
+    a.download='klong-yao-recording.webm';
     a.click();
 }
 </script>
