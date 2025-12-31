@@ -87,13 +87,13 @@ const soundUrls = {
     poeng: 'konglong/pengkob.wav'
 };
 
-let audioCtx, masterGain, compressor;
+let audioCtx, masterGain;
 let audioBuffers = {};
 let destStream, recorder, recordedChunks=[], audioUrl;
 let isRecording=false;
 
 /* =======================
-   INIT AUDIO
+   INIT AUDIO (NO COMPRESSOR)
 ======================= */
 async function initAudio(){
     if(audioCtx) return;
@@ -102,23 +102,14 @@ async function initAudio(){
         latencyHint:'interactive'
     });
 
-    // compressor: ปล่อยหัวเสียงบ่อม
-    compressor = audioCtx.createDynamicsCompressor();
-    compressor.threshold.value = -18;
-    compressor.knee.value = 20;
-    compressor.ratio.value = 3;
-    compressor.attack.value = 0.02;
-    compressor.release.value = 0.25;
-
     masterGain = audioCtx.createGain();
-    masterGain.gain.value = 1.7; // 🔥 ดันทั้งระบบ (ไฟล์ล้วน)
+    masterGain.gain.value = 1.0; // ดันที่ note แทน
 
-    masterGain.connect(compressor);
-    compressor.connect(audioCtx.destination);
+    masterGain.connect(audioCtx.destination);
 
     // สำหรับอัดเสียง
     destStream = audioCtx.createMediaStreamDestination();
-    compressor.connect(destStream);
+    masterGain.connect(destStream);
 
     await loadSoundFiles();
     document.getElementById('start-overlay').style.display='none';
@@ -131,12 +122,12 @@ async function loadSoundFiles(){
     for(const k in soundUrls){
         const res = await fetch(soundUrls[k]);
         const buf = await audioCtx.decodeAudioData(await res.arrayBuffer());
-        audioBuffers[k] = buf; // ❌ ไม่ trim ไม่แตะ
+        audioBuffers[k] = buf; // ❌ ไม่ trim
     }
 }
 
 /* =======================
-   PLAY SOUND (FILE ONLY)
+   PLAY SOUND (FILE ONLY / MAX GAIN)
 ======================= */
 function playSound(type){
     if(!audioCtx) return;
@@ -149,20 +140,21 @@ function playSound(type){
     filter.type = 'lowpass';
 
     if(type==='bom'){
-        filter.frequency.value = 7000; // เปิดไฟล์เต็ม
-        filter.Q.value = 0.7;
+        filter.frequency.value = 10000; // เปิดไฟล์เต็ม
+        filter.Q.value = 0.5;
     }else{
-        filter.frequency.value = 2500;
+        filter.frequency.value = 3000;
         filter.Q.value = 0.9;
     }
 
     const gain = audioCtx.createGain();
     gain.gain.setValueAtTime(0, t);
 
-    const peak = type==='bom' ? 7.0 : 1.2; // 🔥 บ่อมดังจากไฟล์
-    const decay = type==='bom' ? 1.1 : 0.4;
+    // 🔥 ดันตรง ๆ แบบไฟล์ล้วน
+    const peak = type==='bom' ? 12.0 : 1.3;
+    const decay = type==='bom' ? 1.2 : 0.4;
 
-    gain.gain.linearRampToValueAtTime(peak, t + 0.008);
+    gain.gain.linearRampToValueAtTime(peak, t + 0.015);
     gain.gain.exponentialRampToValueAtTime(0.001, t + decay);
 
     src.connect(filter);
@@ -173,7 +165,7 @@ function playSound(type){
 }
 
 /* =======================
-   HIT DETECTION
+   HIT
 ======================= */
 const drum=document.getElementById('drum');
 drum.addEventListener('mousedown',e=>{
@@ -225,7 +217,7 @@ function playRecording(){
 function downloadRecording(){
     const a=document.createElement('a');
     a.href=audioUrl;
-    a.download='klong-yao-file100.webm';
+    a.download='klong-yao-file100-loud.webm';
     a.click();
 }
 </script>
