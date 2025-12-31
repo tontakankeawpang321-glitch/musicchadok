@@ -237,9 +237,9 @@
         // --- Configuration: External Sound URLs ---
         // ⚠️ สำคัญมาก: ต้องใส่ลิงก์ไฟล์เสียง (.mp3, .wav) ตรงนี้ มิฉะนั้นจะไม่มีเสียง
         const soundUrls = {
-            bom: 'konglong/momlong.wav',    // เสียง "บ่อม" (กลาง)
+           bom: 'konglong/momlong.wav',    // เสียง "บ่อม" (กลาง)
             pa: 'konglong/paklong.wav',     // เสียง "ปะ" (ล่างวงกลม/ตบ)
-            poeng: 'konglong/pengkob.wav'  // เสียง "เปิง" (ขอบ)
+            poeng: 'konglong/pengkob.wav'    // เสียง "เปิง" (ขอบ)
         };
 
         // --- Audio Engine (Web Audio API) ---
@@ -267,18 +267,18 @@
         async function initAudio() {
             if (!audioCtx) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
+                // STABILITY FIX: ไม่กำหนด sampleRate เพื่อให้ใช้ Native Rate ของอุปกรณ์ (ลด Latency และลดภาระ CPU)
                 audioCtx = new AudioContext({
-                    latencyHint: 'interactive', // Optimize for lowest latency
-                    sampleRate: 44100
+                    latencyHint: 'interactive' // เน้นความไวสูงสุด
                 });
                 
-                // 1. Create Compressor (ปรับจูนสำหรับ Polyphony เล่นพร้อมกัน)
+                // 1. Create Compressor (ปรับจูนใหม่สำหรับการรัว - Rapid Fire)
                 compressor = audioCtx.createDynamicsCompressor();
                 compressor.threshold.value = -12;
                 compressor.knee.value = 30;
-                compressor.ratio.value = 6; // ลด Ratio ลงเพื่อให้เสียงไม่วูบเมื่อตีพร้อมกัน
-                compressor.attack.value = 0.005;
-                compressor.release.value = 0.15;
+                compressor.ratio.value = 6; 
+                compressor.attack.value = 0.002; // Attack เร็วขึ้น
+                compressor.release.value = 0.1;  // Release เร็วขึ้น (จาก 0.15) เพื่อไม่ให้เสียงวูบเมื่อตีรัว
                 compressor.connect(audioCtx.destination);
 
                 // 2. Master Gain
@@ -309,7 +309,7 @@
 
         function trimSilence(buffer) {
             const rawData = buffer.getChannelData(0); 
-            const threshold = 0.005; // Lower threshold for tighter crop
+            const threshold = 0.005; 
             let start = 0;
             let end = rawData.length;
 
@@ -327,7 +327,7 @@
                 }
             }
             
-            start = Math.max(0, start - 100);
+            start = Math.max(0, start - 50); // ลด Buffer หน้าลงเพื่อให้เสียงมาไวขึ้น
             end = Math.min(rawData.length, end + 100);
 
             const length = end - start;
@@ -380,7 +380,7 @@
         async function setupReverb() {
             reverbNode = audioCtx.createConvolver();
             reverbGain = audioCtx.createGain();
-            reverbGain.gain.value = 0.3; // ปรับลดลงเล็กน้อยเพื่อความชัดเมื่อเล่นพร้อมกัน
+            reverbGain.gain.value = 0.3; 
 
             const length = audioCtx.sampleRate * 1.5; 
             const impulse = audioCtx.createBuffer(2, length, audioCtx.sampleRate);
@@ -402,6 +402,9 @@
         function playSound(type) {
             if (!audioCtx) return;
 
+            // Ensure AudioContext is running (Stability fix for long idle times)
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
             const t = audioCtx.currentTime;
 
             function connectOutput(node) {
@@ -416,7 +419,6 @@
                 const source = audioCtx.createBufferSource();
                 source.buffer = audioBuffers[type];
                 
-                // ใช้ Gain แยกสำหรับแต่ละ hit เพื่ออิสระในการเฟด
                 const fileGain = audioCtx.createGain();
                 fileGain.gain.value = 0; 
                 
@@ -425,9 +427,9 @@
                 
                 const bufferDuration = audioBuffers[type].duration;
                 
-                // Fast Attack (2ms) - เร็วขึ้นเพื่อลดดีเลย์
+                // PERFORMANCE FIX: ลด Fade-in เหลือ 1ms (แทบจะเป็น 0) เพื่อความรู้สึก Instant
                 fileGain.gain.setValueAtTime(0, t);
-                fileGain.gain.linearRampToValueAtTime(1.0, t + 0.002); 
+                fileGain.gain.linearRampToValueAtTime(1.0, t + 0.001); 
                 
                 // Release (10ms before end)
                 if (bufferDuration > 0.02) {
@@ -435,12 +437,15 @@
                     fileGain.gain.linearRampToValueAtTime(0, t + bufferDuration);
                 }
 
-                source.start(t);
+                source.start(t); // Start Immediately
                 
-                // Cleanup (Optional but good for stability)
+                // MEMORY LEAK FIX: Explicitly cleanup on ended
                 source.onended = () => {
-                    source.disconnect();
-                    fileGain.disconnect();
+                    try {
+                        source.stop(); // Safe guard
+                        source.disconnect();
+                        fileGain.disconnect();
+                    } catch(e) { /* ignore cleanup errors */ }
                 };
             }
             
@@ -505,14 +510,13 @@
             }, 250);
         }
 
-        // Visual feedback optimization
+        // Visual feedback optimization (Non-blocking)
         function animateDrum(transform) {
-            // Reset transformation quickly to allow rapid re-triggering visually
-            drum.style.transform = transform;
             requestAnimationFrame(() => {
+                drum.style.transform = transform;
                 setTimeout(() => {
                     drum.style.transform = 'scale(1)';
-                }, 40); // สั้นลงเพื่อให้รองรับการตีรัว
+                }, 40); 
             });
         }
 
