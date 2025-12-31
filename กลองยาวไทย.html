@@ -209,8 +209,8 @@
     <script>
         // --- Configuration ---
         const soundUrls = {
-            bom: '',    // เสียง "บ่อม" (กลาง)
-            poeng: ''   // เสียง "เปิง" (ขอบ)
+     bom: 'konglong/momlong.wav',    // เสียง "บ่อม" (กลาง)
+            poeng: 'konglong/pengkob.wav'   // เสียง "เปิง" (ขอบ)
         };
 
         // --- Global Variables ---
@@ -474,32 +474,35 @@
         // --- Optimized Touch Handler ---
         function handleHit(e) {
             if (e.cancelable) e.preventDefault();
-            
-            // แก้ปัญหาตีครั้งแรกเงียบ: รอ init แล้วตีซ้ำทันที
+
             if (!audioCtx) {
                 initAudio().then(() => handleHit(e));
                 return;
             }
 
-            const touches = e.changedTouches;
-            const len = touches.length;
+            // ✅ รองรับทั้ง Touch และ Mouse
+            const points = e.changedTouches ? e.changedTouches : [e];
+
             let visualTriggered = false;
 
-            for (let i = 0; i < len; i++) {
-                const t = touches[i];
-                const dx = t.clientX - drumCenterX;
-                const dy = t.clientY - drumCenterY;
-                const distSq = dx*dx + dy*dy;
+            for (let i = 0; i < points.length; i++) {
+                const p = points[i];
+
+                const x = p.clientX;
+                const y = p.clientY;
+
+                const dx = x - drumCenterX;
+                const dy = y - drumCenterY;
+                const distSq = dx * dx + dy * dy;
                 const normalizedDistSq = distSq / drumRadiusSq;
 
-                // Zone Logic: Center radius 45% = 0.45 * 0.45 = 0.2025
-                if (normalizedDistSq < 0.2025) { 
+                if (normalizedDistSq < 0.2025) {
                     playSound('bom');
                 } else {
                     playSound('poeng');
                 }
-                
-                requestAnimationFrame(() => createRipple(t.clientX, t.clientY));
+
+                requestAnimationFrame(() => createRipple(x, y));
                 visualTriggered = true;
             }
 
