@@ -301,10 +301,9 @@
 
     <script>
         // --- ส่วนปรับแต่ง URL เสียง (Sound Configuration) ---
-        // หากต้องการใช้เสียงจริง ให้ใส่ Base64 String หรือ URL ที่นี่
-        // ตัวอย่าง: "data:audio/mp3;base64,..." หรือ "sounds/krap.mp3"
-        // หากปล่อยว่างไว้ ("") ระบบจะใช้เสียงสังเคราะห์คุณภาพสูงแทน
-        const CUSTOM_SOUND_URL = "krub/krub.mp3"; 
+        // ⚠️ สำคัญ: ต้องใส่ URL ของไฟล์เสียง หรือ Base64 String ที่นี่เท่านั้น
+        // หากไม่ใส่ จะไม่มีเสียงออกมา (เพราะตัดระบบเสียงสังเคราะห์ออกแล้ว)
+        const CUSTOM_SOUND_URL = "krub/krub.wav"; 
 
         // --- Configuration & State ---
         const state = {
@@ -313,11 +312,11 @@
             recorder: null,
             audioChunks: [],
             audioBlob: null,
-            destination: null, // For routing sound to recorder
+            destination: null, 
             visualsEnabled: true,
             canPlay: false,
-            krapBuffer: null, // เก็บเสียงกรับที่ render ไว้แล้ว (เพื่อความเสถียร)
-            compressor: null // ตัวคุมระดับเสียง
+            krapBuffer: null, // Preloaded AudioBuffer
+            compressor: null 
         };
 
         const dom = {
@@ -334,13 +333,55 @@
             audioPlayer: document.getElementById('playback-audio')
         };
 
-        // --- Audio Engine (Enhanced Stability & Dynamics) ---
+        // --- Advance Audio Processing ---
+
+        // ฟังก์ชันตัดความเงียบหัว-ท้ายของไฟล์เสียง (Trim Silence)
+        function trimSilence(buffer) {
+            const channelData = buffer.getChannelData(0); // ตรวจสอบจาก Channel ซ้าย
+            let start = 0;
+            let end = channelData.length;
+            const threshold = 0.005; // ระดับความดังที่ถือว่าเป็นเสียงเงียบ (-46dB)
+
+            // หาจุดเริ่มต้นเสียง
+            for (let i = 0; i < channelData.length; i++) {
+                if (Math.abs(channelData[i]) > threshold) {
+                    start = i;
+                    break;
+                }
+            }
+
+            // หาจุดจบเสียง
+            for (let i = channelData.length - 1; i >= 0; i--) {
+                if (Math.abs(channelData[i]) > threshold) {
+                    end = i + 1;
+                    break;
+                }
+            }
+
+            if (end <= start) return buffer; // ไฟล์เงียบสนิท ไม่ต้องทำอะไร
+
+            // สร้าง Buffer ใหม่เฉพาะช่วงที่มีเสียง
+            const newLength = end - start;
+            const newBuffer = state.audioContext.createBuffer(buffer.numberOfChannels, newLength, buffer.sampleRate);
+
+            for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+                const oldData = buffer.getChannelData(channel);
+                const newData = newBuffer.getChannelData(channel);
+                for (let i = 0; i < newLength; i++) {
+                    newData[i] = oldData[i + start];
+                }
+            }
+            console.log(`Trimmed silence: start=${start}, length=${newLength}`);
+            return newBuffer;
+        }
+
+        // --- Audio Engine ---
         async function initAudio() {
             if (!state.audioContext) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 state.audioContext = new AudioContext();
                 
-                // 1. สร้าง Compressor เพื่อป้องกันเสียงแตก (Clipping) เวลากดรัวๆ
+                // 1. Dynamics Compressor (ป้องกันเสียงแตกเมื่อกดรัว)
                 state.compressor = state.audioContext.createDynamicsCompressor();
                 state.compressor.threshold.setValueAtTime(-10, state.audioContext.currentTime);
                 state.compressor.knee.setValueAtTime(40, state.audioContext.currentTime);
@@ -350,25 +391,25 @@
 
                 state.destination = state.audioContext.createMediaStreamDestination();
 
-                // ต่อ Compressor เข้ากับลำโพงและตัวอัดเสียง
+                // Chain: Compressor -> Speaker & Recorder
                 state.compressor.connect(state.audioContext.destination);
                 state.compressor.connect(state.destination);
 
-                // 2. เตรียมเสียง (Pre-load/Pre-render)
+                // 2. Preload & Decode Sound (Real File Only)
                 if (CUSTOM_SOUND_URL && CUSTOM_SOUND_URL.length > 0) {
-                    // กรณีใช้ Custom URL
                     try {
                         const response = await fetch(CUSTOM_SOUND_URL);
                         const arrayBuffer = await response.arrayBuffer();
-                        state.krapBuffer = await state.audioContext.decodeAudioData(arrayBuffer);
-                        showStatus("โหลดเสียงภายนอกสำเร็จ");
+                        const rawBuffer = await state.audioContext.decodeAudioData(arrayBuffer);
+                        // ตัดเสียงเงียบออกก่อนใช้งาน
+                        state.krapBuffer = trimSilence(rawBuffer);
+                        showStatus("โหลดเสียงเรียบร้อย");
                     } catch (e) {
-                        console.error("Load sound failed, fallback to synthesis", e);
-                        state.krapBuffer = renderSyntheticKrapBuffer();
+                        console.error("Load sound failed", e);
+                        showStatus("โหลดไฟล์เสียงไม่สำเร็จ");
                     }
                 } else {
-                    // กรณีใช้เสียงสังเคราะห์ (สร้างเป็น Buffer รอไว้เลย เพื่อความลื่นไหลสูงสุด)
-                    state.krapBuffer = renderSyntheticKrapBuffer();
+                    showStatus("กรุณาใส่ URL เสียงในโค้ด");
                 }
             }
             
@@ -377,78 +418,56 @@
             }
         }
 
-        // ฟังก์ชันสร้างเสียงสังเคราะห์แล้วแปลงเป็น Buffer เก็บไว้
-        function renderSyntheticKrapBuffer() {
-            const sampleRate = state.audioContext.sampleRate;
-            const duration = 0.2; // เสียงยาว 0.2 วินาที
-            const frameCount = sampleRate * duration;
-            const buffer = state.audioContext.createBuffer(1, frameCount, sampleRate);
-            const data = buffer.getChannelData(0);
-
-            // สร้างคลื่นเสียงแบบ Manual ลงใน Buffer
-            for (let i = 0; i < frameCount; i++) {
-                const t = i / sampleRate;
-                
-                // 1. Wood Impact (Sine wave ที่ Pitch ตกลงอย่างเร็ว)
-                const freq = 1600 * Math.exp(-t * 15); // Pitch envelope
-                const impact = Math.sin(2 * Math.PI * freq * t);
-                const impactEnv = Math.exp(-t * 60); // Decay envelope เร็ว
-                
-                // 2. Body Resonance (เสียงทุ้มของไม้)
-                const body = Math.sin(2 * Math.PI * 400 * t);
-                const bodyEnv = Math.exp(-t * 20);
-
-                // 3. Click/Noise (Texture ผิวสัมผัส)
-                const noise = (Math.random() * 2 - 1) * 0.5;
-                const noiseEnv = Math.exp(-t * 200); // สั้นมากๆ
-
-                // ผสมเสียง
-                data[i] = (impact * impactEnv * 0.7) + (body * bodyEnv * 0.2) + (noise * noiseEnv * 0.4);
-            }
-            return buffer;
-        }
-
         function playKrapSound() {
             if (!state.audioContext || !state.krapBuffer) return;
 
-            // ใช้ BufferSourceNode เล่นเสียงจาก Memory โดยตรง (เสถียรที่สุด)
+            const t = state.audioContext.currentTime;
+
+            // 1. Source (AudioBufferSourceNode) - แม่นยำที่สุด
             const source = state.audioContext.createBufferSource();
             source.buffer = state.krapBuffer;
             
-            // Randomize Pitch เล็กน้อยเพื่อความสมจริง (ไม้ตีกันเสียงไม่เท่ากันเป๊ะทุกครั้ง)
-            // detune มีหน่วยเป็น cents (100 cents = 1 semitone)
-            // สุ่มค่าระหว่าง -50 ถึง 50 cents
+            // Randomize Pitch เล็กน้อย (Humanize)
             source.detune.value = (Math.random() * 100) - 50;
 
-            // ต่อเข้า Compressor (เพื่อคุมไม่ให้เสียงแตก)
-            source.connect(state.compressor);
+            // 2. Envelope Gain (Micro-fades)
+            // ใช้ GainNode เพื่อทำ Fade in/out ป้องกันเสียง "คลิก" (Pop/Click) ที่หัวและท้ายเสียง
+            const envelope = state.audioContext.createGain();
             
-            source.start(0);
+            // Fade In: 2ms (เพื่อลบเสียง Click ตอนเริ่มถ้า waveform ไม่เริ่มที่ 0)
+            envelope.gain.setValueAtTime(0, t);
+            envelope.gain.linearRampToValueAtTime(1, t + 0.002);
+
+            // Fade Out: 5ms ก่อนจบไฟล์ (เพื่อลบเสียง Click ตอนจบ)
+            const duration = state.krapBuffer.duration;
+            envelope.gain.setValueAtTime(1, t + duration - 0.005);
+            envelope.gain.linearRampToValueAtTime(0, t + duration);
+
+            // Connect Graph
+            source.connect(envelope);
+            envelope.connect(state.compressor);
+            
+            source.start(t);
         }
 
         // --- Visual Logic ---
         function triggerVisuals() {
-            // เทคนิค Reset Animation ที่ดีกว่า เพื่อรองรับการกดรัวๆ (Spamming)
             dom.krapModel.style.animation = 'none';
             dom.krapModel.offsetHeight; /* trigger reflow */
             dom.krapModel.style.animation = null; 
             
             dom.krapModel.classList.add('active');
             
-            // ตั้งเวลาเอา class ออกเพื่อให้ Animation เล่นใหม่ได้ในครั้งหน้า
-            // ใช้ setTimeout ที่สั้นกว่า Animation duration เล็กน้อย
             setTimeout(() => {
                 dom.krapModel.classList.remove('active');
             }, 80);
 
-            // Show "Note" (Visual Ripple)
             if (state.visualsEnabled) {
                 const ripple = dom.visualHit.cloneNode(true);
                 dom.touchArea.appendChild(ripple);
                 ripple.style.display = 'block';
                 ripple.classList.add('animate');
                 
-                // ลบ Element ทิ้งเมื่อเล่นเสร็จเพื่อไม่ให้รก DOM
                 setTimeout(() => {
                     ripple.remove();
                 }, 400);
@@ -456,7 +475,7 @@
         }
 
         function handleTap(e) {
-            if(e && e.cancelable) e.preventDefault(); // Prevent scrolling/zooming
+            if(e && e.cancelable) e.preventDefault();
             if (!state.canPlay) return;
 
             playKrapSound();
@@ -570,7 +589,6 @@
 
         // --- Initialization & Event Listeners ---
         
-        // Start App (Unlock AudioContext)
         dom.startBtn.addEventListener('click', () => {
             initAudio();
             dom.overlay.style.opacity = '0';
@@ -580,11 +598,9 @@
             state.canPlay = true;
         });
 
-        // Touch Interaction (Mobile optimized)
         dom.touchArea.addEventListener('touchstart', handleTap, { passive: false });
         dom.touchArea.addEventListener('mousedown', handleTap); 
 
-        // Button Listeners
         dom.btnRecord.addEventListener('click', toggleRecording);
         dom.btnPlay.addEventListener('click', playRecording);
         dom.btnDownload.addEventListener('click', downloadRecording);
