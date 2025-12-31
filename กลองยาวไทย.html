@@ -34,6 +34,7 @@
             cursor: pointer;
             touch-action: none;
             will-change: transform; /* Hint browser to optimize compositing */
+            transform-origin: center center;
         }
 
         /* Texture overlay */
@@ -84,9 +85,10 @@
             background: rgba(255, 255, 255, 0.5);
             border-radius: 50%;
             pointer-events: none;
-            animation: ripple 0.2s ease-out forwards;
             will-change: transform, opacity;
             z-index: 40;
+            /* Use CSS animation directly for performance */
+            animation: ripple 0.2s ease-out forwards;
         }
 
         /* Note labels */
@@ -241,7 +243,7 @@
 
         let audioBuffers = { bom: null, pa: null, poeng: null };
 
-        // CACHING DRUM GEOMETRY
+        // CACHING DRUM GEOMETRY (Optimization)
         const drum = document.getElementById('drum');
         let drumRect = drum.getBoundingClientRect();
         let drumRadius = drumRect.width / 2;
@@ -259,24 +261,25 @@
         async function initAudio() {
             if (!audioCtx) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
+                // Optimization: latencyHint 'interactive' is key for drumming apps
                 audioCtx = new AudioContext({
                     latencyHint: 'interactive',
                 });
                 
-                // Silent warm-up
+                // Silent warm-up buffer (Wake up audio thread)
                 const buffer = audioCtx.createBuffer(1, 1, 22050);
                 const source = audioCtx.createBufferSource();
                 source.buffer = buffer;
                 source.connect(audioCtx.destination);
                 source.start();
 
-                // 1. Create Compressor
+                // 1. Create Compressor (Fast attack/release for percussive sounds)
                 compressor = audioCtx.createDynamicsCompressor();
                 compressor.threshold.value = -10;
                 compressor.knee.value = 30;
                 compressor.ratio.value = 8; 
                 compressor.attack.value = 0.001; 
-                compressor.release.value = 0.05;
+                compressor.release.value = 0.05; // Fast release prevents pumping
                 compressor.connect(audioCtx.destination);
 
                 // 2. Master Gain
@@ -303,14 +306,12 @@
             }
         }
 
-        // ❌ เอาฟังก์ชัน trimSilence ออก เพื่อแก้ปัญหาเสียงหาย
-
         async function loadSoundFiles() {
             let loadedCount = 0;
             const total = Object.values(soundUrls).filter(u => u).length;
 
             if (total === 0) {
-                 document.getElementById('status-indicator').innerHTML = '<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>รอไฟล์เสียง';
+                 document.getElementById('status-indicator').innerHTML = '<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>ใช้เสียงสังเคราะห์';
                  return;
             }
 
@@ -327,7 +328,6 @@
                     const arrayBuffer = await response.arrayBuffer();
                     const rawBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                     
-                    // ✅ ใช้ไฟล์เสียงดิบๆ เลย ไม่ตัดต่อใดๆ
                     audioBuffers[key] = rawBuffer;
                     loadedCount++;
                 } catch (e) {
@@ -358,46 +358,42 @@
             reverbGain.connect(reverbNode); 
         }
 
-        // --- Standard PlaySound (No complex fallback logic) ---
+        // --- Standard PlaySound (Instant & Stable) ---
         function playSound(type) {
             if (!audioCtx) return;
+            // Ensure audio context is running (Fixes iOS/Chrome auto-suspend issues)
             if (audioCtx.state === 'suspended') audioCtx.resume();
 
             const t = audioCtx.currentTime;
             
             // Check if audio buffer exists
             if (audioBuffers[type]) {
-                // 1. Create Source
                 const source = audioCtx.createBufferSource();
                 source.buffer = audioBuffers[type];
                 
-                // 2. Create Gain Node (Simple Volume)
                 const fileGain = audioCtx.createGain();
-                // ✅ Instant volume, no fade-in delay
-                fileGain.gain.setValueAtTime(1.0, t); 
+                fileGain.gain.value = 1.0; 
                 
-                // 3. Connect: Source -> Gain -> Master
                 source.connect(fileGain);
                 fileGain.connect(masterGain);
                 if(reverbGain) fileGain.connect(reverbGain);
 
-                // Start
-                source.start(0);
+                source.start(0); // Start Immediately
 
-                // Cleanup
+                // Memory cleanup
                 source.onended = function() {
                     source.disconnect();
                     fileGain.disconnect();
                 };
             } else {
-                // Fallback Synth ONLY if file is completely missing
+                // Robust Fallback Synth
                 const osc = audioCtx.createOscillator();
                 const g = audioCtx.createGain();
                 osc.connect(g);
                 g.connect(masterGain);
                 
                 if (type === 'bom') {
-                    osc.frequency.value = 150; // Higher pitch to be audible on phones
+                    osc.frequency.value = 150; 
                     osc.type = 'triangle';
                 } else if (type === 'pa') {
                     osc.frequency.value = 300;
@@ -415,6 +411,19 @@
             }
         }
 
+        // --- Optimized Visual Animation (Web Animations API) ---
+        function triggerDrumAnimation() {
+            // .animate() works better with rapid firing than CSS classes/setTimeout
+            drum.animate([
+                { transform: 'scale(1)' },
+                { transform: 'scale(0.98)' },
+                { transform: 'scale(1)' }
+            ], {
+                duration: 80,
+                easing: 'ease-out'
+            });
+        }
+
         // --- Touch Handler ---
         function handleHit(e) {
             if (e.cancelable) e.preventDefault();
@@ -426,6 +435,7 @@
             const touches = e.changedTouches;
             const len = touches.length;
 
+            // Audio Loop (Priority 1)
             for (let i = 0; i < len; i++) {
                 const t = touches[i];
                 const dx = t.clientX - drumCenterX;
@@ -443,12 +453,12 @@
                 }
             }
 
+            // Visual Loop (Priority 2 - De-coupled from audio for speed)
             requestAnimationFrame(() => {
                 for (let i = 0; i < len; i++) {
                     createRipple(touches[i].clientX, touches[i].clientY);
                 }
-                drum.style.transform = 'scale(0.98)';
-                setTimeout(() => drum.style.transform = 'scale(1)', 50);
+                triggerDrumAnimation();
             });
         }
 
@@ -458,6 +468,7 @@
             el.style.left = x + 'px';
             el.style.top = y + 'px';
             document.body.appendChild(el);
+            // CSS Animation handles the movement, we just cleanup
             setTimeout(() => {
                 el.remove();
             }, 200);
