@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>กลองรำมะนาจำลอง (Rammana Virtual Instrument)</title>
+    <title>Rammana Pro (Realistic Edition)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -11,10 +11,13 @@
 
         body {
             font-family: 'Sarabun', sans-serif;
-            background-color: #1a1a1a;
-            color: white;
-            overflow: hidden; /* ป้องกันการเลื่อน */
-            touch-action: none; /* ป้องกันการซูมและเลื่อนบนมือถือ */
+            background-color: #121212;
+            background-image: 
+                radial-gradient(circle at 50% 0%, #2a2a2a 0%, #121212 60%),
+                url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            color: #e0e0e0;
+            overflow: hidden;
+            touch-action: none;
             user-select: none;
             -webkit-user-select: none;
             height: 100vh;
@@ -25,117 +28,151 @@
             justify-content: space-between;
         }
 
-        /* Drum Skin Texture and Styling */
-        .drum-container {
+        /* --- Realistic Drum Design --- */
+        .instrument-wrapper {
             position: relative;
-            width: 85vw;
-            height: 85vw;
-            max-width: 400px;
-            max-height: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 20px 30px rgba(0,0,0,0.6));
+        }
+
+        .drum-body {
+            position: relative;
+            width: 88vw;
+            height: 88vw;
+            max-width: 420px;
+            max-height: 420px;
             border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #e8cfa0, #d4b483, #8b5a2b);
+            /* Wood Rim Gradient */
+            background: conic-gradient(from 0deg, #3e2723, #5d4037, #3e2723, #4e342e, #3e2723);
             box-shadow: 
-                inset 0 0 20px rgba(0,0,0,0.5),
-                0 10px 25px rgba(0,0,0,0.6),
-                0 0 0 12px #3e2723, /* Wood Rim */
-                0 0 0 14px #281815; /* Darker Rim Edge */
-            transition: transform 0.05s ease;
+                inset 0 2px 5px rgba(255,255,255,0.1), /* Rim highlight */
+                inset 0 -2px 5px rgba(0,0,0,0.5), /* Rim shadow */
+                0 0 0 4px #281815, /* Outer edge */
+                0 15px 35px rgba(0,0,0,0.5); /* Drop shadow */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.05s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             cursor: pointer;
-            overflow: hidden;
             z-index: 10;
         }
 
-        /* Texture overlay */
-        .drum-texture {
+        /* Golden Pegs */
+        .drum-body::after {
+            content: '';
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            opacity: 0.4;
-            background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.4'/%3E%3C/svg%3E");
             border-radius: 50%;
+            border: 2px dashed rgba(255, 215, 0, 0.4); /* Gold dots simulating pegs */
+            transform: scale(0.96);
             pointer-events: none;
         }
 
-        /* Inner Ring for "Center" Zone Visualization */
-        .center-zone {
+        .drum-skin {
             position: absolute;
-            top: 50%;
-            left: 50%;
+            width: 92%;
+            height: 92%;
+            border-radius: 50%;
+            background-color: #dcc096;
+            /* Realistic Skin Texture: Noise + Radial Gradient + Blotches */
+            background-image: 
+                radial-gradient(circle at 30% 30%, rgba(255,255,255,0.1) 0%, rgba(0,0,0,0.1) 80%),
+                url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.15'/%3E%3C/svg%3E");
+            box-shadow: 
+                inset 0 0 20px rgba(62, 39, 35, 0.6), /* Inner shadow near rim */
+                inset 0 0 50px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        /* Center wear mark */
+        .drum-skin::before {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            width: 45%;
-            height: 45%;
+            width: 40%; height: 40%;
             border-radius: 50%;
-            border: 2px dashed rgba(139, 90, 43, 0.0); /* Hidden by default */
-            transition: border-color 0.3s;
-            pointer-events: none;
-        }
-        
-        .show-notes .center-zone {
-            border-color: rgba(139, 90, 43, 0.3);
-            background: rgba(0,0,0,0.05);
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(139,69,19,0.05) 70%, transparent 100%);
+            filter: blur(10px);
         }
 
-        /* Visual Feedback Animation */
-        .hit-effect {
+        /* Animation State */
+        .drum-body:active, .drum-hit {
+            transform: scale(0.98);
+        }
+
+        .skin-depression {
             position: absolute;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.4);
+            background: radial-gradient(circle, rgba(0,0,0,0.1) 0%, transparent 70%);
             transform: scale(0);
             pointer-events: none;
-            animation: ripple 0.4s linear;
+            animation: hit-anim 0.15s ease-out;
         }
 
-        @keyframes ripple {
-            to {
-                transform: scale(2.5);
-                opacity: 0;
-            }
+        @keyframes hit-anim {
+            0% { transform: scale(0.5); opacity: 1; }
+            100% { transform: scale(1.5); opacity: 0; }
         }
 
-        /* Note Labels */
-        .note-label {
+        /* Visual Feedback Ripples */
+        .ripple {
             position: absolute;
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: rgba(62, 39, 35, 0.7);
-            pointer-events: none;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            transform: scale(0);
             opacity: 0;
-            transition: opacity 0.3s;
-            text-shadow: 0 1px 1px rgba(255,255,255,0.5);
-        }
-        
-        .show-notes .note-label {
-            opacity: 1;
+            pointer-events: none;
+            animation: ripple-anim 0.4s ease-out;
         }
 
-        .label-center { top: 50%; left: 50%; transform: translate(-50%, -50%); }
-        .label-top { top: 15%; left: 50%; transform: translateX(-50%); }
-        .label-bottom { bottom: 15%; left: 50%; transform: translateX(-50%); }
-        .label-left { top: 50%; left: 15%; transform: translateY(-50%); }
-        .label-right { top: 50%; right: 15%; transform: translateY(-50%); }
+        @keyframes ripple-anim {
+            0% { transform: scale(0); opacity: 0.8; border-width: 4px; }
+            100% { transform: scale(1.5); opacity: 0; border-width: 0px; }
+        }
 
-        /* Controls */
-        .controls-area {
-            background: rgba(30, 30, 30, 0.95);
-            width: 100%;
-            padding: 20px 10px;
-            border-top-left-radius: 20px;
-            border-top-right-radius: 20px;
-            box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
+        /* --- UI Controls --- */
+        .controls-wrapper {
+            width: 90%;
+            max-width: 500px;
+            margin-bottom: 20px;
             z-index: 20;
         }
 
-        .btn-group {
+        .glass-panel {
+            background: rgba(30, 30, 30, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 15px 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             display: flex;
-            justify-content: center;
-            gap: 15px;
+            flex-direction: column;
+            gap: 12px;
         }
 
-        .control-btn {
-            width: 50px;
-            height: 50px;
+        .top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+
+        .btn-row {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+        }
+
+        .btn-round {
+            width: 56px;
+            height: 56px;
             border-radius: 50%;
             border: none;
             display: flex;
@@ -143,511 +180,430 @@
             justify-content: center;
             font-size: 1.2rem;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
             color: white;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            background: #2d2d2d;
+            position: relative;
+            overflow: hidden;
         }
 
-        .btn-record { background-color: #ef4444; }
-        .btn-record.recording { animation: pulse 1.5s infinite; background-color: #dc2626; box-shadow: 0 0 15px #ef4444; }
-        .btn-play { background-color: #22c55e; }
-        .btn-play:disabled { background-color: #4b5563; opacity: 0.5; }
-        .btn-stop { background-color: #eab308; color: black; }
-        .btn-download { background-color: #3b82f6; }
-        .btn-toggle { background-color: #6366f1; width: auto; padding: 0 15px; border-radius: 25px; font-size: 0.9rem; }
+        .btn-round:active { transform: scale(0.9); }
+        .btn-round:disabled { opacity: 0.4; cursor: not-allowed; }
 
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
+        /* Button Colors */
+        .btn-rec { background: linear-gradient(135deg, #ff5252, #d32f2f); }
+        .btn-rec.recording { animation: pulse-red 1.5s infinite; background: #b71c1c; }
+        
+        .btn-stop { background: linear-gradient(135deg, #ffca28, #ff8f00); color: #3e2723; }
+        .btn-play { background: linear-gradient(135deg, #66bb6a, #2e7d32); }
+        .btn-dl { background: linear-gradient(135deg, #42a5f5, #1565c0); }
+
+        .btn-toggle { 
+            background: rgba(255,255,255,0.1); 
+            border-radius: 20px; 
+            padding: 6px 16px;
+            font-size: 0.8rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .btn-toggle.active { background: rgba(255,255,255,0.2); color: #fff; border-color: rgba(255,255,255,0.3); }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(211, 47, 47, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); }
         }
 
-        /* Animation class for drum hit */
-        .drum-hit {
-            transform: scale(0.97);
+        /* Note Labels */
+        .note-marker {
+            position: absolute;
+            font-size: 1rem;
+            font-weight: 600;
+            color: rgba(62, 39, 35, 0.6);
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.4);
         }
+        .show-labels .note-marker { opacity: 1; }
+        
+        .marker-center { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .marker-top { top: 12%; left: 50%; transform: translateX(-50%); }
+        .marker-bottom { bottom: 12%; left: 50%; transform: translateX(-50%); }
+        .marker-left { top: 50%; left: 12%; transform: translateY(-50%); }
+        .marker-right { top: 50%; right: 12%; transform: translateY(-50%); }
+
+        /* Status Toast */
+        .status-toast {
+            position: absolute;
+            top: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            opacity: 0;
+            transition: all 0.3s;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        .status-toast.show { top: 20px; opacity: 1; }
+
     </style>
 </head>
 <body>
 
     <!-- Header -->
-    <div class="pt-6 pb-2 text-center w-full z-20">
-        <h1 class="text-2xl font-bold text-amber-500 tracking-wider">รำมะนาจำลอง</h1>
-        <p class="text-xs text-gray-400 mt-1">Virtual Rammana Instrument</p>
+    <div class="pt-8 text-center z-20">
+        <h1 class="text-3xl font-light text-amber-500 tracking-[0.2em] uppercase">Rammana</h1>
+        <p class="text-[0.65rem] text-gray-500 tracking-widest mt-1">PRO INSTRUMENT</p>
     </div>
 
-    <!-- Main Instrument Area -->
-    <div class="flex-grow flex items-center justify-center w-full relative">
-        <div id="drum" class="drum-container">
-            <div class="drum-texture"></div>
-            <div class="center-zone"></div>
+    <!-- Instrument -->
+    <div class="instrument-wrapper">
+        <div id="drum" class="drum-body">
+            <div class="drum-skin"></div>
             
-            <!-- Note Labels -->
-            <div class="note-label label-center">โจ๊ะ (Low)</div>
-            <div class="note-label label-top">จ๊ะ (High)</div>
-            <div class="note-label label-bottom">จ๊ะ (High)</div>
-            <div class="note-label label-left">จ๊ะ (High)</div>
-            <div class="note-label label-right">จ๊ะ (High)</div>
+            <!-- Labels -->
+            <div class="note-marker marker-center">โจ๊ะ (Low)</div>
+            <div class="note-marker marker-top">จ๊ะ (High)</div>
+            <div class="note-marker marker-bottom">จ๊ะ (High)</div>
+            <div class="note-marker marker-left">จ๊ะ (High)</div>
+            <div class="note-marker marker-right">จ๊ะ (High)</div>
         </div>
         
-        <!-- Visualizer Canvas (Background) -->
-        <canvas id="visualizer" class="absolute top-0 left-0 w-full h-full pointer-events-none opacity-20 z-0"></canvas>
+        <!-- Status Toast -->
+        <div id="toast" class="status-toast">Ready</div>
     </div>
 
     <!-- Controls -->
-    <div class="controls-area">
-        <div class="flex justify-between items-center px-4 mb-2">
-            <div class="text-sm text-gray-300">
-                <i class="fas fa-clock mr-2"></i><span id="timer">00:00</span>
+    <div class="controls-wrapper">
+        <div class="glass-panel">
+            <div class="top-row">
+                <div class="flex items-center gap-2">
+                    <div id="recordingDot" class="w-2 h-2 rounded-full bg-gray-500"></div>
+                    <span id="timer" class="font-mono">00:00</span>
+                </div>
+                <button id="toggleNotes" class="btn-toggle">
+                    <i class="fas fa-eye mr-1"></i> Labels
+                </button>
             </div>
-            <button id="toggleNotes" class="control-btn btn-toggle">
-                <i class="fas fa-music mr-2"></i> แสดงโน้ต
-            </button>
+            
+            <div class="btn-row">
+                <button id="recordBtn" class="btn-round btn-rec" title="Record">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button id="stopBtn" class="btn-round btn-stop" title="Stop" disabled>
+                    <i class="fas fa-square"></i>
+                </button>
+                <button id="playBtn" class="btn-round btn-play" title="Play" disabled>
+                    <i class="fas fa-play"></i>
+                </button>
+                <button id="downloadBtn" class="btn-round btn-dl" title="Save" disabled>
+                    <i class="fas fa-download"></i>
+                </button>
+            </div>
         </div>
-
-        <div class="btn-group">
-            <button id="recordBtn" class="control-btn btn-record" title="อัดเสียง">
-                <i class="fas fa-microphone"></i>
-            </button>
-            <button id="stopBtn" class="control-btn btn-stop" title="หยุด" disabled>
-                <i class="fas fa-stop"></i>
-            </button>
-            <button id="playBtn" class="control-btn btn-play" title="เล่นเสียงที่อัด" disabled>
-                <i class="fas fa-play"></i>
-            </button>
-            <button id="downloadBtn" class="control-btn btn-download" title="ดาวน์โหลด" disabled>
-                <i class="fas fa-download"></i>
-            </button>
-        </div>
-        <p id="statusMsg" class="text-center text-xs text-gray-500 h-4">แตะที่กลองเพื่อเล่นเสียง</p>
+        <p class="text-center text-[0.6rem] text-gray-600 mt-2">Best experienced with headphones</p>
     </div>
 
     <script>
-        // --- Audio Engine Setup ---
+        // --- CONFIGURATION ---
+        // ใส่ลิงก์ไฟล์เสียงของคุณที่นี่ (.mp3, .wav)
+        const soundUrls = {
+             low: "lummanow/lummanowkang.wave",   // ลิงก์เสียงทุ้ม (โจ๊ะ/Center)
+            high: "lummanow/lummanowkob.wave"      // Ex: "https://example.com/drum-high.mp3"
+        };
+
+        // --- AUDIO ENGINE ---
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
-
-        // --- การตั้งค่าเสียงภายนอก (Sound URLs) ---
-        // ใส่ลิงก์ไฟล์เสียงที่ต้องการ (เช่น .mp3, .wav) ในเครื่องหมายคำพูดด้านล่าง
-        // หากไม่ใส่ เสียงจะไม่ออก (เพราะลบระบบสังเคราะห์ออกแล้ว)
-        const soundUrls = {
-            low: "lummanow/lummanowkang.mp3",   // ลิงก์เสียงทุ้ม (โจ๊ะ/Center)
-            high: "lummanow/lummanowkob.mp3"   // ลิงก์เสียงแหลม (จ๊ะ/Rim)
-        };
-
-        let soundBuffers = {
-            low: null,
-            high: null
-        };
-
-        let mainGainNode;
-        let reverbNode;
-        let reverbGainNode;
-        let reverbFilterNode; // เพิ่มตัวกรองสำหรับ Reverb
-        let dest; // MediaStreamDestination for recording
-        let recorder;
-        let chunks = [];
-        let audioBlob;
-        let audioUrl;
+        let mainGain;
+        let reverbNode, reverbGain;
+        let soundBuffers = { low: null, high: null };
+        
+        // Recorder
+        let dest, recorder, chunks = [];
         let playbackAudio = new Audio();
-
-        // UI Elements
-        const drum = document.getElementById('drum');
-        const recordBtn = document.getElementById('recordBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const playBtn = document.getElementById('playBtn');
-        const downloadBtn = document.getElementById('downloadBtn');
-        const toggleNotesBtn = document.getElementById('toggleNotes');
-        const timerDisplay = document.getElementById('timer');
-        const statusMsg = document.getElementById('statusMsg');
-
         let isRecording = false;
-        let startTime;
-        let timerInterval;
+        let startTime, timerInterval;
 
-        // Initialize Audio Context on first interaction
-        function initAudio() {
-            if (!audioCtx) {
-                audioCtx = new AudioContext();
-                mainGainNode = audioCtx.createGain();
-                mainGainNode.gain.value = 1.0; // Master volume
-                
-                // --- Reverb Setup (ใช้สำหรับไฟล์เสียงภายนอก) ---
-                reverbNode = audioCtx.createConvolver();
-                reverbNode.buffer = createReverbBuffer(1.5, 2.0);
-                
-                // เพิ่มตัวกรอง Lowpass ให้ Reverb เพื่อลดเสียงซ่า/เสียงลมในหางเสียง
-                reverbFilterNode = audioCtx.createBiquadFilter();
-                reverbFilterNode.type = 'lowpass';
-                reverbFilterNode.frequency.value = 3000; // ตัดความถี่สูงกว่า 3000Hz ออกจาก Reverb
-                
-                reverbGainNode = audioCtx.createGain();
-                reverbGainNode.gain.value = 0.6;
+        // UI Refs
+        const drum = document.getElementById('drum');
+        const toast = document.getElementById('toast');
+        const timerDisplay = document.getElementById('timer');
+        const recDot = document.getElementById('recordingDot');
 
-                // เชื่อมต่อ: Reverb -> Filter -> Gain -> Main
-                reverbNode.connect(reverbFilterNode);
-                reverbFilterNode.connect(reverbGainNode);
-                reverbGainNode.connect(mainGainNode);
-                // ------------------------------------
+        // Init Audio
+        async function initAudio() {
+            if (audioCtx) return;
+            
+            audioCtx = new AudioContext();
+            mainGain = audioCtx.createGain();
+            mainGain.connect(audioCtx.destination);
 
-                // เริ่มโหลดเสียงภายนอก
-                loadCustomSounds();
+            // Setup Recording Stream
+            dest = audioCtx.createMediaStreamDestination();
+            mainGain.connect(dest);
 
-                // For Recording
-                dest = audioCtx.createMediaStreamDestination();
-                mainGainNode.connect(audioCtx.destination); 
-                mainGainNode.connect(dest); 
-                
-                setupRecorder();
-            }
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
+            // Setup Reverb
+            setupReverb();
+
+            // Load Sounds
+            await loadSounds();
+            
+            if(audioCtx.state === 'suspended') await audioCtx.resume();
         }
 
-        // ฟังก์ชันโหลดเสียงภายนอก
-        async function loadCustomSounds() {
+        async function loadSounds() {
             const load = async (url) => {
-                if (!url) return null;
+                if(!url) return null;
                 try {
-                    const response = await fetch(url);
-                    const arrayBuffer = await response.arrayBuffer();
-                    return await audioCtx.decodeAudioData(arrayBuffer);
-                } catch (e) {
-                    console.warn("ไม่สามารถโหลดไฟล์เสียงได้ (ตรวจสอบลิงก์หรือ CORS):", url, e);
-                    return null;
-                }
+                    const res = await fetch(url);
+                    const buf = await res.arrayBuffer();
+                    return await audioCtx.decodeAudioData(buf);
+                } catch(e) { console.error("Load error:", e); return null; }
             };
 
-            if (soundUrls.low && !soundBuffers.low) soundBuffers.low = await load(soundUrls.low);
-            if (soundUrls.high && !soundBuffers.high) soundBuffers.high = await load(soundUrls.high);
+            if(soundUrls.low) soundBuffers.low = await load(soundUrls.low);
+            if(soundUrls.high) soundBuffers.high = await load(soundUrls.high);
         }
 
-        // ฟังก์ชันสร้างเสียงก้อง (Procedural Reverb)
-        function createReverbBuffer(duration, decay) {
-            const sampleRate = audioCtx.sampleRate;
-            const length = sampleRate * duration;
-            const impulse = audioCtx.createBuffer(2, length, sampleRate);
-            const left = impulse.getChannelData(0);
-            const right = impulse.getChannelData(1);
-
-            for (let i = 0; i < length; i++) {
-                const n = i / length;
-                const multiplier = Math.pow(1 - n, decay);
-                const data = (Math.random() * 2 - 1) * multiplier;
-                left[i] = data;
-                right[i] = data;
-            }
-            return impulse;
-        }
-
-        // Sound 1: "Jo" / "Tum" (Low, Center hit)
-        function playLowNote() {
-            initAudio();
-            const t = audioCtx.currentTime;
-
-            if (soundBuffers.low) {
-                const source = audioCtx.createBufferSource();
-                source.buffer = soundBuffers.low;
-                
-                // สร้างตัวกรองลดเสียงอากาศ (De-noise Filter) สำหรับไฟล์นี้
-                const sourceFilter = audioCtx.createBiquadFilter();
-                sourceFilter.type = 'lowpass';
-                sourceFilter.frequency.value = 6000; // ตัดเสียงแหลมจัด/เสียงซ่าออกจากไฟล์ต้นฉบับ
-
-                // เชื่อมต่อ: Source -> Filter -> Main
-                source.connect(sourceFilter);
-                sourceFilter.connect(mainGainNode);
-
-                // ส่งเข้า Reverb (ผ่าน Filter ของ Reverb อีกที)
-                const sendGain = audioCtx.createGain();
-                sendGain.gain.value = 0.3;
-                source.connect(sendGain); // ส่งสัญญาณดิบไปเข้า Reverb processing
-                sendGain.connect(reverbNode);
-                
-                source.start(t);
-            } else {
-                showStatus("กรุณาใส่ลิงก์เสียงโจ๊ะ (soundUrls.low)");
-            }
-        }
-
-        // Sound 2: "Ja" / "Ting" (High, Rim hit)
-        function playHighNote() {
-            initAudio();
-            const t = audioCtx.currentTime;
-
-            if (soundBuffers.high) {
-                const source = audioCtx.createBufferSource();
-                source.buffer = soundBuffers.high;
-                
-                // สร้างตัวกรองลดเสียงอากาศ (De-noise Filter) สำหรับไฟล์นี้
-                const sourceFilter = audioCtx.createBiquadFilter();
-                sourceFilter.type = 'lowpass';
-                sourceFilter.frequency.value = 6000; // ตัดเสียงแหลมจัด/เสียงซ่าออกจากไฟล์ต้นฉบับ
-
-                // เชื่อมต่อ: Source -> Filter -> Main
-                source.connect(sourceFilter);
-                sourceFilter.connect(mainGainNode);
-
-                // ส่งเข้า Reverb
-                const sendGain = audioCtx.createGain();
-                sendGain.gain.value = 0.6;
-                source.connect(sendGain);
-                sendGain.connect(reverbNode);
-                
-                source.start(t);
-            } else {
-                showStatus("กรุณาใส่ลิงก์เสียงจ๊ะ (soundUrls.high)");
-            }
-        }
-
-        // --- Interaction Logic ---
-
-        function handleHit(e) {
-            e.preventDefault(); // Prevent scrolling
-            initAudio();
-
-            // Calculate hit position
-            const rect = drum.getBoundingClientRect();
-            const centerX = rect.width / 2;
-            const centerY = rect.height / 2;
+        function setupReverb() {
+            reverbNode = audioCtx.createConvolver();
+            reverbNode.buffer = createImpulse(1.5, 2.0); // 1.5s reverb tail
             
-            // Handle both Touch and Mouse
-            let clientX, clientY;
-            if (e.changedTouches) {
-                // Multi-touch support: iterate through changed touches
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    processHit(e.changedTouches[i].clientX, e.changedTouches[i].clientY, rect, centerX, centerY);
-                }
-                return;
-            } else {
-                processHit(e.clientX, e.clientY, rect, centerX, centerY);
-            }
+            // Reverb Filter (Lowpass to reduce hiss)
+            const revFilter = audioCtx.createBiquadFilter();
+            revFilter.type = 'lowpass';
+            revFilter.frequency.value = 3000;
+
+            reverbGain = audioCtx.createGain();
+            reverbGain.gain.value = 0.4; // 40% wet
+
+            reverbNode.connect(revFilter);
+            revFilter.connect(reverbGain);
+            reverbGain.connect(mainGain);
         }
 
-        function processHit(x, y, rect, centerX, centerY) {
-            const touchX = x - rect.left;
-            const touchY = y - rect.top;
+        function createImpulse(duration, decay) {
+            const rate = audioCtx.sampleRate;
+            const len = rate * duration;
+            const imp = audioCtx.createBuffer(2, len, rate);
+            for (let i = 0; i < len; i++) {
+                const n = i / len;
+                // Exponential decay for smooth tail
+                const vol = Math.pow(1 - n, decay); 
+                imp.getChannelData(0)[i] = (Math.random() * 2 - 1) * vol;
+                imp.getChannelData(1)[i] = (Math.random() * 2 - 1) * vol;
+            }
+            return imp;
+        }
 
-            // Calculate distance from center (0 to 1)
-            const dist = Math.sqrt(Math.pow(touchX - centerX, 2) + Math.pow(touchY - centerY, 2));
-            const maxRadius = rect.width / 2;
-            const normalizedDist = dist / maxRadius;
+        function playSound(type) {
+            initAudio();
+            const buffer = soundBuffers[type];
+            const t = audioCtx.currentTime;
 
-            // Threshold for Center vs Edge (0.45 is roughly 45% radius)
-            if (normalizedDist < 0.45) {
-                playLowNote();
-                createRipple(touchX, touchY, 'rgba(139, 69, 19, 0.4)'); // Brownish ripple
-                showStatus("โจ๊ะ (Tum)");
-            } else {
-                playHighNote();
-                createRipple(touchX, touchY, 'rgba(255, 255, 255, 0.4)'); // White ripple
-                showStatus("จ๊ะ (Ting)");
+            if (!buffer) {
+                showToast(`Please add URL for ${type} sound`);
+                return;
             }
 
-            // Visual drum shake
+            // Source
+            const source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+
+            // De-noise Filter (Source specific)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 8000;
+
+            // Envelope (Fade In/Out to prevent clicks)
+            const env = audioCtx.createGain();
+            env.gain.setValueAtTime(0, t);
+            env.gain.linearRampToValueAtTime(1, t + 0.005); // 5ms fade in
+            
+            const dur = buffer.duration;
+            if(dur > 0.02) {
+                env.gain.setValueAtTime(1, t + dur - 0.015);
+                env.gain.linearRampToValueAtTime(0, t + dur); // 15ms fade out
+            }
+
+            // Routing
+            source.connect(filter);
+            filter.connect(env);
+            env.connect(mainGain);
+
+            // Send to Reverb
+            const send = audioCtx.createGain();
+            send.gain.value = type === 'low' ? 0.2 : 0.5; // High note gets more reverb
+            env.connect(send);
+            send.connect(reverbNode);
+
+            source.start(t);
+        }
+
+        // --- INTERACTION ---
+        function handleHit(e) {
+            e.preventDefault();
+            const rect = drum.getBoundingClientRect();
+            
+            // Handle Multi-touch
+            const touches = e.changedTouches || [{clientX: e.clientX, clientY: e.clientY}];
+            
+            for(let i=0; i<touches.length; i++) {
+                const t = touches[i];
+                const x = t.clientX - rect.left;
+                const y = t.clientY - rect.top;
+                
+                // Visuals
+                createRipple(t.clientX, t.clientY);
+                createDepression(x, y);
+
+                // Logic
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                const dist = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+                const radius = rect.width / 2;
+                
+                // 45% radius threshold
+                if (dist / radius < 0.45) {
+                    playSound('low');
+                } else {
+                    playSound('high');
+                }
+            }
+            
             drum.classList.add('drum-hit');
             setTimeout(() => drum.classList.remove('drum-hit'), 100);
         }
 
-        function createRipple(x, y, color) {
-            const ripple = document.createElement('div');
-            ripple.className = 'hit-effect';
-            ripple.style.left = x + 'px';
-            ripple.style.top = y + 'px';
-            ripple.style.width = '20px';
-            ripple.style.height = '20px';
-            ripple.style.background = color;
-            drum.appendChild(ripple);
-
-            // Remove after animation
-            setTimeout(() => ripple.remove(), 400);
+        // --- VISUAL FX ---
+        function createRipple(screenX, screenY) {
+            const el = document.createElement('div');
+            el.className = 'ripple';
+            el.style.left = (screenX - 25) + 'px'; // Center 50px ripple
+            el.style.top = (screenY - 25) + 'px';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 400);
         }
 
-        function showStatus(text) {
-            statusMsg.textContent = text;
-            statusMsg.style.opacity = 1;
-            setTimeout(() => statusMsg.style.opacity = 0.5, 500);
+        function createDepression(x, y) {
+            const el = document.createElement('div');
+            el.className = 'skin-depression';
+            el.style.left = (x - 40) + 'px'; // 80px spot
+            el.style.top = (y - 40) + 'px';
+            el.style.width = '80px';
+            el.style.height = '80px';
+            drum.querySelector('.drum-skin').appendChild(el);
+            setTimeout(() => el.remove(), 150);
         }
 
-        // Event Listeners
-        drum.addEventListener('mousedown', handleHit);
-        drum.addEventListener('touchstart', handleHit, { passive: false });
-
-        // Toggle Notes Visuals
-        toggleNotesBtn.addEventListener('click', () => {
-            drum.classList.toggle('show-notes');
-            toggleNotesBtn.classList.toggle('bg-indigo-600');
-            toggleNotesBtn.classList.toggle('bg-indigo-400');
-        });
-
-        // --- Recording Logic ---
-
-        function setupRecorder() {
-            if(recorder) return;
-            
-            const options = { mimeType: 'audio/webm' };
-            try {
-                recorder = new MediaRecorder(dest.stream, options);
-            } catch (e) {
-                // Fallback for Safari/Older browsers usually defaults correctly without options or specific mime
-                recorder = new MediaRecorder(dest.stream);
-            }
-
-            recorder.ondataavailable = (e) => {
-                if (e.data.size > 0) chunks.push(e.data);
-            };
-
-            recorder.onstop = () => {
-                audioBlob = new Blob(chunks, { type: 'audio/webm' });
-                audioUrl = URL.createObjectURL(audioBlob);
-                playbackAudio.src = audioUrl;
-                
-                // Enable Play/Download
-                playBtn.disabled = false;
-                downloadBtn.disabled = false;
-                statusMsg.textContent = "บันทึกเสร็จสิ้น";
-            };
+        function showToast(msg) {
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
         }
 
-        recordBtn.addEventListener('click', () => {
-            initAudio();
-            if (isRecording) return;
+        // --- RECORDING ---
+        document.getElementById('recordBtn').onclick = async () => {
+            await initAudio();
+            if(isRecording) return;
             
             chunks = [];
+            // Try different mime types for browser compatibility
+            const types = ['audio/webm', 'audio/ogg', 'audio/mp4'];
+            const type = types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+            
+            recorder = new MediaRecorder(dest.stream, type ? {mimeType: type} : undefined);
+            
+            recorder.ondataavailable = e => chunks.push(e.data);
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'audio/webm' }); // Default to webm for DL
+                audioUrl = URL.createObjectURL(blob);
+                playbackAudio.src = audioUrl;
+                
+                document.getElementById('playBtn').disabled = false;
+                document.getElementById('downloadBtn').disabled = false;
+                showToast('Recording Saved');
+            };
+
             recorder.start();
             isRecording = true;
             startTime = Date.now();
+            updateUIState();
             
-            // UI Update
-            recordBtn.classList.add('recording');
-            recordBtn.disabled = true;
-            stopBtn.disabled = false;
-            playBtn.disabled = true;
-            downloadBtn.disabled = true;
-            statusMsg.textContent = "กำลังบันทึก...";
-
             timerInterval = setInterval(() => {
-                const diff = Date.now() - startTime;
-                const secs = Math.floor(diff / 1000);
-                const mins = Math.floor(secs / 60);
-                timerDisplay.textContent = 
-                    `${mins.toString().padStart(2, '0')}:${(secs % 60).toString().padStart(2, '0')}`;
+                const s = Math.floor((Date.now() - startTime)/1000);
+                timerDisplay.textContent = new Date(s * 1000).toISOString().substr(14, 5);
             }, 1000);
-        });
+        };
 
-        stopBtn.addEventListener('click', () => {
-            if (!isRecording && !playbackAudio.paused) {
-                // Use Stop button to stop playback too
-                playbackAudio.pause();
-                playbackAudio.currentTime = 0;
-                stopBtn.disabled = true;
-                playBtn.disabled = false;
-                statusMsg.textContent = "หยุดเล่น";
-                return;
-            }
-
-            if (isRecording) {
+        document.getElementById('stopBtn').onclick = () => {
+            if(isRecording) {
                 recorder.stop();
                 isRecording = false;
-                clearInterval(timerInterval);
-                
-                recordBtn.classList.remove('recording');
-                recordBtn.disabled = false;
-                stopBtn.disabled = true; // Will enable when playing
-                playBtn.disabled = false;
+            } else {
+                playbackAudio.pause();
+                playbackAudio.currentTime = 0;
             }
-        });
+            clearInterval(timerInterval);
+            updateUIState();
+        };
 
-        playBtn.addEventListener('click', () => {
-            if (audioUrl) {
-                playbackAudio.play();
-                statusMsg.textContent = "กำลังเล่นเสียงที่อัด...";
-                playBtn.disabled = true;
+        document.getElementById('playBtn').onclick = () => {
+            playbackAudio.play();
+            showToast('Playing...');
+            document.getElementById('playBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            playbackAudio.onended = () => {
+                document.getElementById('playBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+            };
+        };
+
+        document.getElementById('downloadBtn').onclick = () => {
+            const a = document.createElement('a');
+            a.href = audioUrl;
+            a.download = `rammana_${Date.now()}.webm`;
+            a.click();
+        };
+
+        function updateUIState() {
+            const recBtn = document.getElementById('recordBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const playBtn = document.getElementById('playBtn');
+            const dlBtn = document.getElementById('downloadBtn');
+
+            if(isRecording) {
+                recBtn.classList.add('recording');
+                recBtn.disabled = true;
                 stopBtn.disabled = false;
-
-                playbackAudio.onended = () => {
-                    playBtn.disabled = false;
-                    stopBtn.disabled = true;
-                    statusMsg.textContent = "จบการเล่น";
-                };
+                playBtn.disabled = true;
+                dlBtn.disabled = true;
+                recDot.className = "w-2 h-2 rounded-full bg-red-500 animate-pulse";
+            } else {
+                recBtn.classList.remove('recording');
+                recBtn.disabled = false;
+                stopBtn.disabled = true;
+                recDot.className = "w-2 h-2 rounded-full bg-gray-500";
             }
-        });
-
-        downloadBtn.addEventListener('click', () => {
-            if (audioUrl) {
-                const a = document.createElement('a');
-                a.href = audioUrl;
-                a.download = `rammana_recording_${new Date().getTime()}.webm`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                statusMsg.textContent = "ดาวน์โหลดเรียบร้อย";
-            }
-        });
-
-        // --- Visualizer (Optional Background Flair) ---
-        const canvas = document.getElementById('visualizer');
-        const canvasCtx = canvas.getContext('2d');
-        let analyser;
-        
-        function setupVisualizer() {
-             // Need to connect analyser
-             analyser = audioCtx.createAnalyser();
-             analyser.fftSize = 64;
-             mainGainNode.connect(analyser);
-             
-             resizeCanvas();
-             window.addEventListener('resize', resizeCanvas);
-             drawVisualizer();
         }
 
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
+        // Toggle Labels
+        document.getElementById('toggleNotes').onclick = (e) => {
+            drum.classList.toggle('show-labels');
+            e.currentTarget.classList.toggle('active');
+        };
 
-        function drawVisualizer() {
-            requestAnimationFrame(drawVisualizer);
-            if (!analyser) return;
-
-            const bufferLength = analyser.frequencyBinCount;
-            const dataArray = new Uint8Array(bufferLength);
-            analyser.getByteFrequencyData(dataArray);
-
-            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-
-            const cx = canvas.width / 2;
-            const cy = canvas.height / 2;
-            const radius = Math.min(cx, cy) * 0.8; // Match vaguely drum size
-
-            canvasCtx.beginPath();
-            canvasCtx.strokeStyle = 'rgba(234, 179, 8, 0.2)'; // Amber color
-            canvasCtx.lineWidth = 4;
-
-            for (let i = 0; i < bufferLength; i++) {
-                const barHeight = dataArray[i];
-                const angle = (i / bufferLength) * Math.PI * 2;
-                
-                // Draw circle pulsing
-                const r = radius + (barHeight * 0.5);
-                const x = cx + Math.cos(angle) * r;
-                const y = cy + Math.sin(angle) * r;
-
-                if (i === 0) canvasCtx.moveTo(x, y);
-                else canvasCtx.lineTo(x, y);
-            }
-            canvasCtx.closePath();
-            canvasCtx.stroke();
-        }
-
-        // Initialize visualizer after audio starts
-        document.body.addEventListener('click', () => {
-            if (audioCtx && !analyser) setupVisualizer();
-        }, { once: true });
-        document.body.addEventListener('touchstart', () => {
-            if (audioCtx && !analyser) setupVisualizer();
-        }, { once: true });
+        // Events
+        drum.addEventListener('mousedown', handleHit);
+        drum.addEventListener('touchstart', handleHit, {passive: false});
 
     </script>
 </body>
