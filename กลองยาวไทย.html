@@ -31,8 +31,6 @@
                 0 0 0 20px #8b5a2b, /* Outer rim wood */
                 0 15px 30px rgba(0,0,0,0.6); /* Drop shadow */
             position: relative;
-            /* Remove transition for instant touch response visually if needed, but keeping small anim is okay via JS */
-            /* transition: transform 0.05s; */ 
             cursor: pointer;
             touch-action: none;
             will-change: transform; /* Hint browser to optimize compositing */
@@ -243,15 +241,13 @@
 
         let audioBuffers = { bom: null, pa: null, poeng: null };
 
-        // CACHING DRUM GEOMETRY (Optimization #1)
-        // เก็บค่าตำแหน่งกลองไว้ เพื่อไม่ต้องคำนวณใหม่ทุกครั้งที่แตะ (ลด Lag)
+        // CACHING DRUM GEOMETRY
         const drum = document.getElementById('drum');
         let drumRect = drum.getBoundingClientRect();
         let drumRadius = drumRect.width / 2;
         let drumCenterX = drumRect.left + drumRadius;
         let drumCenterY = drumRect.top + drumRadius;
 
-        // อัปเดตค่าเมื่อหมุนจอหรือเปลี่ยนขนาด
         window.addEventListener('resize', updateDrumGeometry);
         function updateDrumGeometry() {
             drumRect = drum.getBoundingClientRect();
@@ -263,26 +259,24 @@
         async function initAudio() {
             if (!audioCtx) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
-                // Optimization #2: ใช้ Native Sample Rate ลดภาระการแปลงสัญญาณ
                 audioCtx = new AudioContext({
                     latencyHint: 'interactive',
                 });
                 
-                // Silent warm-up buffer (Optimization #3)
-                // เล่นเสียงเงียบๆ เพื่อปลุก Audio Thread ให้ตื่น
+                // Silent warm-up
                 const buffer = audioCtx.createBuffer(1, 1, 22050);
                 const source = audioCtx.createBufferSource();
                 source.buffer = buffer;
                 source.connect(audioCtx.destination);
                 source.start();
 
-                // 1. Create Compressor (Fast Response)
+                // 1. Create Compressor
                 compressor = audioCtx.createDynamicsCompressor();
                 compressor.threshold.value = -10;
                 compressor.knee.value = 30;
                 compressor.ratio.value = 8; 
-                compressor.attack.value = 0.001; // Ultra fast attack
-                compressor.release.value = 0.05; // Ultra fast release for rapid fire
+                compressor.attack.value = 0.001; 
+                compressor.release.value = 0.05;
                 compressor.connect(audioCtx.destination);
 
                 // 2. Master Gain
@@ -309,36 +303,46 @@
             }
         }
 
+        // --- IMPROVED TRIM SILENCE (Fixed for Bass Sounds) ---
         function trimSilence(buffer) {
-            const rawData = buffer.getChannelData(0); 
-            // Reduced threshold to preserve quiet bass sounds
-            const threshold = 0.002; 
-            let start = 0;
-            let end = rawData.length;
+            const threshold = 0.001; // Low threshold for bass sensitivity
+            let start = buffer.length;
+            let end = 0;
+            const numChannels = buffer.numberOfChannels;
 
-            for (let i = 0; i < rawData.length; i++) {
-                if (Math.abs(rawData[i]) > threshold) {
-                    start = i; break;
+            // Scan all channels
+            for (let c = 0; c < numChannels; c++) {
+                const data = buffer.getChannelData(c);
+                for (let i = 0; i < data.length; i++) {
+                    if (Math.abs(data[i]) > threshold) {
+                        if (i < start) start = i;
+                        break;
+                    }
+                }
+                for (let i = data.length - 1; i >= 0; i--) {
+                    if (Math.abs(data[i]) > threshold) {
+                        if (i > end) end = i;
+                        break;
+                    }
                 }
             }
-            
-            for (let i = rawData.length - 1; i >= 0; i--) {
-                if (Math.abs(rawData[i]) > threshold) {
-                    end = i; break;
-                }
-            }
-            
-            // Tight crop for instant attack
-            start = Math.max(0, start - 20); 
-            end = Math.min(rawData.length, end + 50);
+
+            // Safety: If no sound found, return original
+            if (start >= end) return buffer; 
+
+            // Padding: Keep some buffer before start
+            start = Math.max(0, start - 100); 
+            end = Math.min(buffer.length, end + 200);
 
             const length = end - start;
-            if (length <= 0) return buffer; 
+            
+            // Safety: If result is impossibly short, assume error and return original
+            if (length < 100) return buffer; 
 
-            const newBuffer = audioCtx.createBuffer(buffer.numberOfChannels, length, buffer.sampleRate);
-            for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
-                 const oldData = buffer.getChannelData(channel);
-                 const newData = newBuffer.getChannelData(channel);
+            const newBuffer = audioCtx.createBuffer(numChannels, length, buffer.sampleRate);
+            for (let c = 0; c < numChannels; c++) {
+                 const oldData = buffer.getChannelData(c);
+                 const newData = newBuffer.getChannelData(c);
                  for (let i = 0; i < length; i++) {
                      newData[i] = oldData[i + start];
                  }
@@ -366,6 +370,7 @@
                     const arrayBuffer = await response.arrayBuffer();
                     const rawBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                     
+                    // Apply optimized trimming
                     audioBuffers[key] = trimSilence(rawBuffer);
                     loadedCount++;
                 } catch (e) {
@@ -380,14 +385,13 @@
             reverbGain = audioCtx.createGain();
             reverbGain.gain.value = 0.25; 
 
-            // สร้าง Impulse Response สั้นๆ เพื่อไม่ให้เสียงตีกันมั่วเวลารัว
             const length = audioCtx.sampleRate * 0.8; 
             const impulse = audioCtx.createBuffer(2, length, audioCtx.sampleRate);
             const left = impulse.getChannelData(0);
             const right = impulse.getChannelData(1);
 
             for (let i = 0; i < length; i++) {
-                const decay = Math.pow(1 - i / length, 3); // Faster decay
+                const decay = Math.pow(1 - i / length, 3);
                 left[i] = (Math.random() * 2 - 1) * decay;
                 right[i] = (Math.random() * 2 - 1) * decay;
             }
@@ -397,44 +401,41 @@
             reverbGain.connect(reverbNode); 
         }
 
-        // --- Highly Optimized PlaySound ---
+        // --- PlaySound with Fallback ---
         function playSound(type) {
-            // Check for AudioContext first
             if (!audioCtx) return;
             if (audioCtx.state === 'suspended') audioCtx.resume();
 
             const t = audioCtx.currentTime;
             
-            // 1. Create Filter (LowPass) - Apply to both File and Synth
+            // 1. Create Filter
             const filter = audioCtx.createBiquadFilter();
             filter.type = "lowpass";
             filter.frequency.value = 1800; 
             filter.Q.value = 0.8;
 
-            // 2. Create Gain Node (Envelope)
+            // 2. Create Gain
             const fileGain = audioCtx.createGain();
             
-            // 3. Envelope Settings (Attack + Decay)
+            // 3. Envelope
             fileGain.gain.cancelScheduledValues(t);
             fileGain.gain.setValueAtTime(0, t);
-            fileGain.gain.linearRampToValueAtTime(1.0, t + 0.015); // Attack 15ms
-            fileGain.gain.exponentialRampToValueAtTime(0.001, t + 0.45); // Decay
+            fileGain.gain.linearRampToValueAtTime(1.0, t + 0.015);
+            fileGain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
 
             let source;
 
-            // CHECK: Does the file buffer exist?
+            // CHECK: Use Buffer if available, else Fallback
             if (audioBuffers[type]) {
-                // Case 1: Use loaded file
                 source = audioCtx.createBufferSource();
                 source.buffer = audioBuffers[type];
             } else {
-                // Case 2: FALLBACK SYNTH (Fix for missing sound)
-                // ถ้าไฟล์โหลดไม่ได้ (เช่นไม่มีไฟล์จริง) ให้ใช้เสียงสังเคราะห์แทน เพื่อให้แอปไม่เงียบ
+                // FALLBACK SYNTH (If file fails to load)
                 source = audioCtx.createOscillator();
                 if (type === 'bom') {
                     source.frequency.value = 130;
                     source.type = 'sine';
-                    source.frequency.exponentialRampToValueAtTime(60, t + 0.2); // Kick drop
+                    source.frequency.exponentialRampToValueAtTime(60, t + 0.2); 
                 } else if (type === 'pa') {
                     source.frequency.value = 300;
                     source.type = 'triangle';
@@ -444,13 +445,13 @@
                 }
             }
             
-            // 4. Connect graph: Source -> Filter -> Gain -> Master/Reverb
+            // 4. Connect
             source.connect(filter);
             filter.connect(fileGain);
             fileGain.connect(masterGain);
             if(reverbGain) fileGain.connect(reverbGain);
 
-            // Instant Start
+            // Start
             source.start(0);
 
             // Cleanup
@@ -460,44 +461,31 @@
                 fileGain.disconnect();
             };
 
-            // For oscillator fallback (needs manual stop)
+            // Stop oscillator manually if used
             if (!audioBuffers[type]) {
                 source.stop(t + 0.45);
             }
         }
 
-        // --- Optimized Touch Handler ---
+        // --- Touch Handler ---
         function handleHit(e) {
-            // Prevent default zooming/scrolling behavior
             if (e.cancelable) e.preventDefault();
-            
-            // Init audio context on first touch
             if (!audioCtx) {
                 initAudio();
                 return;
             }
 
-            // ใช้ cached touches เพื่อความเร็ว
             const touches = e.changedTouches;
             const len = touches.length;
 
-            // LOOP 1: AUDIO PROCESSING (High Priority - Synchronous)
-            // ทำงานเสียงก่อนภาพเสมอ เพื่อลด Latency ให้ต่ำที่สุด
             for (let i = 0; i < len; i++) {
                 const t = touches[i];
-                // ใช้ cached drum geometry ไม่คำนวณใหม่
                 const dx = t.clientX - drumCenterX;
                 const dy = t.clientY - drumCenterY;
-                
-                // ใช้ Math.pow เร็วกว่า Math.sqrt สำหรับการเทียบค่า
                 const distSq = dx*dx + dy*dy;
                 const radiusSq = drumRadius * drumRadius;
                 const normalizedDistSq = distSq / radiusSq;
 
-                // Zone Logic (Square comparison is faster)
-                // 0.35^2 = 0.1225
-                // 0.75^2 = 0.5625
-                
                 if (normalizedDistSq < 0.1225) {
                     playSound('bom');
                 } else if (normalizedDistSq > 0.5625) {
@@ -507,41 +495,32 @@
                 }
             }
 
-            // LOOP 2: VISUAL PROCESSING (Low Priority - Asynchronous)
-            // แยกการวาดภาพออกไปทำเฟรมถัดไป ไม่ให้ขวางเสียง
             requestAnimationFrame(() => {
                 for (let i = 0; i < len; i++) {
                     createRipple(touches[i].clientX, touches[i].clientY);
                 }
-                // Trigger drum animation once per batch
                 drum.style.transform = 'scale(0.98)';
                 setTimeout(() => drum.style.transform = 'scale(1)', 50);
             });
         }
 
-        // Simplified Ripple (Pure CSS Animation)
         function createRipple(x, y) {
             const el = document.createElement('div');
             el.className = 'hit-anim';
             el.style.left = x + 'px';
             el.style.top = y + 'px';
             document.body.appendChild(el);
-            
-            // Auto remove after animation (0.2s)
             setTimeout(() => {
                 el.remove();
             }, 200);
         }
 
-        // --- Event Listeners ---
-        // ใช้ passive: false เพื่อให้ preventDefault() ทำงานได้ (กัน Scroll/Zoom)
+        // Event Listeners
         drum.addEventListener('touchstart', handleHit, { passive: false });
-        drum.addEventListener('mousedown', handleHit); // Fallback for mouse
-
-        // Prevent unwanted gestures
+        drum.addEventListener('mousedown', handleHit); 
         document.body.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
-        // --- Controls Logic ---
+        // Controls
         function toggleNotes() {
             const drumEl = document.getElementById('drum');
             const btn = document.getElementById('btn-notes');
@@ -616,7 +595,6 @@
             setTimeout(() => document.body.removeChild(a), 100);
         }
 
-        // Prevent context menu
         window.oncontextmenu = (e) => { e.preventDefault(); return false; };
 
     </script>
