@@ -182,9 +182,9 @@
         // คุณสามารถเปลี่ยนลิงก์ URL เป็นไฟล์ .mp3, .wav หรือ .ogg ของคุณเองได้ที่นี่
         const soundUrls = {
             // เสียงกลาง (ทุ้ม): ใช้เสียง Tom Drum แทนเสียงกลองมลายูตัวผู้/ทุ้ม
-            dung: "malayu/marayucen.wav", 
+              dung: "malayu/marayurim.wav", 
             // เสียงขอบ (แหลม): ใช้เสียง Wood Block หรือ Rim Shot แทนเสียงกลองมลายูตัวเมีย/ขอบ
-            tak: "malayu/marayurim.wav"   
+            tak: "malayu/marayucen.wav"     
         };
 
         // --- Audio Context & Engine ---
@@ -277,46 +277,15 @@
             source.start(t);
         }
 
-        // --- Fallback Synthesis (สังเคราะห์เสียงกรณีโหลดไฟล์ไม่ทัน) ---
-        function playSynthDung() {
-            const t = audioCtx.currentTime;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.frequency.setValueAtTime(150, t);
-            osc.frequency.exponentialRampToValueAtTime(40, t + 0.5);
-            gain.gain.setValueAtTime(1.0, t);
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.6);
-            osc.connect(gain);
-            gain.connect(masterGain);
-            osc.start(t);
-            osc.stop(t + 0.6);
-        }
-
-        function playSynthTak() {
-            const t = audioCtx.currentTime;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(400, t);
-            osc.frequency.exponentialRampToValueAtTime(200, t + 0.1);
-            gain.gain.setValueAtTime(0.6, t);
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
-            osc.connect(gain);
-            gain.connect(masterGain);
-            osc.start(t);
-            osc.stop(t + 0.15);
-        }
-
         // --- Main Trigger Functions ---
         
         // Sound 1: "Dung" (Bass/Center)
         function playDung() {
             if(!audioCtx) initAudio();
             
+            // เล่นเฉพาะเมื่อโหลดไฟล์เสียงเสร็จแล้ว
             if (audioBuffers.dung) {
                 playBuffer(audioBuffers.dung);
-            } else {
-                playSynthDung(); // Fallback
             }
             showVisual('ตุง', 'dung');
         }
@@ -325,10 +294,9 @@
         function playTak() {
             if(!audioCtx) initAudio();
             
+            // เล่นเฉพาะเมื่อโหลดไฟล์เสียงเสร็จแล้ว
             if (audioBuffers.tak) {
                 playBuffer(audioBuffers.tak);
-            } else {
-                playSynthTak(); // Fallback
             }
             showVisual('ตั๊ก', 'tak');
         }
