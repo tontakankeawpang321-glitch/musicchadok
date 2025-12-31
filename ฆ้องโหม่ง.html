@@ -294,7 +294,7 @@
         // 1. CONFIGURATION: ใส่ลิงก์ไฟล์เสียงของคุณที่นี่
         const soundUrls = {
             // ใส่ URL ไฟล์เสียงจริงที่นี่ (ต้องรองรับ CORS ถ้าอยู่คนละโดเมน)
-            // ตัวอย่าง: ""
+            // ตัวอย่าง: "https://mysite.com/audio/mong.wav"
             mong: "mong/mog.wav" 
         };
 
@@ -382,30 +382,30 @@
             if (!audioCtx) {
                 audioCtx = new AudioContext();
                 
-                // 1. เพิ่มความดัง (Volume Boost)
+                // 1. ความดังหลัก
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 2.5; // เพิ่มจาก 1.0 เป็น 2.5
+                masterGain.gain.value = 2.5; 
                 
                 destination = audioCtx.createMediaStreamDestination();
                 masterGain.connect(audioCtx.destination);
                 masterGain.connect(destination);
 
-                // 2. สร้างระบบ Echo/Resonance (เพิ่มความกังวาล)
+                // 2. ปรับจูนระบบ Echo/Resonance (ลดลงไม่ให้เพี้ยน)
                 const delay = audioCtx.createDelay();
-                delay.delayTime.value = 0.4; // ระยะเวลา Echo (ก้องกังวาน)
+                delay.delayTime.value = 0.25; // ลดลงเพื่อให้กระชับ (จาก 0.4)
                 
                 const feedback = audioCtx.createGain();
-                feedback.gain.value = 0.5; // ความยาวของหางเสียง (0.0 - 0.9)
+                feedback.gain.value = 0.3; // ลดหางเสียง (จาก 0.5)
 
                 const filter = audioCtx.createBiquadFilter();
                 filter.type = 'lowpass';
-                filter.frequency.value = 800; // ตัดเสียงแหลมของ Echo ให้ทุ้มอุ่น
+                filter.frequency.value = 600; // ตัดเสียงแหลมของ Echo ให้ทุ้มอุ่นอยู่ข้างหลัง
 
                 // เชื่อมต่อวงจร Echo
                 delay.connect(filter);
                 filter.connect(feedback);
                 feedback.connect(delay);
-                filter.connect(masterGain); // ส่งเสียง Echo ไปที่ Master
+                filter.connect(masterGain); 
 
                 // เก็บ Input ของ Echo ไว้เพื่อให้ Sample ส่งเสียงเข้ามาได้
                 echoNode = delay;
@@ -450,7 +450,7 @@
             // เชื่อมต่อ 2: ส่งเสียงไปที่ Echo (สร้างความกังวาลเพิ่ม)
             if (echoNode) {
                 const echoSend = audioCtx.createGain();
-                echoSend.gain.value = 0.6; // ส่งเสียงไป Echo 60%
+                echoSend.gain.value = 0.3; // ลด Send Level เหลือ 30% (จาก 60%) เพื่อไม่ให้กลบเสียงหลัก
                 fadeGain.connect(echoSend);
                 echoSend.connect(echoNode);
             }
@@ -569,4 +569,3 @@
     </script>
 </body>
 </html>
-
