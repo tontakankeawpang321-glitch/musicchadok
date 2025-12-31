@@ -50,7 +50,6 @@
             align-items: center;
             justify-content: center;
             position: relative;
-            /* จะใช้ transform กับตัวนี้ตอนเขย่า */
         }
 
         /* --- Shake Hint (Mobile Only) --- */
@@ -168,7 +167,6 @@
         }
 
         /* --- Animations --- */
-        /* อัปเกรด Animation เขย่าให้ขยับเยอะขึ้น */
         .shake-anim { animation: shake-hard 0.35s cubic-bezier(.36,.07,.19,.97) both; }
         
         @keyframes shake-hard {
@@ -217,7 +215,7 @@
 
     <div id="start-overlay">
         <h1 style="font-weight: 300; letter-spacing: 2px; margin-bottom: 0;">PRO TAMBOURINE</h1>
-        <p style="color: #aaa; margin-top: 5px;">Realistic Physics & High-Fidelity Audio</p>
+        <p style="color: #aaa; margin-top: 5px;">Realistic Physics & Real Audio Only</p>
         <button id="btn-start-init" class="btn-start" onclick="initAudio()" ontouchstart="initAudio()">START ENGINE</button>
         <div id="loading-text" style="margin-top:20px; font-size: 0.8rem; opacity: 0.7;">Ready to Load</div>
     </div>
@@ -270,13 +268,12 @@
         // UI Initialization
         function createZils() {
             const container = document.getElementById('zils-layer');
-            const numberOfZils = 8; // เพิ่มจำนวนให้ดูโปรขึ้น
+            const numberOfZils = 8;
             container.innerHTML = '';
             for (let i = 0; i < numberOfZils; i++) {
                 const zil = document.createElement('div');
                 zil.className = 'zil';
                 const angle = (i / numberOfZils) * 360;
-                // จัดวางตำแหน่งให้สมดุล
                 zil.style.transform = `rotate(${angle}deg) translate(280%, 0)`; 
                 container.appendChild(zil);
             }
@@ -301,6 +298,7 @@
             try {
                 if (url.includes('INSERT')) throw new Error("No URL");
                 const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const arrayBuffer = await response.arrayBuffer();
                 const decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                 
@@ -311,7 +309,7 @@
                 console.log(`Loaded ${key}: Trimmed offset = ${bufferOffsets[key].toFixed(4)}s`);
                 
             } catch (error) {
-                console.warn(`Fallback for ${key}`);
+                console.warn(`Failed to load sound '${key}'. It will be silent.`);
             }
         }
 
@@ -340,11 +338,10 @@
             setupRecorder();
 
             createZils();
-            // Start motion sensor immediately on user interaction
             startMotionSensor();
             setupInteractions();
 
-            // Preload Sounds
+            // Preload Sounds (Wait for all to try loading)
             await Promise.all([
                 loadSound('hit', soundUrls.hit),
                 loadSound('shake', soundUrls.shake)
@@ -360,6 +357,7 @@
             if (!audioCtx) return;
             if (audioCtx.state === 'suspended') audioCtx.resume();
 
+            // เล่นเฉพาะเมื่อมีไฟล์เสียงจริงเท่านั้น
             if (audioBuffers[type]) {
                 const source = audioCtx.createBufferSource();
                 source.buffer = audioBuffers[type];
@@ -379,26 +377,16 @@
                 envelope.gain.setValueAtTime(0, now);
                 envelope.gain.linearRampToValueAtTime(1, now + 0.005); // 5ms attack
                 
-                // ✅ Fade Out: ป้องกันเสียงคลิกตอนจบ (10ms ก่อนจบ)
-                envelope.gain.setValueAtTime(1, now + duration - offset - 0.015);
-                envelope.gain.exponentialRampToValueAtTime(0.001, now + duration - offset - 0.005);
+                // ✅ Fade Out: ป้องกันเสียงคลิกตอนจบ
+                if (duration - offset > 0.02) {
+                    envelope.gain.setValueAtTime(1, now + duration - offset - 0.015);
+                    envelope.gain.exponentialRampToValueAtTime(0.001, now + duration - offset - 0.005);
+                }
 
                 // ✅ Play with Offset (Trim Silence)
                 source.start(now, offset); 
-                
-            } else {
-                playBackupBeep(type);
-            }
-        }
-
-        function playBackupBeep(type) {
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.frequency.setValueAtTime(type === 'hit' ? 200 : 800, audioCtx.currentTime);
-            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-            osc.connect(gain); gain.connect(masterGain);
-            osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+            } 
+            // ❌ เอา playBackupBeep ออก: ถ้าไม่มีไฟล์จะเงียบไปเลย
         }
 
         // --- Interaction Logic (3D Physics) ---
@@ -408,7 +396,6 @@
             
             const startHandler = (e) => {
                 if (e.target.closest('.controls')) return;
-                // e.preventDefault(); 
                 
                 const clientX = e.touches ? e.touches[0].clientX : e.clientX;
                 const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -464,7 +451,6 @@
 
         // --- Motion Sensor & Shake Logic ---
         function startMotionSensor() {
-            // iOS 13+ requires permission on user gesture (which is why this is called in initAudio)
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                 DeviceMotionEvent.requestPermission()
                     .then(response => {
@@ -474,7 +460,6 @@
                     })
                     .catch(console.error);
             } else {
-                // Non-iOS 13+ devices
                 window.addEventListener('devicemotion', handleMotion);
             }
         }
@@ -489,19 +474,15 @@
                 const speed = delta / (now - lastTime) * 1000;
 
                 if (speed > SHAKE_THRESHOLD && (now - lastShakeTime > 200)) {
-                    // Trigger sound
                     playSound('shake');
                     
-                    // Trigger Visual Shake Animation on Wrapper
                     const wrapper = document.getElementById('shaker-wrapper');
                     wrapper.classList.remove('shake-anim');
-                    // Force Reflow
                     void wrapper.offsetWidth; 
                     wrapper.classList.add('shake-anim');
                     
                     lastShakeTime = now;
                     
-                    // Hide instruction once user shakes successfully
                     const hint = document.getElementById('shake-instruction');
                     if(hint && hint.style.display !== 'none') {
                         hint.style.display = 'none';
