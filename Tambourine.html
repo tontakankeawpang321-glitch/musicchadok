@@ -167,8 +167,8 @@
         }
 
         /* --- Animations --- */
-        /* Animation เขย่าแบบกระชับ (One-shot) */
-        .shake-anim { animation: shake-hard 0.3s ease-out; }
+        /* Animation เขย่าแบบกระชับ (One-shot) ปรับเวลาให้เร็วขึ้นเล็กน้อยเพื่อให้ทันจังหวะรัว */
+        .shake-anim { animation: shake-hard 0.25s ease-out; }
         
         @keyframes shake-hard {
             0% { transform: translate3d(0, 0, 0) rotate(0deg); }
@@ -263,12 +263,13 @@
         // Motion & Timing Variables
         let lastX=0, lastY=0, lastZ=0, lastTime=0;
         let lastShakeTime = 0;
-        let lastHitTime = 0; // เพิ่มตัวแปรสำหรับคุมจังหวะการกด
+        let lastHitTime = 0; 
         
         // Settings for "Single Rhythm"
-        const SHAKE_THRESHOLD = 300; // เพิ่มความแรงขั้นต่ำเพื่อให้เขย่าจริงๆ ถึงจะดัง
-        const SHAKE_COOLDOWN = 500; // (ms) หน่วงเวลาเขย่านานขึ้น (0.5วิ) เพื่อให้ดังแค่ทีเดียวต่อการสะบัด
-        const HIT_COOLDOWN = 80;    // (ms) ป้องกันการกดเบิ้ลเร็วเกินไป (Bounce)
+        // ปรับจูน: Threshold สูงเพื่อกันเสียงรบกวน, Cooldown ต่ำเพื่อให้เล่นรัวได้ทัน
+        const SHAKE_THRESHOLD = 300; 
+        const SHAKE_COOLDOWN = 150; // ลดเหลือ 0.15s เพื่อรองรับการเขย่าไป-กลับ (รัว)
+        const HIT_COOLDOWN = 80;    
 
         // UI Initialization
         function createZils() {
@@ -387,10 +388,10 @@
                 // ป้องกันการกดปุ่มควบคุม
                 if (e.target.closest('.controls')) return;
                 
-                // 🛑 Prevent Double Trigger (Touch followed by Mouse on mobile)
+                // 🛑 Prevent Double Trigger
                 if (e.cancelable) e.preventDefault(); 
                 
-                // 🛑 Debounce Logic: ถ้ากดรัวเกินไป (80ms) ไม่ให้เล่น
+                // 🛑 Debounce Logic
                 const now = Date.now();
                 if (now - lastHitTime < HIT_COOLDOWN) return;
                 lastHitTime = now;
@@ -413,8 +414,6 @@
 
             const moveHandler = (e) => {
                 if (!isPressed) return;
-                
-                // ป้องกันการลากเลื่อนหน้าจอ (Scrolling) ขณะเล่น
                 if (e.cancelable) e.preventDefault();
 
                 let clientX, clientY;
@@ -435,13 +434,10 @@
                 tambourine.style.transform = 'rotateX(0deg) rotateY(0deg) scale(1)';
             };
 
-            // ใช้ Passive: false เพื่อให้ preventDefault() ทำงานได้
-            // Mouse
             document.addEventListener('mousedown', startHandler);
             document.addEventListener('mousemove', moveHandler);
             document.addEventListener('mouseup', endHandler);
 
-            // Touch
             document.addEventListener('touchstart', startHandler, {passive: false});
             document.addEventListener('touchmove', moveHandler, {passive: false});
             document.addEventListener('touchend', endHandler, {passive: false});
@@ -465,7 +461,7 @@
             tambourine.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(0.96)`;
         }
 
-        // --- Motion Sensor & Shake Logic (Single Beat) ---
+        // --- Motion Sensor & Shake Logic (Dynamic Rhythm) ---
         function startMotionSensor() {
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                 DeviceMotionEvent.requestPermission()
@@ -489,9 +485,10 @@
                 const delta = Math.sqrt((acc.x-lastX)**2 + (acc.y-lastY)**2 + (acc.z-lastZ)**2);
                 const speed = delta / (now - lastTime) * 1000;
 
-                // 🛑 Shake Logic: 
-                // 1. SHAKE_THRESHOLD = 300 (แรงขึ้นเพื่อป้องกันเสียงรบกวน)
-                // 2. SHAKE_COOLDOWN = 500ms (เว้นระยะนานขึ้นเพื่อให้สะบัด 1 ที ได้ 1 เสียงเท่านั้น)
+                // 🛑 Logic ใหม่:
+                // 1. Threshold สูง (300) = ต้องเขย่าจริงจัง (กันมือสั่น)
+                // 2. Cooldown ต่ำ (150ms) = อนุญาตให้เขย่ารัว (ไป-กลับ) ได้
+                // ผลลัพธ์: เขย่าเร็ว = ได้เสียงรัว (เพราะพ้น cooldown 150ms), เขย่าช้า/ครั้งเดียว = ได้เสียงเดียว (เพราะ threshold สูง ไม่จับตอนหยุดมือ)
                 if (speed > SHAKE_THRESHOLD && (now - lastShakeTime > SHAKE_COOLDOWN)) {
                     playSound('shake');
                     
