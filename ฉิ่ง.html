@@ -34,13 +34,14 @@
         }
 
         .ching-btn {
-            transition: all 0.1s;
+            transition: all 0.05s; /* ตอบสนองไวขึ้น */
             position: relative;
             overflow: hidden;
+            -webkit-tap-highlight-color: transparent; /* ลบสีไฮไลท์ตอนแตะ */
         }
 
         .ching-btn:active, .ching-btn.active {
-            transform: scale(0.95);
+            transform: scale(0.92);
             box-shadow: inset 0 0 30px #5e4b20;
         }
 
@@ -50,13 +51,13 @@
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.4);
             transform: scale(0);
-            animation: ripple-anim 0.6s linear;
+            animation: ripple-anim 0.4s ease-out; /* ปรับให้ไวขึ้น */
             pointer-events: none;
         }
 
         @keyframes ripple-anim {
             to {
-                transform: scale(4);
+                transform: scale(3.5);
                 opacity: 0;
             }
         }
@@ -68,7 +69,7 @@
             height: 80px;
             text-shadow: 0 0 10px rgba(255, 215, 0, 0.7);
             opacity: 0;
-            transition: opacity 0.2s;
+            transition: opacity 0.1s;
         }
         
         #note-display.show {
@@ -122,7 +123,7 @@
         #start-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.85);
+            background: rgba(0,0,0,0.9);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -150,6 +151,13 @@
             z-index: -1;
             opacity: 0.3;
         }
+        
+        .loading-text {
+            font-size: 0.8rem;
+            color: #fbbf24;
+            margin-top: 5px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -158,37 +166,38 @@
     <canvas id="visualizer"></canvas>
 
     <!-- Header -->
-    <div class="pt-6 text-center z-10">
+    <div class="pt-6 text-center z-10 select-none">
         <h1 class="text-2xl font-bold text-yellow-400">ฉิ่งไทยจำลอง</h1>
-        <p class="text-gray-400 text-xs mt-1">Virtual Thai Ching</p>
+        <p class="text-gray-400 text-xs mt-1">Pro Audio Engine (Trimmed & Faded)</p>
+        <p id="loading-indicator" class="loading-text">กำลังโหลดและประมวลผลเสียง...</p>
     </div>
 
     <!-- Note Display -->
-    <div id="note-display" class="text-yellow-200">
+    <div id="note-display" class="text-yellow-200 select-none">
         -
     </div>
 
     <!-- The Instrument Area -->
-    <div class="flex-grow flex flex-col justify-center items-center w-full relative z-10 mb-8">
+    <div class="flex-grow flex flex-col justify-center items-center w-full relative z-10 mb-8 select-none">
         <!-- Area for CHING (Open) -->
-        <div class="relative w-full flex justify-center items-center h-1/2" id="area-ching">
-             <div class="gold-metal w-32 h-32 rounded-full flex items-center justify-center ching-btn cursor-pointer" onclick="playSound('ching')">
+        <div class="relative w-full flex justify-center items-center h-1/2" id="area-ching" ontouchstart="handleTouchStart(event, 'ching')" onmousedown="handleMouseDown('ching')">
+             <div class="gold-metal w-32 h-32 rounded-full flex items-center justify-center ching-btn">
                 <div class="w-8 h-8 rounded-full bg-yellow-900 opacity-20 shadow-inner"></div>
-                <span class="absolute text-yellow-900 font-bold opacity-30 select-none text-xl">ฉิ่ง</span>
+                <span class="absolute text-yellow-900 font-bold opacity-30 text-xl pointer-events-none">ฉิ่ง</span>
              </div>
         </div>
 
         <div class="rope"></div>
 
         <!-- Area for CHAP (Closed) -->
-        <div class="relative w-full flex justify-center items-center h-1/2" id="area-chap">
-            <div class="gold-metal w-32 h-32 rounded-full flex items-center justify-center ching-btn cursor-pointer" onclick="playSound('chap')">
+        <div class="relative w-full flex justify-center items-center h-1/2" id="area-chap" ontouchstart="handleTouchStart(event, 'chap')" onmousedown="handleMouseDown('chap')">
+            <div class="gold-metal w-32 h-32 rounded-full flex items-center justify-center ching-btn">
                 <div class="w-8 h-8 rounded-full bg-yellow-900 opacity-20 shadow-inner"></div>
-                <span class="absolute text-yellow-900 font-bold opacity-30 select-none text-xl">ฉับ</span>
+                <span class="absolute text-yellow-900 font-bold opacity-30 text-xl pointer-events-none">ฉับ</span>
             </div>
         </div>
         
-        <p class="absolute bottom-0 text-gray-500 text-xs mb-2">แตะด้านบนเพื่อตี "ฉิ่ง" / แตะด้านล่างเพื่อตี "ฉับ"</p>
+        <p class="absolute bottom-0 text-gray-500 text-xs mb-2 pointer-events-none">แตะด้านบนเพื่อตี "ฉิ่ง" / แตะด้านล่างเพื่อตี "ฉับ"</p>
     </div>
 
     <!-- Controls -->
@@ -214,84 +223,207 @@
     </div>
 
     <script>
-        // --- Audio Context & Synthesis ---
+        // --- 1. CONFIGURATION: Sound URLs ---
+        // ใส่ลิงก์ไฟล์เสียง (.mp3, .wav) ตรงนี้
+        const soundUrls = {
+            ching: "ching/ching.wav", // เช่น "sounds/ching.wav"
+            chap: "ching/chuw.wav"   // เช่น "sounds/chap.wav"
+        };
+
+        // --- Audio Context & Variables ---
         let audioCtx;
         let masterGain;
-        let dest; // For recording
+        let dest;
         let mediaRecorder;
         let recordedChunks = [];
         let audioBlob;
         let audioUrl;
         let isRecording = false;
         let analyser;
+        let lastTouchTime = 0;
+        
+        // Asset Store (Buffer + Meta Data)
+        const audioAssets = {
+            ching: { buffer: null, start: 0, duration: 0 },
+            chap:  { buffer: null, start: 0, duration: 0 }
+        };
 
-        // ฟังก์ชันสร้างเสียงฉิ่ง/ฉับ ด้วย Oscillator (สังเคราะห์เสียงสด)
-        // เพื่อความสมจริง เราจะผสมหลายคลื่นเสียงและ Noise
-        function createChingSound(type) {
-            if (!audioCtx) return;
+        // --- 2. Advanced Audio Loading & Processing ---
+        
+        // ฟังก์ชันหาจุดเริ่มต้นและสิ้นสุดของเสียง (Trim Silence) - ปรับปรุงใหม่ให้คมขึ้น
+        function detectSilence(buffer) {
+            const data = buffer.getChannelData(0); // ใช้ Channel ซ้ายในการวิเคราะห์
+            const threshold = 0.002; // ปรับลดลงเพื่อให้ไวต่อเสียงเบา (เดิม 0.005)
+            let start = 0;
+            let end = data.length - 1;
 
-            const t = audioCtx.currentTime;
+            // สแกนหาจุดเริ่ม
+            while (start < end && Math.abs(data[start]) < threshold) {
+                start++;
+            }
+
+            // สแกนหาจุดจบ
+            while (end > start && Math.abs(data[end]) < threshold) {
+                end--;
+            }
+
+            return {
+                startOffset: Math.max(0, start / buffer.sampleRate - 0.001), // ดึงหัวเสียงกลับ 1ms กันเสียงหาย
+                duration: (end - start) / buffer.sampleRate
+            };
+        }
+
+        async function loadSound(key, url) {
+            if (!url) return;
+            try {
+                const response = await fetch(url);
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                
+                // คำนวณ Trim Silence ทันทีที่โหลดเสร็จ
+                const meta = detectSilence(audioBuffer);
+                
+                audioAssets[key] = {
+                    buffer: audioBuffer,
+                    start: meta.startOffset,
+                    duration: meta.duration
+                };
+                
+                console.log(`Loaded & Trimmed ${key}: Start ${meta.startOffset.toFixed(3)}s, Dur ${meta.duration.toFixed(3)}s`);
+            } catch (error) {
+                console.error(`Error loading ${key}:`, error);
+                // ถ้าโหลดไม่ได้ ค่าจะเป็น null และจะไปใช้ Synth แทน
+            }
+        }
+
+        async function loadAllSounds() {
+            const indicator = document.getElementById('loading-indicator');
+            if(soundUrls.ching || soundUrls.chap) indicator.style.display = 'block';
             
-            // Gain Node หลักสำหรับโน้ตตัวนี้
+            const promises = [];
+            if (soundUrls.ching) promises.push(loadSound('ching', soundUrls.ching));
+            if (soundUrls.chap) promises.push(loadSound('chap', soundUrls.chap));
+            
+            await Promise.all(promises);
+            indicator.style.display = 'none';
+        }
+
+        // --- 3. Playback Logic (Buffer with Fade & Trim) ---
+        
+        // หัวใจหลัก: Play Sample แบบ “Synth-like” (Soft Clip + Envelope)
+        function playSampleSound(type) {
+            const asset = audioAssets[type];
+            if (!asset || !asset.buffer) return;
+
+            const t = audioCtx.currentTime + 0.002; // look-ahead 2ms (ลด jitter)
+
+            const source = audioCtx.createBufferSource();
+            source.buffer = asset.buffer;
+
+            const gain = audioCtx.createGain();
+            gain.gain.value = 0;
+
+            // Soft clip + presence
+            const shaper = audioCtx.createWaveShaper();
+            shaper.curve = new Float32Array(
+                Array.from({ length: 44100 }, (_, i) => {
+                const x = (i * 2) / 44100 - 1;
+                return Math.tanh(x * 1.4);
+                })
+            );
+
+            source.connect(gain);
+            gain.connect(shaper);
+            shaper.connect(masterGain);
+            shaper.connect(dest);
+            shaper.connect(analyser);
+
+            const fadeIn = 0.002;   // 2ms (เร็วมาก)
+            const dur = asset.duration;
+
+            // Envelope แบบ synth
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(1.15, t + fadeIn); // boost attack
+            gain.gain.setValueAtTime(1.0, t + fadeIn + 0.01);
+            gain.gain.linearRampToValueAtTime(0, t + dur);
+
+            source.start(t, asset.start, dur);
+        }
+
+        // ฟังก์ชันสังเคราะห์เสียง (สำรองกรณีไม่มีไฟล์)
+        function playSynthSound(type) {
+             if (!audioCtx) return;
+            const t = audioCtx.currentTime;
             const noteGain = audioCtx.createGain();
             noteGain.connect(masterGain);
-            noteGain.connect(dest); // ส่งเข้าตัวอัดเสียง
-            noteGain.connect(analyser); // ส่งเข้า Visualizer
+            noteGain.connect(dest); 
+            noteGain.connect(analyser);
 
-            // Fundamental Frequency (ความถี่หลัก) ของฉิ่ง สูงและกังวาน
-            const fundFreq = 2200; 
-
-            // Ratios เพื่อสร้างเสียงโลหะ (Inharmonic partials)
-            const ratios = [1, 1.6, 2.3, 4.1, 5.7];
+            const decayTime = type === 'ching' ? 4.5 : 0.15; 
+            const brightnessDecay = type === 'ching' ? 2.0 : 0.1;
             
-            ratios.forEach((ratio, index) => {
-                const osc = audioCtx.createOscillator();
-                osc.type = index === 0 ? 'sine' : 'triangle';
-                osc.frequency.value = fundFreq * ratio;
+            const carrier = audioCtx.createOscillator();
+            const modulator = audioCtx.createOscillator();
+            const modGain = audioCtx.createGain();
 
-                const oscGain = audioCtx.createGain();
-                
-                // การตั้งค่า Envelope (ADSR)
-                if (type === 'ching') {
-                    // เสียงฉิ่ง: หางเสียงยาว กังวาน
-                    oscGain.gain.setValueAtTime(0, t);
-                    oscGain.gain.linearRampToValueAtTime(0.3 / (index + 1), t + 0.01); // Attack เร็ว
-                    oscGain.gain.exponentialRampToValueAtTime(0.001, t + 2.5); // Decay ยาว (2.5 วิ)
-                } else {
-                    // เสียงฉับ: หางเสียงสั้นมาก หยุดทันที
-                    oscGain.gain.setValueAtTime(0, t);
-                    oscGain.gain.linearRampToValueAtTime(0.3 / (index + 1), t + 0.005);
-                    oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.15); // Decay สั้นกุด (0.15 วิ)
-                }
+            const fundamental = 2100; 
+            const ratio = 1.414; 
 
-                osc.connect(oscGain);
-                oscGain.connect(noteGain);
-                
-                osc.start(t);
-                osc.stop(t + 3); // หยุด Oscillator เพื่อประหยัด CPU
-            });
+            carrier.frequency.value = fundamental;
+            modulator.frequency.value = fundamental * ratio;
 
-            // เพิ่มเสียงกระทบ (Impact Noise) เล็กน้อยเพื่อให้ดูสมจริงตอนตี
-            const bufferSize = audioCtx.sampleRate * 0.1; // 0.1 วินาที
+            modulator.connect(modGain);
+            modGain.connect(carrier.frequency);
+            
+            const carrierGain = audioCtx.createGain();
+            carrier.connect(carrierGain);
+            carrierGain.connect(noteGain);
+
+            // Synthetic Fade In (De-click) included in envelope
+            carrierGain.gain.setValueAtTime(0, t);
+            carrierGain.gain.linearRampToValueAtTime(0.7, t + 0.005); 
+            carrierGain.gain.exponentialRampToValueAtTime(0.001, t + decayTime);
+
+            modGain.gain.setValueAtTime(2000, t); 
+            modGain.gain.exponentialRampToValueAtTime(10, t + brightnessDecay);
+
+            carrier.start(t);
+            modulator.start(t);
+            carrier.stop(t + decayTime + 0.5);
+            modulator.stop(t + decayTime + 0.5);
+
+            if (type === 'ching') {
+                const highOsc = audioCtx.createOscillator();
+                const highGain = audioCtx.createGain();
+                highOsc.frequency.value = 5400; 
+                highOsc.type = 'sine';
+                highOsc.connect(highGain);
+                highGain.connect(noteGain);
+                highGain.gain.setValueAtTime(0, t);
+                highGain.gain.linearRampToValueAtTime(0.1, t + 0.01);
+                highGain.gain.exponentialRampToValueAtTime(0.001, t + 3.0);
+                highOsc.start(t);
+                highOsc.stop(t + 3.5);
+            }
+
+            // Impact Noise
+            const bufferSize = audioCtx.sampleRate * 0.05; 
             const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
             const data = buffer.getChannelData(0);
             for (let i = 0; i < bufferSize; i++) {
                 data[i] = Math.random() * 2 - 1;
             }
-
             const noise = audioCtx.createBufferSource();
             noise.buffer = buffer;
             const noiseFilter = audioCtx.createBiquadFilter();
             noiseFilter.type = 'highpass';
-            noiseFilter.frequency.value = 5000;
-            
+            noiseFilter.frequency.value = 5000; 
             const noiseGain = audioCtx.createGain();
-            noiseGain.gain.setValueAtTime(0.3, t);
-            noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
-
             noise.connect(noiseFilter);
             noiseFilter.connect(noiseGain);
             noiseGain.connect(noteGain);
+            noiseGain.gain.setValueAtTime(0.4, t);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.03); 
             noise.start(t);
         }
 
@@ -300,21 +432,33 @@
         function initAudio() {
             if (!audioCtx) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
-                audioCtx = new AudioContext();
+                audioCtx = new AudioContext({ latencyHint: 'interactive' });
                 
-                // Master Gain
+                const compressor = audioCtx.createDynamicsCompressor();
+                compressor.threshold.value = -10;
+                compressor.knee.value = 40;
+                compressor.ratio.value = 12;
+                compressor.attack.value = 0;
+                compressor.release.value = 0.25;
+
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 0.8;
-                masterGain.connect(audioCtx.destination);
-
-                // Setup Recording Stream
-                dest = audioCtx.createMediaStreamDestination();
+                masterGain.gain.value = 0.9;
                 
-                // Setup Visualizer
-                analyser = audioCtx.createAnalyser();
-                analyser.fftSize = 256;
-                drawVisualizer();
+                masterGain.connect(compressor);
+                compressor.connect(audioCtx.destination);
 
+                dest = audioCtx.createMediaStreamDestination();
+                masterGain.connect(dest); 
+                
+                analyser = audioCtx.createAnalyser();
+                analyser.smoothingTimeConstant = 0.7;
+                analyser.fftSize = 512; 
+                masterGain.connect(analyser); 
+
+                // Load sounds if URLs are provided
+                loadAllSounds();
+
+                drawVisualizer();
                 document.getElementById('start-overlay').style.display = 'none';
             } else if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
@@ -322,20 +466,43 @@
             }
         }
 
-        function playSound(type) {
+        function handleTouchStart(e, type) {
+            e.preventDefault(); 
+            triggerSound(type);
+            animateButton(type);
+        }
+
+        function handleMouseDown(type) {
+             triggerSound(type);
+             animateButton(type);
+        }
+
+        function triggerSound(type) {
+            const now = Date.now();
+            if (now - lastTouchTime < 40) return; // Debounce 40ms
+            lastTouchTime = now;
+
             if (!audioCtx) initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
 
-            // สร้างเสียง
-            createChingSound(type);
+            // CHECK: มีไฟล์เสียงโหลดไว้หรือไม่?
+            if (audioAssets[type] && audioAssets[type].buffer) {
+                playSampleSound(type); // ใช้ไฟล์เสียง (Optimized)
+            } else {
+                playSynthSound(type); // ใช้เสียงสังเคราะห์ (Synth)
+            }
 
-            // แสดงผล UI
             showNote(type === 'ching' ? 'ฉิ่ง' : 'ฉับ');
             createRipple(type);
             
-            // Feedback การสั่น (ถ้ามือถือรองรับ)
-            if (navigator.vibrate) {
-                navigator.vibrate(type === 'ching' ? 20 : 50);
-            }
+            if (navigator.vibrate) navigator.vibrate(type === 'ching' ? 15 : 30);
+        }
+
+        function animateButton(type) {
+            const containerId = type === 'ching' ? 'area-ching' : 'area-chap';
+            const btn = document.querySelector(`#${containerId} .ching-btn`);
+            btn.classList.add('active');
+            setTimeout(() => btn.classList.remove('active'), 80);
         }
 
         // UI Effects
@@ -345,7 +512,7 @@
         function showNote(text) {
             noteDisplay.innerText = text;
             noteDisplay.classList.add('show');
-            noteDisplay.style.color = text === 'ฉิ่ง' ? '#fef08a' : '#fbbf24'; // สีอ่อนสำหรับฉิ่ง เข้มสำหรับฉับ
+            noteDisplay.style.color = text === 'ฉิ่ง' ? '#fef08a' : '#fbbf24';
             
             clearTimeout(noteTimeout);
             noteTimeout = setTimeout(() => {
@@ -358,16 +525,10 @@
             const container = document.getElementById(containerId);
             const circle = document.createElement('div');
             circle.classList.add('ripple');
-            
-            // ขนาดสุ่มเล็กน้อย
-            const size = 150;
+            const size = 180;
             circle.style.width = circle.style.height = `${size}px`;
-            
             container.appendChild(circle);
-            
-            setTimeout(() => {
-                circle.remove();
-            }, 600);
+            setTimeout(() => { circle.remove(); }, 500);
         }
 
         // --- Recording Logic ---
@@ -378,11 +539,11 @@
             const btnDownload = document.getElementById('btn-download');
 
             if (!isRecording) {
-                // Start Recording
                 if (!audioCtx) initAudio();
                 
                 recordedChunks = [];
-                mediaRecorder = new MediaRecorder(dest.stream);
+                const options = MediaRecorder.isTypeSupported('audio/webm') ? { mimeType: 'audio/webm' } : {};
+                mediaRecorder = new MediaRecorder(dest.stream, options);
 
                 mediaRecorder.ondataavailable = (evt) => {
                     if (evt.data.size > 0) recordedChunks.push(evt.data);
@@ -402,7 +563,6 @@
                 btnDownload.classList.add('btn-disabled');
                 
             } else {
-                // Stop Recording
                 mediaRecorder.stop();
                 isRecording = false;
                 btnRecord.classList.remove('recording');
@@ -420,17 +580,15 @@
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = audioUrl;
-            a.download = 'my-ching-sound.webm';
+            a.download = 'ching-recording-' + new Date().toISOString().slice(0,19).replace(/:/g,"-") + '.webm';
             document.body.appendChild(a);
             a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-                // URL.revokeObjectURL(audioUrl); // Keep it for replay
-            }, 100);
+            setTimeout(() => { document.body.removeChild(a); }, 100);
         }
 
         // --- Visualizer Logic ---
         function drawVisualizer() {
+            if(!analyser) return;
             const canvas = document.getElementById('visualizer');
             const canvasCtx = canvas.getContext('2d');
             canvas.width = window.innerWidth;
@@ -447,29 +605,33 @@
 
                 const centerX = canvas.width / 2;
                 const centerY = canvas.height / 2;
-                const radius = Math.min(canvas.width, canvas.height) / 3;
+                const radius = Math.min(canvas.width, canvas.height) / 3.5;
 
+                canvasCtx.beginPath();
                 for (let i = 0; i < bufferLength; i++) {
-                    const barHeight = dataArray[i] / 2; // Scale down
+                    const barHeight = dataArray[i] * 0.8; 
                     const rad = (i / bufferLength) * 2 * Math.PI;
                     
-                    const xStart = centerX + Math.cos(rad) * radius;
-                    const yStart = centerY + Math.sin(rad) * radius;
-                    const xEnd = centerX + Math.cos(rad) * (radius + barHeight);
-                    const yEnd = centerY + Math.sin(rad) * (radius + barHeight);
+                    const r = radius + barHeight;
+                    const x = centerX + Math.cos(rad) * r;
+                    const y = centerY + Math.sin(rad) * r;
 
-                    canvasCtx.beginPath();
-                    canvasCtx.moveTo(xStart, yStart);
-                    canvasCtx.lineTo(xEnd, yEnd);
-                    canvasCtx.strokeStyle = `rgba(255, 215, 0, ${dataArray[i]/255})`;
-                    canvasCtx.lineWidth = 2;
-                    canvasCtx.stroke();
+                    if (i === 0) canvasCtx.moveTo(x, y);
+                    else canvasCtx.lineTo(x, y);
+                }
+                canvasCtx.closePath();
+                canvasCtx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
+                canvasCtx.lineWidth = 2;
+                canvasCtx.stroke();
+                
+                if (dataArray[10] > 0) {
+                   canvasCtx.fillStyle = `rgba(255, 223, 0, ${dataArray[10]/1000})`;
+                   canvasCtx.fill();
                 }
             }
             renderFrame();
         }
 
-        // Handle Resize
         window.addEventListener('resize', () => {
             const canvas = document.getElementById('visualizer');
             canvas.width = window.innerWidth;
