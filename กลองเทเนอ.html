@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>กลองเทเนอร์จำลอง (Real Samples)</title>
+    <title>กลองเทเนอร์จำลอง (Pro Audio Engine)</title>
     <style>
         :root {
             --bg-color: #1a1a1a;
@@ -196,8 +196,9 @@
 
     <div id="start-overlay">
         <h1>กลองเทเนอร์จำลอง</h1>
-           <button id="btn-start-init" class="btn-start" onclick="initAudio()">
-             เริ่มเล่น
+        <p style="color: #aaa; margin-bottom: 20px;">ระบบเสียง Pro: Preload + Trim Silence + Fade</p>
+        <button id="btn-start-init" class="btn-start" onclick="initAudio()">
+            โหลดไฟล์ & เริ่มเล่น
         </button>
         <div id="loading-text"></div>
     </div>
@@ -227,19 +228,16 @@
      
     <script>
         // ==========================================
-        // ตั้งค่าไฟล์เสียง (ระบบเล่นจากไฟล์ในเครื่อง)
-        // **สำคัญ**: ต้องมีโฟลเดอร์ชื่อ "tenors" และมีไฟล์ .mp3 ตามชื่อด้านล่าง
+        // การตั้งค่าไฟล์เสียง
         // ==========================================
         const soundFiles = {
-            'spock': 'tenors/stenor.mp3',
-            '1': 'tenors/1tenor.mp3',
-            '2': 'tenors/tenors.mp3',
-            '3': 'tenors/tenors.mp3',
-            '4': 'tenors/4tenors.mp3'
+            'spock': 'tenors/stenor.wave',
+            '1': 'tenors/1tenor.wave',
+            '2': 'tenors/tenors.wave',
+            '3': 'tenors/tenors.wave',
+            '4': 'tenors/4tenors.wave'
         };
 
-        // การปรับจูนเสียง (Playback Rate) 
-        // หากไฟล์เสียงของคุณตรงคีย์อยู่แล้ว ให้แก้เลขเป็น 1.0 ทั้งหมดได้เลย
         const tuning = {
             'spock': 1.0, 
             '1': 1.0,     
@@ -258,13 +256,64 @@
         let destNode; 
         let isRecording = false;
 
+        // ✅ ฟังก์ชันตัดเสียงเงียบหัว-ท้าย (Trim Silence)
+        function trimAudioBuffer(buffer) {
+            const threshold = 0.002; // ระดับความดังขั้นต่ำที่จะเริ่มนับว่าเป็นเสียง (-54dB โดยประมาณ)
+            const numChannels = buffer.numberOfChannels;
+            let start = buffer.length;
+            let end = 0;
+
+            // วนลูปหาจุดเริ่มต้นและจุดสิ้นสุดของเสียงจริง
+            for (let c = 0; c < numChannels; c++) {
+                const data = buffer.getChannelData(c);
+                
+                // หา Start
+                for (let i = 0; i < data.length; i++) {
+                    if (Math.abs(data[i]) > threshold) {
+                        if (i < start) start = i;
+                        break;
+                    }
+                }
+                
+                // หา End
+                for (let i = data.length - 1; i >= 0; i--) {
+                    if (Math.abs(data[i]) > threshold) {
+                        if (i > end) end = i;
+                        break;
+                    }
+                }
+            }
+
+            // ถ้าหาไม่เจอ หรือไฟล์เงียบสนิท ให้คืนค่าเดิม
+            if (start >= end) return buffer;
+
+            // สร้าง Buffer ใหม่เฉพาะส่วนที่มีเสียง
+            const newLength = end - start + 1;
+            const newBuffer = audioCtx.createBuffer(numChannels, newLength, buffer.sampleRate);
+
+            for (let c = 0; c < numChannels; c++) {
+                const data = buffer.getChannelData(c);
+                newBuffer.getChannelData(c).set(data.subarray(start, end + 1));
+            }
+            
+            // console.log(`Trimmed silence: ${start} samples removed from start.`);
+            return newBuffer;
+        }
+
         async function loadSound(note, url) {
             try {
+                // ✅ Preload: โหลดไฟล์
                 const response = await fetch(url);
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const arrayBuffer = await response.arrayBuffer();
-                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-                audioBuffers[note] = audioBuffer;
+                
+                // ✅ Decode: แปลงเป็น AudioBuffer
+                const decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                
+                // ✅ Process: ตัดเสียงเงียบ (Trim) ก่อนเก็บ
+                const trimmedBuffer = trimAudioBuffer(decodedBuffer);
+                
+                audioBuffers[note] = trimmedBuffer;
                 return true;
             } catch (error) {
                 console.warn(`ไม่สามารถโหลดไฟล์เสียง: ${url}`);
@@ -278,8 +327,8 @@
             const loadingText = document.getElementById('loading-text');
             
             btnStart.disabled = true;
-            btnStart.innerText = "กำลังโหลด...";
-            loadingText.innerText = "กำลังโหลดไฟล์เสียงจากโฟลเดอร์ tenors...";
+            btnStart.innerText = "กำลังประมวลผล...";
+            loadingText.innerText = "กำลังโหลด, Decode และตัดเสียงเงียบ...";
 
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -294,19 +343,17 @@
 
                 setupRecorder();
 
-                // โหลดไฟล์เสียงทั้งหมด
                 const promises = Object.keys(soundFiles).map(note => loadSound(note, soundFiles[note]));
                 await Promise.all(promises);
 
-                // ซ่อน Overlay
                 const overlay = document.getElementById('start-overlay');
                 overlay.style.opacity = '0';
                 setTimeout(() => overlay.remove(), 500);
 
             } catch (e) {
-                alert("เกิดข้อผิดพลาดในการโหลดเสียง หรือ Browser ไม่รองรับ");
+                alert("เกิดข้อผิดพลาดในการโหลดเสียง");
                 console.error(e);
-                btnStart.innerText = "เกิดข้อผิดพลาด";
+                btnStart.innerText = "Error";
             }
         }
 
@@ -320,11 +367,9 @@
                     const a = document.createElement('a');
                     a.style.display = 'none';
                     a.href = audioUrl;
-                    
                     const now = new Date();
                     const timestamp = `${now.getHours()}-${now.getMinutes()}-${now.getSeconds()}`;
                     a.download = `tenor_rec_${timestamp}.webm`; 
-                    
                     document.body.appendChild(a);
                     a.click();
                     setTimeout(() => {
@@ -375,16 +420,40 @@
             if (audioCtx.state === 'suspended') audioCtx.resume();
 
             if (audioBuffers[note]) {
+                // ✅ 1. สร้าง Source Node
                 const source = audioCtx.createBufferSource();
                 source.buffer = audioBuffers[note];
                 
-                // ปรับจูนเสียง (Pitch)
+                // ✅ 2. สร้าง Envelope (Gain) สำหรับ Fade In/Out
+                const envelope = audioCtx.createGain();
+
+                // Pitch Tuning
+                let rate = 1.0;
                 if (tuning[note]) {
-                    source.playbackRate.value = tuning[note];
+                    rate = tuning[note];
+                    source.playbackRate.value = rate;
                 }
 
-                source.connect(masterGain);
-                source.start(0);
+                // เชื่อมต่อ: Source -> Envelope -> Master
+                source.connect(envelope);
+                envelope.connect(masterGain);
+
+                // ✅ 3. คำนวณเวลาและทำ Fade (ระดับ ms)
+                const now = audioCtx.currentTime;
+                // คำนวณความยาวจริงหลังปรับ Pitch
+                const actualDuration = source.buffer.duration / rate;
+
+                // Fade In: 3ms (เร็วมาก) เพื่อลบเสียง Click ตอนเริ่ม แต่ยังคง Attack ของกลองไว้
+                envelope.gain.setValueAtTime(0, now);
+                envelope.gain.linearRampToValueAtTime(1, now + 0.003);
+
+                // Fade Out: 5ms ก่อนจบไฟล์จริง เพื่อให้เสียงจบสนิท
+                if (actualDuration > 0.005) {
+                    envelope.gain.setValueAtTime(1, now + actualDuration - 0.005);
+                    envelope.gain.linearRampToValueAtTime(0, now + actualDuration);
+                }
+
+                source.start(now);
             } else {
                 console.log("Audio buffer not ready for: " + note);
             }
