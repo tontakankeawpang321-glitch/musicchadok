@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>กลองยาวจำลอง (Virtual Klong Yao)</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+body{
+    font-family:'Sarabun',sans-serif;
+    background:#2d1b0e;
+    overflow:hidden;
+    touch-action:none;
+    user-select:none;
+}
+.drum-head{
+    background:radial-gradient(circle,#f3e5ab 0%,#e0c87e 55%,#b69b4c 100%);
+    box-shadow:
+        inset 0 0 30px rgba(0,0,0,.3),
+        0 0 0 12px #5c3a21,
+        0 0 0 24px #8b5a2b,
+        0 18px 30px rgba(0,0,0,.6);
+    cursor:pointer;
+}
+.khoon{
+    position:absolute;
+    inset:28%;
+    border-radius:50%;
+    background:radial-gradient(circle,#3e2723 0%,#5d4037 70%,transparent 100%);
+    opacity:.85;
+}
+.hit-anim{
+    position:fixed;
+    width:20px;height:20px;
+    background:rgba(255,255,255,.6);
+    border-radius:50%;
+    animation:ripple .15s ease-out forwards;
+    pointer-events:none;
+}
+@keyframes ripple{
+    from{transform:scale(.5);opacity:.8}
+    to{transform:scale(1.5);opacity:0}
+}
+</style>
+</head>
+
+<body class="h-screen flex flex-col">
+
+<div id="start-overlay" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+    <div onclick="initAudio()" class="cursor-pointer text-center text-white">
+        <i class="fas fa-drum text-6xl text-yellow-400 mb-4"></i>
+        <div class="text-2xl font-bold">แตะเพื่อเริ่มตีกลอง</div>
+    </div>
+</div>
+
+<div class="flex-1 flex items-center justify-center">
+    <div id="drum" class="drum-head w-[80vw] h-[80vw] max-w-[480px] max-h-[480px] rounded-full relative">
+        <div class="khoon"></div>
+    </div>
+</div>
+
+<script>
+/* =======================
+   CONFIG
+======================= */
+const soundUrls = {
+    bom: 'konglong/momlong.wav',
+    pa: 'konglong/paklong.wav',
+    poeng: 'konglong/pengkob.wav'
+};
+
+let audioCtx, masterGain, compressor, reverbNode, reverbGain;
+let audioBuffers = {};
+
+/* =======================
+   INIT AUDIO
+======================= */
+async function initAudio(){
+    if(audioCtx) return;
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
+
+    compressor = audioCtx.createDynamicsCompressor();
+    compressor.threshold.value = -20;
+    compressor.knee.value = 24;
+    compressor.ratio.value = 3.5;
+    compressor.attack.value = 0.015;
+    compressor.release.value = 0.18;
+
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 1.25;
+
+    compressor.connect(audioCtx.destination);
+    masterGain.connect(compressor);
+
+    await setupReverb();
+    await loadSoundFiles();
+
+    document.getElementById('start-overlay').style.display='none';
+}
+
+/* =======================
+   REVERB
+======================= */
+async function setupReverb(){
+    reverbNode = audioCtx.createConvolver();
+    reverbGain = audioCtx.createGain();
+    reverbGain.gain.value = 0.25;
+
+    const len = audioCtx.sampleRate * .8;
+    const impulse = audioCtx.createBuffer(2,len,audioCtx.sampleRate);
+    for(let c=0;c<2;c++){
+        const d = impulse.getChannelData(c);
+        for(let i=0;i<len;i++){
+            d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3);
+        }
+    }
+    reverbNode.buffer = impulse;
+    reverbGain.connect(reverbNode);
+    reverbNode.connect(masterGain);
+}
+
+/* =======================
+   LOAD FILES (NO TRIM BOM)
+======================= */
+async function loadSoundFiles(){
+    for(const k in soundUrls){
+        const res = await fetch(soundUrls[k]);
+        const buf = await audioCtx.decodeAudioData(await res.arrayBuffer());
+        audioBuffers[k] = buf;
+    }
+}
+
+/* =======================
+   PLAY SOUND
+======================= */
+function playSound(type){
+    if(!audioCtx) return;
+    const t = audioCtx.currentTime;
+
+    const src = audioCtx.createBufferSource();
+    src.buffer = audioBuffers[type];
+
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+
+    if(type==='bom'){
+        filter.frequency.value = 4800;
+        filter.Q.value = 0.6;
+    }else{
+        filter.frequency.value = 2200;
+        filter.Q.value = 0.8;
+    }
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0,t);
+
+    const peak = type==='bom'?3.8:1.1;
+    const decay = type==='bom'?.85:.4;
+
+    gain.gain.linearRampToValueAtTime(peak,t+.01);
+    gain.gain.exponentialRampToValueAtTime(.001,t+decay);
+
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(masterGain);
+    gain.connect(reverbGain);
+
+    /* SUB HARMONIC (มือถือสั่น) */
+    if(type==='bom'){
+        const sub = audioCtx.createOscillator();
+        const subGain = audioCtx.createGain();
+        sub.type='sine';
+        sub.frequency.value=55;
+        subGain.gain.setValueAtTime(.9,t);
+        subGain.gain.exponentialRampToValueAtTime(.001,t+.45);
+        sub.connect(subGain);
+        subGain.connect(masterGain);
+        sub.start(t);
+        sub.stop(t+.45);
+    }
+
+    src.start(t);
+}
+
+/* =======================
+   HIT DETECTION
+======================= */
+const drum = document.getElementById('drum');
+drum.addEventListener('mousedown',e=>{
+    const r = drum.getBoundingClientRect();
+    const dx = e.clientX-(r.left+r.width/2);
+    const dy = e.clientY-(r.top+r.height/2);
+    const d = Math.sqrt(dx*dx+dy*dy)/(r.width/2);
+
+    if(d<.35) playSound('bom');
+    else if(d>.75) playSound('poeng');
+    else playSound('pa');
+
+    const h=document.createElement('div');
+    h.className='hit-anim';
+    h.style.left=e.clientX+'px';
+    h.style.top=e.clientY+'px';
+    document.body.appendChild(h);
+    setTimeout(()=>h.remove(),200);
+});
+</script>
+
+</body>
+</html>
