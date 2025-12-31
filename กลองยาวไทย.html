@@ -18,6 +18,7 @@
             user-select: none; /* Prevent text selection */
             -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
+            overscroll-behavior: none;
         }
 
         /* Drum Head Texture */
@@ -30,16 +31,14 @@
                 0 0 0 20px #8b5a2b, /* Outer rim wood */
                 0 15px 30px rgba(0,0,0,0.6); /* Drop shadow */
             position: relative;
-            transition: transform 0.05s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Smoother bounce */
+            /* Remove transition for instant touch response visually if needed, but keeping small anim is okay via JS */
+            /* transition: transform 0.05s; */ 
             cursor: pointer;
-            touch-action: none; /* Critical for multi-touch */
+            touch-action: none;
+            will-change: transform; /* Hint browser to optimize compositing */
         }
 
-        .drum-head:active {
-            transform: scale(0.98);
-        }
-
-        /* Texture overlay for realistic skin look */
+        /* Texture overlay */
         .drum-texture {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -48,22 +47,22 @@
             pointer-events: none;
         }
 
-        /* "Rice Paste" Center tuning spot (Khoon) */
+        /* "Rice Paste" Center */
         .khoon {
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            width: 30%; /* ปรับขนาดให้เหมาะสมกับโซนบ่อม */
+            width: 30%;
             height: 30%;
             background: radial-gradient(circle, #3e2723 0%, #5d4037 80%, transparent 100%);
             border-radius: 50%;
             opacity: 0.8;
             filter: blur(2px);
             pointer-events: none;
-            border: 2px dashed rgba(255,255,255,0.1); /* ไกด์สายตาเบาๆ */
+            border: 2px dashed rgba(255,255,255,0.1);
         }
 
-        /* Zone Guides (Optional: for visual aid) */
+        /* Zone Guides */
         .pa-zone-guide {
             position: absolute;
             top: 50%; left: 50%;
@@ -75,13 +74,21 @@
             pointer-events: none;
         }
 
-        /* Hit animations */
+        /* Hit animations - Optimized */
         @keyframes ripple {
-            0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.6); transform: translate(-50%, -50%) scale(0.5); }
-            100% { box-shadow: 0 0 0 40px rgba(255, 255, 255, 0); transform: translate(-50%, -50%) scale(1.5); }
+            0% { opacity: 0.8; transform: translate(-50%, -50%) scale(0.5); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
         }
         .hit-anim {
-            animation: ripple 0.25s ease-out; /* Faster ripple */
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: ripple 0.2s ease-out forwards; /* 'forwards' keeps final state */
+            will-change: transform, opacity;
+            z-index: 40;
         }
 
         /* Note labels */
@@ -91,7 +98,7 @@
             font-weight: bold;
             pointer-events: none;
             text-shadow: 0 1px 1px rgba(255,255,255,0.5);
-            display: none; /* Hidden by default */
+            display: none;
             text-align: center;
         }
         .show-notes .note-label {
@@ -107,7 +114,7 @@
         }
 
         .btn-control {
-            transition: all 0.2s;
+            transition: transform 0.1s;
         }
         .btn-control:active {
             transform: scale(0.95);
@@ -138,7 +145,7 @@
 </head>
 <body class="h-screen w-screen flex flex-col justify-between overflow-hidden">
 
-    <!-- Start Overlay (Required for AudioContext) -->
+    <!-- Start Overlay -->
     <div id="start-overlay">
         <div class="p-6 bg-white/10 backdrop-blur-md rounded-xl border border-white/20 animate-bounce cursor-pointer" onclick="initAudio()">
             <i class="fas fa-drum text-6xl mb-4 text-yellow-400"></i>
@@ -148,12 +155,12 @@
     </div>
 
     <!-- Header -->
-    <div class="flex justify-between items-center p-4 pt-6 z-10">
+    <div class="flex justify-between items-center p-4 pt-6 z-10 pointer-events-none">
         <div>
             <h1 class="text-white text-xl font-bold drop-shadow-md"><i class="fas fa-music text-yellow-500 mr-2"></i>กลองยาวไทย</h1>
             <p class="text-yellow-200/70 text-xs">Virtual Klong Yao Simulator</p>
         </div>
-        <div id="status-indicator" class="text-xs text-green-400 font-mono hidden">
+        <div id="status-indicator" class="text-xs text-green-400 font-mono hidden pointer-events-auto">
             <i class="fas fa-circle text-[8px] mr-1"></i>พร้อมใช้งาน
         </div>
     </div>
@@ -172,31 +179,13 @@
             <!-- Middle Zone Guide (Pa) -->
             <div class="pa-zone-guide"></div>
             
-            <!-- Note Labels (Visual Guide) -->
-            
-            <!-- 1. บ่อม (Bom) - ตรงกลาง -->
-            <div class="note-label text-3xl text-white drop-shadow-lg" style="top: 50%; left: 50%; transform: translate(-50%, -50%);">
-                บ่อม
-            </div>
-
-            <!-- 2. ปะ (Pa) - ล่างวงกลม -->
-            <div class="note-label text-2xl" style="top: 70%; left: 50%; transform: translate(-50%, -50%);">
-                ปะ
-            </div>
-            
-            <!-- 3. เปิง (Poeng) - ขอบ -->
-            <div class="note-label text-xl" style="top: 10%; left: 50%; transform: translate(-50%, -50%);">
-                เปิง
-            </div>
-            <div class="note-label text-xl" style="bottom: 10%; left: 50%; transform: translate(-50%, -50%);">
-                เปิง
-            </div>
-            <div class="note-label text-xl" style="left: 10%; top: 50%; transform: translate(-50%, -50%);">
-                เปิง
-            </div>
-            <div class="note-label text-xl" style="right: 10%; top: 50%; transform: translate(-50%, -50%);">
-                เปิง
-            </div>
+            <!-- Note Labels -->
+            <div class="note-label text-3xl text-white drop-shadow-lg" style="top: 50%; left: 50%; transform: translate(-50%, -50%);">บ่อม</div>
+            <div class="note-label text-2xl" style="top: 70%; left: 50%; transform: translate(-50%, -50%);">ปะ</div>
+            <div class="note-label text-xl" style="top: 10%; left: 50%; transform: translate(-50%, -50%);">เปิง</div>
+            <div class="note-label text-xl" style="bottom: 10%; left: 50%; transform: translate(-50%, -50%);">เปิง</div>
+            <div class="note-label text-xl" style="left: 10%; top: 50%; transform: translate(-50%, -50%);">เปิง</div>
+            <div class="note-label text-xl" style="right: 10%; top: 50%; transform: translate(-50%, -50%);">เปิง</div>
             
         </div>
     </div>
@@ -205,19 +194,16 @@
     <div class="glass-panel pb-8 pt-4 px-4 w-full z-20 rounded-t-3xl">
         <div class="flex justify-between items-center gap-2 max-w-md mx-auto">
             
-            <!-- Show Notes -->
             <button id="btn-notes" class="btn-control flex flex-col items-center justify-center w-16 h-16 rounded-2xl bg-white/10 text-white border border-white/20" onclick="toggleNotes()">
                 <i class="fas fa-eye text-xl mb-1"></i>
                 <span class="text-[10px]">โน้ต</span>
             </button>
 
-            <!-- Record -->
             <button id="btn-record" class="btn-control flex flex-col items-center justify-center w-20 h-20 rounded-full bg-red-600/80 text-white shadow-lg border-4 border-red-900/50" onclick="toggleRecord()">
                 <i class="fas fa-microphone text-2xl mb-1"></i>
                 <span class="text-[10px]" id="rec-text">อัดเสียง</span>
             </button>
 
-            <!-- Playback Group -->
             <div class="flex gap-2">
                 <button id="btn-play" class="btn-control flex flex-col items-center justify-center w-16 h-16 rounded-2xl bg-blue-500/80 text-white disabled:opacity-30 disabled:grayscale" onclick="playRecording()" disabled>
                     <i class="fas fa-play text-xl mb-1"></i>
@@ -235,14 +221,14 @@
 
     <script>
         // --- Configuration: External Sound URLs ---
-        // ⚠️ สำคัญมาก: ต้องใส่ลิงก์ไฟล์เสียง (.mp3, .wav) ตรงนี้ มิฉะนั้นจะไม่มีเสียง
+        // ⚠️ สำคัญ: ใส่ลิงก์ตรงนี้ (ต้องเป็นลิงก์ตรง .mp3/.wav)
         const soundUrls = {
-           bom: 'konglong/momlong.wav',    // เสียง "บ่อม" (กลาง)
+            bom: 'konglong/momlong.wav',    // เสียง "บ่อม" (กลาง)
             pa: 'konglong/paklong.wav',     // เสียง "ปะ" (ล่างวงกลม/ตบ)
-            poeng: 'konglong/pengkob.wav'    // เสียง "เปิง" (ขอบ)
+            poeng: 'konglong/pengkob.wav'   // เสียง "เปิง"
         };
 
-        // --- Audio Engine (Web Audio API) ---
+        // --- Global Variables ---
         let audioCtx;
         let masterGain;
         let compressor;
@@ -255,30 +241,48 @@
         let isRecording = false;
         let destStream;
 
-        // ตัวแปรเก็บไฟล์เสียงที่โหลดและ Trim แล้ว
-        let audioBuffers = {
-            bom: null,
-            pa: null,
-            poeng: null
-        };
+        let audioBuffers = { bom: null, pa: null, poeng: null };
 
+        // CACHING DRUM GEOMETRY (Optimization #1)
+        // เก็บค่าตำแหน่งกลองไว้ เพื่อไม่ต้องคำนวณใหม่ทุกครั้งที่แตะ (ลด Lag)
         const drum = document.getElementById('drum');
-        
+        let drumRect = drum.getBoundingClientRect();
+        let drumRadius = drumRect.width / 2;
+        let drumCenterX = drumRect.left + drumRadius;
+        let drumCenterY = drumRect.top + drumRadius;
+
+        // อัปเดตค่าเมื่อหมุนจอหรือเปลี่ยนขนาด
+        window.addEventListener('resize', updateDrumGeometry);
+        function updateDrumGeometry() {
+            drumRect = drum.getBoundingClientRect();
+            drumRadius = drumRect.width / 2;
+            drumCenterX = drumRect.left + drumRadius;
+            drumCenterY = drumRect.top + drumRadius;
+        }
+
         async function initAudio() {
             if (!audioCtx) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
-                // STABILITY FIX: ไม่กำหนด sampleRate เพื่อให้ใช้ Native Rate ของอุปกรณ์ (ลด Latency และลดภาระ CPU)
+                // Optimization #2: ใช้ Native Sample Rate ลดภาระการแปลงสัญญาณ
                 audioCtx = new AudioContext({
-                    latencyHint: 'interactive' // เน้นความไวสูงสุด
+                    latencyHint: 'interactive',
                 });
                 
-                // 1. Create Compressor (ปรับจูนใหม่สำหรับการรัว - Rapid Fire)
+                // Silent warm-up buffer (Optimization #3)
+                // เล่นเสียงเงียบๆ เพื่อปลุก Audio Thread ให้ตื่น
+                const buffer = audioCtx.createBuffer(1, 1, 22050);
+                const source = audioCtx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(audioCtx.destination);
+                source.start();
+
+                // 1. Create Compressor (Fast Response)
                 compressor = audioCtx.createDynamicsCompressor();
-                compressor.threshold.value = -12;
+                compressor.threshold.value = -10;
                 compressor.knee.value = 30;
-                compressor.ratio.value = 6; 
-                compressor.attack.value = 0.002; // Attack เร็วขึ้น
-                compressor.release.value = 0.1;  // Release เร็วขึ้น (จาก 0.15) เพื่อไม่ให้เสียงวูบเมื่อตีรัว
+                compressor.ratio.value = 8; 
+                compressor.attack.value = 0.001; // Ultra fast attack
+                compressor.release.value = 0.05; // Ultra fast release for rapid fire
                 compressor.connect(audioCtx.destination);
 
                 // 2. Master Gain
@@ -289,7 +293,7 @@
                 // 3. Setup Reverb
                 await setupReverb();
 
-                // 4. Load & Process External Sounds
+                // 4. Load External Sounds
                 await loadSoundFiles();
 
                 // Setup Stream for Recording
@@ -305,8 +309,6 @@
             }
         }
 
-        // --- Audio Processing Logic ---
-
         function trimSilence(buffer) {
             const rawData = buffer.getChannelData(0); 
             const threshold = 0.005; 
@@ -315,26 +317,24 @@
 
             for (let i = 0; i < rawData.length; i++) {
                 if (Math.abs(rawData[i]) > threshold) {
-                    start = i;
-                    break;
+                    start = i; break;
                 }
             }
             
             for (let i = rawData.length - 1; i >= 0; i--) {
                 if (Math.abs(rawData[i]) > threshold) {
-                    end = i;
-                    break;
+                    end = i; break;
                 }
             }
             
-            start = Math.max(0, start - 50); // ลด Buffer หน้าลงเพื่อให้เสียงมาไวขึ้น
-            end = Math.min(rawData.length, end + 100);
+            // Tight crop for instant attack
+            start = Math.max(0, start - 20); 
+            end = Math.min(rawData.length, end + 50);
 
             const length = end - start;
             if (length <= 0) return buffer; 
 
             const newBuffer = audioCtx.createBuffer(buffer.numberOfChannels, length, buffer.sampleRate);
-            
             for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
                  const oldData = buffer.getChannelData(channel);
                  const newData = newBuffer.getChannelData(channel);
@@ -356,7 +356,6 @@
 
             for (const [key, url] of Object.entries(soundUrls)) {
                 if (!url) continue;
-                
                 try {
                     const statusDiv = document.getElementById('status-indicator');
                     statusDiv.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i>กำลังโหลด ${key}...`;
@@ -368,10 +367,8 @@
                     
                     audioBuffers[key] = trimSilence(rawBuffer);
                     loadedCount++;
-                    
-                    console.log(`Loaded and trimmed sound for ${key}`);
                 } catch (e) {
-                    console.warn(`Cannot load sound for ${key}`, e);
+                    console.warn(`Error loading ${key}`, e);
                 }
             }
             document.getElementById('status-indicator').innerHTML = `<i class="fas fa-check-circle text-green-400 mr-1"></i>พร้อมใช้งาน (${loadedCount}/${total})`;
@@ -380,15 +377,16 @@
         async function setupReverb() {
             reverbNode = audioCtx.createConvolver();
             reverbGain = audioCtx.createGain();
-            reverbGain.gain.value = 0.3; 
+            reverbGain.gain.value = 0.25; 
 
-            const length = audioCtx.sampleRate * 1.5; 
+            // สร้าง Impulse Response สั้นๆ เพื่อไม่ให้เสียงตีกันมั่วเวลารัว
+            const length = audioCtx.sampleRate * 0.8; 
             const impulse = audioCtx.createBuffer(2, length, audioCtx.sampleRate);
             const left = impulse.getChannelData(0);
             const right = impulse.getChannelData(1);
 
             for (let i = 0; i < length; i++) {
-                const decay = Math.pow(1 - i / length, 2);
+                const decay = Math.pow(1 - i / length, 3); // Faster decay
                 left[i] = (Math.random() * 2 - 1) * decay;
                 right[i] = (Math.random() * 2 - 1) * decay;
             }
@@ -398,191 +396,162 @@
             reverbGain.connect(reverbNode); 
         }
 
-        // Sound Engine
+        // --- Highly Optimized PlaySound ---
         function playSound(type) {
-            if (!audioCtx) return;
+            if (!audioCtx || !audioBuffers[type]) return;
 
-            // Ensure AudioContext is running (Stability fix for long idle times)
+            // AudioContext Auto-Resume (Fail-safe)
             if (audioCtx.state === 'suspended') audioCtx.resume();
 
             const t = audioCtx.currentTime;
-
-            function connectOutput(node) {
-                node.connect(masterGain); 
-                if (reverbGain) {
-                    node.connect(reverbGain);
-                }
-            }
-
-            // --- Case 1: เล่นไฟล์เสียง (Preloaded AudioBuffer) ---
-            if (audioBuffers[type]) {
-                const source = audioCtx.createBufferSource();
-                source.buffer = audioBuffers[type];
-                
-                const fileGain = audioCtx.createGain();
-                fileGain.gain.value = 0; 
-                
-                source.connect(fileGain);
-                connectOutput(fileGain);
-                
-                const bufferDuration = audioBuffers[type].duration;
-                
-                // PERFORMANCE FIX: ลด Fade-in เหลือ 1ms (แทบจะเป็น 0) เพื่อความรู้สึก Instant
-                fileGain.gain.setValueAtTime(0, t);
-                fileGain.gain.linearRampToValueAtTime(1.0, t + 0.001); 
-                
-                // Release (10ms before end)
-                if (bufferDuration > 0.02) {
-                    fileGain.gain.setValueAtTime(1.0, t + bufferDuration - 0.01);
-                    fileGain.gain.linearRampToValueAtTime(0, t + bufferDuration);
-                }
-
-                source.start(t); // Start Immediately
-                
-                // MEMORY LEAK FIX: Explicitly cleanup on ended
-                source.onended = () => {
-                    try {
-                        source.stop(); // Safe guard
-                        source.disconnect();
-                        fileGain.disconnect();
-                    } catch(e) { /* ignore cleanup errors */ }
-                };
-            }
             
-            // Note: ตัดเสียงสังเคราะห์ (Synth) ออกแล้วตามคำขอ
+            // Create nodes lightweight
+            const source = audioCtx.createBufferSource();
+            source.buffer = audioBuffers[type];
+            
+            // 1. เพิ่ม Low-Pass Filter (หัวใจของเสียง synth)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = "lowpass";
+            filter.frequency.value = 1800; // ค่าที่เหมาะกับกลองยาว
+            filter.Q.value = 0.8;
+
+            // 2. Create Gain Node
+            const fileGain = audioCtx.createGain();
+
+            // 3. ใส่ Envelope (Attack + Decay)
+            fileGain.gain.cancelScheduledValues(t);
+            fileGain.gain.setValueAtTime(0, t);
+            fileGain.gain.linearRampToValueAtTime(1.0, t + 0.015); // Attack 15ms
+            fileGain.gain.exponentialRampToValueAtTime(0.001, t + 0.45); // Decay
+            
+            // 4. Update Connections: source -> filter -> fileGain -> master/reverb
+            source.connect(filter);
+            filter.connect(fileGain);
+            fileGain.connect(masterGain);
+            if(reverbGain) fileGain.connect(reverbGain);
+
+            // Instant Start
+            source.start(0);
+
+            // Cleanup on end (prevents memory leaks during long play)
+            source.onended = function() {
+                source.disconnect();
+                filter.disconnect(); // ตัดการเชื่อมต่อ Filter ด้วย
+                fileGain.disconnect();
+            };
         }
 
-        // --- Input Handling (Multi-touch Optimized) ---
+        // --- Optimized Touch Handler ---
         function handleHit(e) {
+            // Prevent default zooming/scrolling behavior
             if (e.cancelable) e.preventDefault();
-            if (!audioCtx) initAudio();
+            
+            // Init audio context on first touch
+            if (!audioCtx) {
+                initAudio();
+                return;
+            }
 
-            const rect = drum.getBoundingClientRect();
-            const radius = rect.width / 2;
-            const centerX = rect.left + radius;
-            const centerY = rect.top + radius;
+            // ใช้ cached touches เพื่อความเร็ว
+            const touches = e.changedTouches;
+            const len = touches.length;
 
-            // Handle ALL changed touches
-            const touches = e.changedTouches || [e];
+            // LOOP 1: AUDIO PROCESSING (High Priority - Synchronous)
+            // ทำงานเสียงก่อนภาพเสมอ เพื่อลด Latency ให้ต่ำที่สุด
+            for (let i = 0; i < len; i++) {
+                const t = touches[i];
+                // ใช้ cached drum geometry ไม่คำนวณใหม่
+                const dx = t.clientX - drumCenterX;
+                const dy = t.clientY - drumCenterY;
+                
+                // ใช้ Math.pow เร็วกว่า Math.sqrt สำหรับการเทียบค่า
+                const distSq = dx*dx + dy*dy;
+                const radiusSq = drumRadius * drumRadius;
+                const normalizedDistSq = distSq / radiusSq;
 
-            for (let i = 0; i < touches.length; i++) {
-                const clientX = touches[i].clientX;
-                const clientY = touches[i].clientY;
-
-                // Simple pythagoras for distance
-                const dist = Math.sqrt(Math.pow(clientX - centerX, 2) + Math.pow(clientY - centerY, 2));
-                const distNormalized = dist / radius; 
-
-                createRipple(clientX, clientY);
-
-                // ** Zone Logic (Bom, Pa, Poeng) **
-                if (distNormalized < 0.35) {
+                // Zone Logic (Square comparison is faster)
+                // 0.35^2 = 0.1225
+                // 0.75^2 = 0.5625
+                
+                if (normalizedDistSq < 0.1225) {
                     playSound('bom');
-                    animateDrum('scale(0.97)');
-                } else if (distNormalized > 0.75) {
+                } else if (normalizedDistSq > 0.5625) {
                     playSound('poeng');
-                    animateDrum('scale(0.99)');
                 } else {
                     playSound('pa');
-                    animateDrum('scale(0.98)');
                 }
             }
-        }
 
-        function createRipple(x, y) {
-            const ripple = document.createElement('div');
-            ripple.style.position = 'fixed';
-            ripple.style.left = `${x}px`;
-            ripple.style.top = `${y}px`;
-            ripple.style.width = '10px';
-            ripple.style.height = '10px';
-            ripple.style.background = 'rgba(255, 255, 255, 0.6)';
-            ripple.style.borderRadius = '50%';
-            ripple.style.transform = 'translate(-50%, -50%)';
-            ripple.style.pointerEvents = 'none';
-            ripple.style.boxShadow = '0 0 10px 5px rgba(255, 255, 255, 0.4)';
-            ripple.className = 'hit-anim';
-            
-            document.body.appendChild(ripple);
-
-            setTimeout(() => {
-                ripple.remove();
-            }, 250);
-        }
-
-        // Visual feedback optimization (Non-blocking)
-        function animateDrum(transform) {
+            // LOOP 2: VISUAL PROCESSING (Low Priority - Asynchronous)
+            // แยกการวาดภาพออกไปทำเฟรมถัดไป ไม่ให้ขวางเสียง
             requestAnimationFrame(() => {
-                drum.style.transform = transform;
-                setTimeout(() => {
-                    drum.style.transform = 'scale(1)';
-                }, 40); 
+                for (let i = 0; i < len; i++) {
+                    createRipple(touches[i].clientX, touches[i].clientY);
+                }
+                // Trigger drum animation once per batch
+                drum.style.transform = 'scale(0.98)';
+                setTimeout(() => drum.style.transform = 'scale(1)', 50);
             });
         }
 
-        // Add Listeners
-        // Use 'touchstart' for lowest latency on mobile
-        drum.addEventListener('touchstart', handleHit, {passive: false});
-        
-        // Use 'mousedown' for desktop
-        drum.addEventListener('mousedown', handleHit);
+        // Simplified Ripple (Pure CSS Animation)
+        function createRipple(x, y) {
+            const el = document.createElement('div');
+            el.className = 'hit-anim';
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            document.body.appendChild(el);
+            
+            // Auto remove after animation (0.2s)
+            setTimeout(() => {
+                el.remove();
+            }, 200);
+        }
 
-        // Prevent dragging/selecting on the whole body for stability
-        document.body.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
+        // --- Event Listeners ---
+        // ใช้ passive: false เพื่อให้ preventDefault() ทำงานได้ (กัน Scroll/Zoom)
+        drum.addEventListener('touchstart', handleHit, { passive: false });
+        drum.addEventListener('mousedown', handleHit); // Fallback for mouse
 
+        // Prevent unwanted gestures
+        document.body.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
         // --- Controls Logic ---
-        
         function toggleNotes() {
             const drumEl = document.getElementById('drum');
             const btn = document.getElementById('btn-notes');
+            drumEl.classList.toggle('show-notes');
             if (drumEl.classList.contains('show-notes')) {
-                drumEl.classList.remove('show-notes');
-                btn.classList.remove('bg-yellow-500/80');
-                btn.classList.add('bg-white/10');
-            } else {
-                drumEl.classList.add('show-notes');
                 btn.classList.remove('bg-white/10');
                 btn.classList.add('bg-yellow-500/80');
+            } else {
+                btn.classList.add('bg-white/10');
+                btn.classList.remove('bg-yellow-500/80');
             }
         }
 
         function toggleRecord() {
-            if (!isRecording) {
-                startRecording();
-            } else {
-                stopRecording();
-            }
+            if (!isRecording) startRecording();
+            else stopRecording();
         }
 
         function startRecording() {
             if (!audioCtx) initAudio();
-            
             recordedChunks = [];
             const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
             recorder = new MediaRecorder(destStream.stream, { mimeType: mimeType });
-
-            recorder.ondataavailable = (e) => {
-                if (e.data.size > 0) {
-                    recordedChunks.push(e.data);
-                }
-            };
-
+            recorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
             recorder.onstop = () => {
                 audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
                 audioUrl = URL.createObjectURL(audioBlob);
-                
                 document.getElementById('btn-play').disabled = false;
                 document.getElementById('btn-download').disabled = false;
             };
-
             recorder.start();
             isRecording = true;
-
             const recBtn = document.getElementById('btn-record');
             recBtn.classList.add('recording-pulse', 'bg-red-700');
             recBtn.innerHTML = '<i class="fas fa-stop text-2xl mb-1"></i><span class="text-[10px]">หยุดอัด</span>';
-            
             document.getElementById('btn-play').disabled = true;
             document.getElementById('btn-download').disabled = true;
         }
@@ -590,7 +559,6 @@
         function stopRecording() {
             recorder.stop();
             isRecording = false;
-
             const recBtn = document.getElementById('btn-record');
             recBtn.classList.remove('recording-pulse', 'bg-red-700');
             recBtn.classList.add('bg-red-600/80');
@@ -600,18 +568,14 @@
         function playRecording() {
             if (!audioUrl) return;
             const audio = new Audio(audioUrl);
-            
             const playBtn = document.getElementById('btn-play');
             const originalHTML = playBtn.innerHTML;
-            
             playBtn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl mb-1"></i><span class="text-[10px]">เล่นอยู่</span>';
             playBtn.disabled = true;
-
             audio.onended = () => {
                 playBtn.innerHTML = originalHTML;
                 playBtn.disabled = false;
             };
-            
             audio.play();
         }
 
@@ -620,23 +584,15 @@
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = audioUrl;
-            
             const date = new Date();
-            const timestamp = `${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`;
-            a.download = `klong-yao-recording-${timestamp}.webm`;
-            
+            a.download = `klong-yao-recording-${date.getHours()}-${date.getMinutes()}.webm`;
             document.body.appendChild(a);
             a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-            }, 100);
+            setTimeout(() => document.body.removeChild(a), 100);
         }
 
-        window.oncontextmenu = function(event) {
-            event.preventDefault();
-            event.stopPropagation();
-            return false;
-        };
+        // Prevent context menu
+        window.oncontextmenu = (e) => { e.preventDefault(); return false; };
 
     </script>
 </body>
