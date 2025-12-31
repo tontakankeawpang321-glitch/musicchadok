@@ -3,29 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>แทมบูรีน 3D Metal Morph</title>
+    <title>Realistic Tambourine Pro</title>
     <style>
         :root {
-            --bg-color: #1a1a1a;
-            /* สีไม้เดิม */
-            --wood-dark: #3e2723;
-            --wood-light: #5d4037;
+            --bg-color: #121212;
             
-            /* สีโลหะใหม่ */
-            --metal-surface: linear-gradient(135deg, #e0e0e0 0%, #909090 50%, #404040 100%);
-            --metal-rim: #263238;
-            --metal-glow: 0 0 30px rgba(192, 192, 192, 0.4);
-
-            --metal-gold: #f1c40f;
-            --metal-dark: #9a7d0a;
-            --highlight: #e67e22; 
+            /* Realistic Materials */
+            --rim-color: #263238; /* Dark composite material */
+            --rim-gradient: linear-gradient(145deg, #37474f, #102027);
+            --skin-color: radial-gradient(circle, #f5f5f5, #e0e0e0);
+            --skin-texture: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIi8+CjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiNjY2MiLz4KPC9zdmc+');
+            
+            --metal-gold: #ffd700;
+            --metal-shine: linear-gradient(45deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
+            
+            --highlight: #00bcd4; 
             --record-color: #ff5252;
-            --text-color: #ffe0b2;
+            --text-color: #eceff1;
         }
 
         body {
             margin: 0; padding: 0;
             background-color: var(--bg-color);
+            background-image: radial-gradient(circle at 50% 50%, #1a1a1a 0%, #000 100%);
             height: 100vh; width: 100vw;
             overflow: hidden;
             display: flex;
@@ -37,88 +37,111 @@
             user-select: none;
             -webkit-user-select: none;
             color: var(--text-color);
-            perspective: 1000px; /* เพิ่มมิติความลึก 3D */
+            perspective: 1200px;
         }
 
-        /* --- Container เพื่อแยก Animation การเขย่า --- */
+        /* --- Wrapper --- */
         #shaker-wrapper {
-            width: 75vmin;
-            height: 75vmin;
-            max-width: 400px;
-            max-height: 400px;
+            width: 80vmin;
+            height: 80vmin;
+            max-width: 420px;
+            max-height: 420px;
             display: flex;
             align-items: center;
             justify-content: center;
-            /* Animation การเขย่าจะทำที่ตัวนี้แทน */
+            position: relative;
+            /* จะใช้ transform กับตัวนี้ตอนเขย่า */
         }
 
-        /* --- ตัวแทมบูรีน --- */
+        /* --- Shake Hint (Mobile Only) --- */
+        .shake-hint {
+            position: absolute;
+            top: -80px;
+            width: 100%;
+            text-align: center;
+            font-size: 1rem;
+            color: rgba(255,255,255,0.8);
+            background: rgba(0,0,0,0.3);
+            padding: 8px 0;
+            border-radius: 20px;
+            animation: fadeInOut 2.5s infinite;
+            pointer-events: none;
+            display: none; /* Show via JS on mobile */
+        }
+        .shake-icon { font-size: 1.8rem; display: block; margin-bottom: 5px; }
+
+        @keyframes fadeInOut { 0%, 100% { opacity: 0.4; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-5px); } }
+
+        /* --- Tambourine Body --- */
         #tambourine {
             position: relative;
-            width: 100%;
-            height: 100%;
+            width: 100%; height: 100%;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            box-shadow: 
-                0 20px 40px rgba(0,0,0,0.6),
-                inset 0 0 30px rgba(0,0,0,0.5);
             -webkit-tap-highlight-color: transparent;
+            transform-style: preserve-3d;
             
-            /* พื้นผิวเริ่มต้น (ไม้) */
-            background: repeating-linear-gradient(45deg, var(--wood-light), var(--wood-light) 10px, var(--wood-dark) 10px, var(--wood-dark) 20px);
-            border: 12px solid #2d1e1a;
-            
-            /* การเปลี่ยนสถานะ */
-            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
-                        background 0.2s, 
-                        border-color 0.2s,
-                        box-shadow 0.2s;
-            transform-style: preserve-3d; /* ให้ลูกๆ มีมิติด้วย */
-        }
-
-        /* --- โหมดโลหะ (Metal Mode) --- */
-        #tambourine.metal-morph {
-            /* เปลี่ยนลายไม้เป็นโลหะเงาๆ */
-            background: radial-gradient(circle at 30% 30%, #cfd8dc, #b0bec5, #546e7a, #37474f);
-            border-color: #cfd8dc; /* ขอบเงิน */
-            border-width: 12px;
+            /* Realistic Shadow */
             box-shadow: 
-                0 25px 50px rgba(0,0,0,0.7),
-                inset 0 0 50px rgba(255, 255, 255, 0.3),
-                var(--metal-glow); /* เรืองแสงนิดๆ */
+                0 30px 60px rgba(0,0,0,0.8), /* Deep shadow */
+                0 10px 20px rgba(0,0,0,0.5),
+                inset 0 0 40px rgba(0,0,0,0.8); /* Inner depth */
+
+            /* Material: Dark Composite Polymer */
+            background: var(--rim-gradient);
+            border: 8px solid #1c2529;
+            
+            transition: transform 0.08s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s;
         }
 
-        /* หนังกลอง */
+        /* Ring Detail (Chrome accent) */
+        #tambourine::before {
+            content: '';
+            position: absolute;
+            top: -12px; left: -12px; right: -12px; bottom: -12px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.1);
+            pointer-events: none;
+        }
+
+        /* Active/Hit State (Shinier Metal) */
+        #tambourine.metal-active {
+            box-shadow: 
+                0 25px 50px rgba(0,0,0,0.9),
+                0 0 30px rgba(0, 188, 212, 0.2), /* Cyan glow */
+                inset 0 0 20px rgba(255,255,255,0.1);
+            border-color: #37474f;
+        }
+
+        /* --- Drum Skin --- */
         .skin {
-            width: 85%;
-            height: 85%;
+            width: 88%; height: 88%;
             border-radius: 50%;
             position: relative;
             z-index: 2;
-            background: radial-gradient(circle, #fff8e1 30%, #ffecb3 100%);
-            box-shadow: inset 0 0 30px rgba(0,0,0,0.2);
-            transition: background 0.2s;
+            /* Texture synthetic skin */
+            background-color: #eee;
+            background-image: var(--skin-texture); 
+            background-size: 4px 4px;
+            box-shadow: 
+                inset 0 0 20px rgba(0,0,0,0.4),
+                0 1px 2px rgba(255,255,255,0.2);
+            transition: transform 0.05s;
+        }
+        
+        #tambourine.metal-active .skin {
+            transform: scale(0.98) translateZ(-5px); /* Push in effect */
+            background-color: #e0e0e0;
         }
 
-        /* หนังกลองในโหมดโลหะ */
-        #tambourine.metal-morph .skin {
-            background: radial-gradient(circle, #eceff1 20%, #b0bec5 100%); /* หนังสังเคราะห์สีขาวเงิน */
-            opacity: 0.95;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
-        }
-
-        /* จานโลหะ (Jingles) */
+        /* --- Zils (Jingles) --- */
         .zils-container {
-            position: absolute;
-            width: 100%; height: 100%;
-            border-radius: 50%;
-            pointer-events: none;
-            /* เอา animation spin ออกชั่วคราวเพื่อให้เห็นการเอียงชัดเจน หรือใส่กลับถ้าต้องการ */
-            /* animation: spin 60s linear infinite; */
-            transform: translateZ(20px); /* ลอยขึ้นมานิดนึงในแกน Z */
+            position: absolute; width: 100%; height: 100%;
+            border-radius: 50%; pointer-events: none;
+            transform: translateZ(15px); 
         }
 
         .zil {
@@ -127,142 +150,181 @@
             border-radius: 50%;
             top: 50%; left: 50%;
             transform-origin: 0 0;
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.4);
-            background: radial-gradient(circle, var(--metal-gold) 10%, #d4ac0d 60%, var(--metal-dark) 100%);
+            
+            /* Realistic Gold/Brass Shader */
+            background: var(--metal-shine);
+            box-shadow: 
+                2px 4px 8px rgba(0,0,0,0.5),
+                inset 1px 1px 2px rgba(255,255,255,0.8);
+            border: 1px solid rgba(0,0,0,0.2);
         }
         
         .zil::after {
-            content: ''; position: absolute; top: 25%; left: 25%; width: 50%; height: 50%;
-            border-radius: 50%; border: 1px solid rgba(0,0,0,0.3);
+            /* Hole in the middle */
+            content: ''; position: absolute; top: 35%; left: 35%; width: 30%; height: 30%;
+            border-radius: 50%; 
+            background: #1a1a1a;
+            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.8);
         }
 
-        /* Animation การเขย่า (ใช้กับ Wrapper แทน) */
-        .shake-anim { animation: shake 0.3s ease-in-out; }
-        @keyframes shake {
-            0% { transform: rotate(0deg) translate(0, 0); }
-            20% { transform: rotate(10deg) translate(10px, 0); }
-            40% { transform: rotate(-10deg) translate(-10px, 0); }
-            60% { transform: rotate(5deg) translate(5px, 0); }
-            80% { transform: rotate(-5deg) translate(-5px, 0); }
-            100% { transform: rotate(0deg) translate(0, 0); }
+        /* --- Animations --- */
+        /* อัปเกรด Animation เขย่าให้ขยับเยอะขึ้น */
+        .shake-anim { animation: shake-hard 0.35s cubic-bezier(.36,.07,.19,.97) both; }
+        
+        @keyframes shake-hard {
+            0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+            15% { transform: translate3d(-10px, -5px, 0) rotate(-8deg); }
+            30% { transform: translate3d(8px, 5px, 0) rotate(6deg); }
+            45% { transform: translate3d(-6px, -3px, 0) rotate(-4deg); }
+            60% { transform: translate3d(4px, 2px, 0) rotate(3deg); }
+            75% { transform: translate3d(-2px, -1px, 0) rotate(-1deg); }
+            100% { transform: translate3d(0, 0, 0) rotate(0deg); }
         }
 
-        /* --- UI Elements --- */
+        /* --- UI Overlay --- */
         #start-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); display: flex; flex-direction: column;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+            display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 100;
             color: white; text-align: center; transition: opacity 0.5s;
         }
         .btn-start {
-            padding: 15px 30px; font-size: 1.5rem; background: var(--highlight);
+            padding: 18px 40px; font-size: 1.2rem; background: var(--highlight);
             border: none; color: white; border-radius: 50px; cursor: pointer;
-            margin-top: 20px; box-shadow: 0 0 20px rgba(230, 126, 34, 0.5); font-weight: bold;
+            margin-top: 25px; box-shadow: 0 4px 20px rgba(0, 188, 212, 0.4); 
+            font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
-        #loading-text { margin-top: 15px; font-size: 0.9rem; color: #aaa; }
+        .btn-start:active { transform: scale(0.95); }
 
         .controls {
-            position: absolute; top: 20px; display: flex; gap: 15px; z-index: 50;
-            background: rgba(0,0,0,0.5); padding: 10px 20px; border-radius: 30px;
-            backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1);
+            position: absolute; top: 20px; right: 20px; 
+            display: flex; gap: 10px; z-index: 50;
         }
         .btn-control {
-            padding: 8px 16px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2);
-            background: rgba(255,255,255,0.1); color: white; cursor: pointer;
-            font-size: 1rem; display: flex; align-items: center; gap: 5px;
+            width: 45px; height: 45px; border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(30,30,30,0.6); color: white; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; transition: background 0.3s;
         }
-        .btn-control:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-record.recording { background-color: var(--record-color); border-color: var(--record-color); animation: pulse 1.5s infinite; }
-        .status-text { color: var(--record-color); font-weight: bold; display: none; align-items: center; margin-left: 10px; font-size: 0.9rem; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { opacity: 0.5; } 100% { transform: scale(1); } }
-        .footer { position: absolute; bottom: 20px; color: #666; font-size: 0.8rem; }
+        .btn-control.recording { background: var(--record-color); border-color: red; animation: pulse 1.5s infinite; }
+        .footer { position: absolute; bottom: 20px; color: rgba(255,255,255,0.3); font-size: 0.75rem; }
     </style>
 </head>
 <body>
 
     <div id="start-overlay">
-        <h1>แทมบูรีน 3D Metal</h1>
-        <p>แตะเพื่อเปลี่ยนเป็นโลหะและเอียงตามนิ้ว</p>
-        <button id="btn-start-init" class="btn-start" onclick="initAudio()" ontouchstart="initAudio()">แตะเพื่อเริ่ม</button>
-
+        <h1 style="font-weight: 300; letter-spacing: 2px; margin-bottom: 0;">PRO TAMBOURINE</h1>
+        <p style="color: #aaa; margin-top: 5px;">Realistic Physics & High-Fidelity Audio</p>
+        <button id="btn-start-init" class="btn-start" onclick="initAudio()" ontouchstart="initAudio()">START ENGINE</button>
+        <div id="loading-text" style="margin-top:20px; font-size: 0.8rem; opacity: 0.7;">Ready to Load</div>
     </div>
 
     <div class="controls">
-        <button id="btn-record" class="btn-control btn-record" onclick="toggleRecord()">
-            <span class="icon">●</span> บันทึก
-        </button>
-        <button id="btn-stop" class="btn-control" onclick="stopRecord()" disabled>
-            <span class="icon">■</span> หยุด & โหลด
-        </button>
-        <span id="record-status" class="status-text">กำลังบันทึก...</span>
+        <button id="btn-record" class="btn-control" onclick="toggleRecord()" title="Record">●</button>
+        <button id="btn-stop" class="btn-control" onclick="stopRecord()" disabled title="Stop & Save">■</button>
     </div>
 
-    <!-- Wrapper สำหรับเขย่า -->
     <div id="shaker-wrapper">
-        <!-- ตัวแทมบูรีนสำหรับเอียงและเปลี่ยนสี -->
+        <div id="shake-instruction" class="shake-hint">
+            <span class="shake-icon">📳</span>
+            เขย่าเครื่องเพื่อเล่น!
+        </div>
+
         <div id="tambourine">
             <div class="zils-container" id="zils-layer"></div>
             <div class="skin"></div>
         </div>
     </div>
 
-    <div class="footer">สร้างโดย AI (Gemini)</div>
+    <div class="footer">Audio Engine: WebAudio API | Logic: Gemini AI</div>
 
     <script>
         // ==========================================
-        // 🛠️ ตั้งค่า URL ไฟล์เสียงที่นี่
+        // 🛠️ Audio Configuration
         // ==========================================
         const soundUrls = {
-           'hit': 'tamburin/toburi01.mp3',
-           'shake': 'tamburin/toburi02t.mp3'  
+           'hit': 'tamburin/toburi01.wav',
+           'shake': 'tamburin/toburi02t.wav'  
         };
 
-        // Audio & Logic Variables
+        // Audio Engine
         let audioCtx;
         let masterGain;
         let audioBuffers = { hit: null, shake: null };
+        // Store trim offsets { key: startOffset }
+        let bufferOffsets = { hit: 0, shake: 0 }; 
 
-        // Recording Variables
+        // State
+        let isRecording = false;
         let mediaRecorder;
         let audioChunks = [];
         let destNode; 
-        let isRecording = false;
 
-        // Motion Variables
+        // Motion
         let lastX=0, lastY=0, lastZ=0, lastTime=0, lastShakeTime=0;
-        const SHAKE_THRESHOLD = 300;
+        const SHAKE_THRESHOLD = 250; // Sensitivity
 
+        // UI Initialization
         function createZils() {
             const container = document.getElementById('zils-layer');
-            const numberOfZils = 6; 
+            const numberOfZils = 8; // เพิ่มจำนวนให้ดูโปรขึ้น
             container.innerHTML = '';
             for (let i = 0; i < numberOfZils; i++) {
                 const zil = document.createElement('div');
                 zil.className = 'zil';
                 const angle = (i / numberOfZils) * 360;
-                // ปรับระยะ zils ให้สวยงาม
+                // จัดวางตำแหน่งให้สมดุล
                 zil.style.transform = `rotate(${angle}deg) translate(280%, 0)`; 
                 container.appendChild(zil);
             }
         }
 
+        // --- Audio Processing Logic ---
+
+        // ฟังก์ชันหาจุดเริ่มต้นของเสียงจริง (Trim Silence)
+        function detectSilence(audioBuffer) {
+            const rawData = audioBuffer.getChannelData(0); // Check channel 1
+            const threshold = 0.01; // Noise floor threshold
+            
+            for (let i = 0; i < rawData.length; i++) {
+                if (Math.abs(rawData[i]) > threshold) {
+                    return i / audioBuffer.sampleRate; // คืนค่าเป็นวินาที
+                }
+            }
+            return 0;
+        }
+
         async function loadSound(key, url) {
             try {
-                if (url.includes('INSERT_YOUR')) throw new Error("URL ยังไม่ได้ตั้งค่า");
+                if (url.includes('INSERT')) throw new Error("No URL");
                 const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const arrayBuffer = await response.arrayBuffer();
-                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-                audioBuffers[key] = audioBuffer;
+                const decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                
+                audioBuffers[key] = decodedBuffer;
+                
+                // คำนวณ Trim offset ทันทีหลังโหลดเสร็จ
+                bufferOffsets[key] = detectSilence(decodedBuffer);
+                console.log(`Loaded ${key}: Trimmed offset = ${bufferOffsets[key].toFixed(4)}s`);
+                
             } catch (error) {
-                console.warn(`Load failed for ${key}, creating backup.`);
+                console.warn(`Fallback for ${key}`);
             }
         }
 
         async function initAudio() {
             if (audioCtx) return;
+            
+            // Check Mobile to show hint
+            if (/Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent)) {
+                document.getElementById('shake-instruction').style.display = 'block';
+            }
+
             const btnStart = document.getElementById('btn-start-init');
-            btnStart.innerText = "กำลังโหลด...";
+            btnStart.innerText = "LOADING...";
             btnStart.disabled = true;
             
             const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -271,44 +333,27 @@
 
             masterGain = audioCtx.createGain();
             masterGain.connect(audioCtx.destination);
+            
+            // Recorder setup
             destNode = audioCtx.createMediaStreamDestination();
             masterGain.connect(destNode);
-
             setupRecorder();
-            createZils();
-            startMotionSensor();
 
-            // Setup interaction events (Mouse & Touch)
+            createZils();
+            // Start motion sensor immediately on user interaction
+            startMotionSensor();
             setupInteractions();
 
-            try {
-                await Promise.all([
-                    loadSound('hit', soundUrls.hit),
-                    loadSound('shake', soundUrls.shake)
-                ]);
-            } catch (err) { console.error(err); }
+            // Preload Sounds
+            await Promise.all([
+                loadSound('hit', soundUrls.hit),
+                loadSound('shake', soundUrls.shake)
+            ]);
 
+            // Animation out
             const overlay = document.getElementById('start-overlay');
             overlay.style.opacity = '0';
             setTimeout(() => overlay.remove(), 500);
-        }
-
-        function playBackupBeep(type) {
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            if (type === 'hit') {
-                osc.frequency.setValueAtTime(200, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
-            } else {
-                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-                osc.type = 'triangle';
-            }
-            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-            osc.connect(gain);
-            gain.connect(masterGain);
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.1);
         }
 
         function playSound(type) {
@@ -318,166 +363,180 @@
             if (audioBuffers[type]) {
                 const source = audioCtx.createBufferSource();
                 source.buffer = audioBuffers[type];
-                source.connect(masterGain);
-                source.start(0);
+
+                // Create Envelope Gain (Fade In/Out)
+                const envelope = audioCtx.createGain();
+                
+                // Connect Graph: Source -> Envelope -> Master
+                source.connect(envelope);
+                envelope.connect(masterGain);
+
+                const now = audioCtx.currentTime;
+                const duration = source.buffer.duration;
+                const offset = bufferOffsets[type] || 0; // Use calculated silence offset
+
+                // ✅ Fade In: ป้องกันเสียงคลิกตอนเริ่ม (2ms)
+                envelope.gain.setValueAtTime(0, now);
+                envelope.gain.linearRampToValueAtTime(1, now + 0.005); // 5ms attack
+                
+                // ✅ Fade Out: ป้องกันเสียงคลิกตอนจบ (10ms ก่อนจบ)
+                envelope.gain.setValueAtTime(1, now + duration - offset - 0.015);
+                envelope.gain.exponentialRampToValueAtTime(0.001, now + duration - offset - 0.005);
+
+                // ✅ Play with Offset (Trim Silence)
+                source.start(now, offset); 
+                
             } else {
                 playBackupBeep(type);
             }
         }
 
-        // --- New Interaction & 3D Logic ---
+        function playBackupBeep(type) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.frequency.setValueAtTime(type === 'hit' ? 200 : 800, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+            osc.connect(gain); gain.connect(masterGain);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        // --- Interaction Logic (3D Physics) ---
 
         function setupInteractions() {
             const tambourine = document.getElementById('tambourine');
             
-            // Mouse Events
-            document.body.addEventListener('mousedown', (e) => handleStart(e, e.clientX, e.clientY));
-            document.body.addEventListener('mousemove', (e) => handleMove(e, e.clientX, e.clientY));
-            document.body.addEventListener('mouseup', handleEnd);
-            
-            // Touch Events
-            document.body.addEventListener('touchstart', (e) => {
+            const startHandler = (e) => {
                 if (e.target.closest('.controls')) return;
-                e.preventDefault(); // ป้องกัน scroll
-                const touch = e.changedTouches[0];
-                handleStart(e, touch.clientX, touch.clientY);
-            }, { passive: false });
+                // e.preventDefault(); 
+                
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                
+                isPressed = true;
+                playSound('hit');
+                tambourine.classList.add('metal-active');
+                calculateTilt(clientX, clientY);
+            };
 
-            document.body.addEventListener('touchmove', (e) => {
-                 if (e.target.closest('.controls')) return;
-                 e.preventDefault();
-                 const touch = e.changedTouches[0];
-                 handleMove(e, touch.clientX, touch.clientY);
-            }, { passive: false });
+            const moveHandler = (e) => {
+                if (!isPressed) return;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                calculateTilt(clientX, clientY);
+            };
 
-            document.body.addEventListener('touchend', handleEnd);
+            const endHandler = () => {
+                isPressed = false;
+                tambourine.classList.remove('metal-active');
+                tambourine.style.transform = 'rotateX(0deg) rotateY(0deg) scale(1)';
+            };
+
+            // Mouse
+            document.addEventListener('mousedown', startHandler);
+            document.addEventListener('mousemove', moveHandler);
+            document.addEventListener('mouseup', endHandler);
+
+            // Touch
+            document.addEventListener('touchstart', startHandler, {passive: false});
+            document.addEventListener('touchmove', moveHandler, {passive: false});
+            document.addEventListener('touchend', endHandler);
         }
 
         let isPressed = false;
 
-        function handleStart(e, x, y) {
-            if (e.target.closest('.controls')) return;
-            
-            isPressed = true;
-            playSound('hit');
-
-            // 1. เปลี่ยนเป็นโลหะ (Add Class)
-            const tambourine = document.getElementById('tambourine');
-            tambourine.classList.add('metal-morph');
-
-            // 2. คำนวณการเอียง 3D
-            calculateTilt(x, y);
-        }
-
-        function handleMove(e, x, y) {
-            if (!isPressed) return;
-            // ขยับนิ้วตอนกดค้าง ก็ให้เอียงตามนิ้ว
-            calculateTilt(x, y);
-        }
-
-        function handleEnd() {
-            isPressed = false;
-            const tambourine = document.getElementById('tambourine');
-            
-            // กลับเป็นไม้
-            tambourine.classList.remove('metal-morph');
-            
-            // คืนค่าตำแหน่ง 3D กลับมาตรงกลาง
-            tambourine.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)';
-        }
-
         function calculateTilt(clientX, clientY) {
             const tambourine = document.getElementById('tambourine');
             const rect = tambourine.getBoundingClientRect();
-            
-            // หาจุดกึ่งกลางของแทมบูรีน
             const centerX = rect.left + rect.width / 2;
             const centerY = rect.top + rect.height / 2;
 
-            // คำนวณระยะห่างจากจุดกดถึงจุดกึ่งกลาง (-1 ถึง 1)
+            // Physics params
+            const maxTilt = 15; // Degrees
             const percentX = (clientX - centerX) / (rect.width / 2);
             const percentY = (clientY - centerY) / (rect.height / 2);
 
-            // คำนวณมุมเอียง (สูงสุด 20 องศา)
-            // ถ้ากดขวา (X เป็นบวก) ต้องหมุนแกน Y เป็นบวก
-            // ถ้ากดล่าง (Y เป็นบวก) ต้องหมุนแกน X เป็นลบ (เพื่อให้กระดกขึ้นทางอื่น)
-            const maxTilt = 20; 
             const rotateY = percentX * maxTilt;
             const rotateX = -percentY * maxTilt;
 
-            // กดลงไปนิดหน่อย (scaleDown)
-            tambourine.style.transform = `
-                perspective(1000px) 
-                rotateX(${rotateX}deg) 
-                rotateY(${rotateY}deg) 
-                scale(0.95)
-            `;
+            tambourine.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(0.96)`;
         }
 
-        // --- Motion Sensor (Shake) ---
+        // --- Motion Sensor & Shake Logic ---
         function startMotionSensor() {
+            // iOS 13+ requires permission on user gesture (which is why this is called in initAudio)
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                 DeviceMotionEvent.requestPermission()
                     .then(response => {
-                        if (response === 'granted') window.addEventListener('devicemotion', handleMotion);
+                        if (response === 'granted') {
+                            window.addEventListener('devicemotion', handleMotion);
+                        }
                     })
                     .catch(console.error);
             } else {
+                // Non-iOS 13+ devices
                 window.addEventListener('devicemotion', handleMotion);
             }
         }
 
-        function handleMotion(event) {
-            const acc = event.accelerationIncludingGravity;
+        function handleMotion(e) {
+            const acc = e.accelerationIncludingGravity;
             if (!acc) return;
+            
             const now = Date.now();
             if ((now - lastTime) > 20) {
-                const deltaX = acc.x - lastX;
-                const deltaY = acc.y - lastY;
-                const deltaZ = acc.z - lastZ;
-                const speed = Math.sqrt(deltaX**2 + deltaY**2 + deltaZ**2) / (now - lastTime) * 1000;
+                const delta = Math.sqrt((acc.x-lastX)**2 + (acc.y-lastY)**2 + (acc.z-lastZ)**2);
+                const speed = delta / (now - lastTime) * 1000;
 
-                if (speed > SHAKE_THRESHOLD && (now - lastShakeTime > 150)) {
+                if (speed > SHAKE_THRESHOLD && (now - lastShakeTime > 200)) {
+                    // Trigger sound
                     playSound('shake');
-                    // เปลี่ยนไปใช้ wrapper ในการเขย่า เพื่อไม่ให้ตีกับ transform 3D ของตัวกลอง
+                    
+                    // Trigger Visual Shake Animation on Wrapper
                     const wrapper = document.getElementById('shaker-wrapper');
                     wrapper.classList.remove('shake-anim');
-                    void wrapper.offsetWidth;
+                    // Force Reflow
+                    void wrapper.offsetWidth; 
                     wrapper.classList.add('shake-anim');
+                    
                     lastShakeTime = now;
+                    
+                    // Hide instruction once user shakes successfully
+                    const hint = document.getElementById('shake-instruction');
+                    if(hint && hint.style.display !== 'none') {
+                        hint.style.display = 'none';
+                    }
                 }
                 lastX=acc.x; lastY=acc.y; lastZ=acc.z; lastTime=now;
             }
         }
 
-        // --- Recorder Logic ---
+        // --- Recording ---
         function setupRecorder() {
             try {
                 mediaRecorder = new MediaRecorder(destNode.stream);
-                mediaRecorder.ondataavailable = (event) => audioChunks.push(event.data);
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
                 mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    const audioUrl = URL.createObjectURL(audioBlob);
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    a.style.display = 'none'; a.href = audioUrl;
-                    a.download = `tambourine_${Date.now()}.webm`; 
-                    document.body.appendChild(a);
-                    a.click();
-                    setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(audioUrl); }, 100);
+                    a.style.display = 'none'; a.href = url;
+                    a.download = `tambourine_pro_${Date.now()}.webm`;
+                    document.body.appendChild(a); a.click();
+                    setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 100);
                     audioChunks = [];
-                    alert('บันทึกเรียบร้อย!');
+                    alert('Audio Saved!');
                 };
-            } catch (e) { console.error(e); }
+            } catch(e) { console.error(e); }
         }
 
         function toggleRecord() {
-            if (!audioCtx) { alert('แตะเริ่มก่อน'); return; }
+            if (!audioCtx) return;
             if (audioCtx.state === 'suspended') audioCtx.resume();
             if (!isRecording) {
                 audioChunks = []; mediaRecorder.start(); isRecording = true;
                 document.getElementById('btn-record').classList.add('recording');
                 document.getElementById('btn-stop').disabled = false;
-                document.getElementById('record-status').style.display = 'flex';
             }
         }
 
@@ -486,10 +545,8 @@
                 mediaRecorder.stop(); isRecording = false;
                 document.getElementById('btn-record').classList.remove('recording');
                 document.getElementById('btn-stop').disabled = true;
-                document.getElementById('record-status').style.display = 'none';
             }
         }
     </script>
 </body>
 </html>
-
