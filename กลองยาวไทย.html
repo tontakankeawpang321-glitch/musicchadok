@@ -51,26 +51,14 @@
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            width: 40%;
-            height: 40%;
+            width: 45%; 
+            height: 45%;
             background: radial-gradient(circle, #3e2723 0%, #5d4037 80%, transparent 100%);
             border-radius: 50%;
             opacity: 0.8;
             filter: blur(2px);
             pointer-events: none;
             border: 2px dashed rgba(255,255,255,0.1);
-        }
-
-        /* Zone Guides */
-        .pa-zone-guide {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 75%;
-            height: 75%;
-            border-radius: 50%;
-            border: 1px dashed rgba(62, 39, 35, 0.1);
-            pointer-events: none;
         }
 
         /* Hit animations */
@@ -175,16 +163,16 @@
             <!-- Center Target (Bom) -->
             <div class="khoon"></div>
             
-            <!-- Middle Zone Guide (Pa) -->
-            <div class="pa-zone-guide"></div>
+            <!-- Note Labels (2 Zones Only) -->
+            <div class="note-label text-4xl text-white drop-shadow-lg" style="top: 50%; left: 50%; transform: translate(-50%, -50%);">
+                บ่อม
+            </div>
             
-            <!-- Note Labels -->
-            <div class="note-label text-3xl text-white drop-shadow-lg" style="top: 50%; left: 50%; transform: translate(-50%, -50%);">บ่อม</div>
-            <div class="note-label text-2xl" style="top: 70%; left: 50%; transform: translate(-50%, -50%);">ปะ</div>
-            <div class="note-label text-xl" style="top: 10%; left: 50%; transform: translate(-50%, -50%);">เปิง</div>
-            <div class="note-label text-xl" style="bottom: 10%; left: 50%; transform: translate(-50%, -50%);">เปิง</div>
-            <div class="note-label text-xl" style="left: 10%; top: 50%; transform: translate(-50%, -50%);">เปิง</div>
-            <div class="note-label text-xl" style="right: 10%; top: 50%; transform: translate(-50%, -50%);">เปิง</div>
+            <!-- Rim Labels -->
+            <div class="note-label text-2xl" style="top: 10%; left: 50%; transform: translate(-50%, -50%);">เปิง</div>
+            <div class="note-label text-2xl" style="bottom: 10%; left: 50%; transform: translate(-50%, -50%);">เปิง</div>
+            <div class="note-label text-2xl" style="left: 10%; top: 50%; transform: translate(-50%, -50%);">เปิง</div>
+            <div class="note-label text-2xl" style="right: 10%; top: 50%; transform: translate(-50%, -50%);">เปิง</div>
             
         </div>
     </div>
@@ -220,10 +208,10 @@
 
     <script>
         // --- Configuration ---
+        // ใส่ลิงก์สำหรับ 2 เสียงตรงนี้
         const soundUrls = {
-            bom: 'konglong/momlong.wav',
-            pa: 'konglong/paklong.wav',
-            poeng: 'konglong/pengkob.wav'
+            bom: 'konglong/momlong.wav',    // เสียง "บ่อม" (กลาง)
+            poeng: 'konglong/pengkob.wav'   // เสียง "เปิง" (ขอบ)
         };
 
         // --- Global Variables ---
@@ -239,21 +227,20 @@
         let isRecording = false;
         let destStream;
 
-        let audioBuffers = { bom: null, pa: null, poeng: null };
+        let audioBuffers = { bom: null, poeng: null };
 
-        // PRE-CALCULATED GEOMETRY (Optimization)
+        // PRE-CALCULATED GEOMETRY
         const drum = document.getElementById('drum');
         let drumRect, drumRadius, drumCenterX, drumCenterY, drumRadiusSq;
 
         function updateDrumGeometry() {
             drumRect = drum.getBoundingClientRect();
             drumRadius = drumRect.width / 2;
-            drumRadiusSq = drumRadius * drumRadius; // Pre-calc squared radius
+            drumRadiusSq = drumRadius * drumRadius; 
             drumCenterX = drumRect.left + drumRadius;
             drumCenterY = drumRect.top + drumRadius;
         }
         window.addEventListener('resize', updateDrumGeometry);
-        // Call immediately
         updateDrumGeometry();
 
         async function initAudio() {
@@ -268,18 +255,18 @@
                 source.connect(audioCtx.destination);
                 source.start();
 
-                // 1. Compressor
+                // 1. Compressor (Drum Pro Settings)
                 compressor = audioCtx.createDynamicsCompressor();
-                compressor.threshold.value = -10;
-                compressor.knee.value = 30;
-                compressor.ratio.value = 8; 
-                compressor.attack.value = 0.001; 
-                compressor.release.value = 0.05; 
+                compressor.threshold.value = -14;
+                compressor.knee.value = 18;
+                compressor.ratio.value = 4; // จาก 12 -> 4 (ไม่บี้)
+                compressor.attack.value = 0.004;
+                compressor.release.value = 0.18; 
                 compressor.connect(audioCtx.destination);
 
                 // 2. Master Gain
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 1.2;
+                masterGain.gain.value = 1.0;
                 masterGain.connect(compressor);
 
                 // 3. Reverb
@@ -298,6 +285,41 @@
             if (audioCtx.state === 'suspended') {
                 await audioCtx.resume();
             }
+        }
+
+        // --- Trim Silence (นำกลับมาตามคำขอ) ---
+        function trimSilence(buffer) {
+            const rawData = buffer.getChannelData(0); 
+            const threshold = 0.001; // Low threshold for sensitivity
+            let start = 0;
+            let end = rawData.length;
+
+            for (let i = 0; i < rawData.length; i++) {
+                if (Math.abs(rawData[i]) > threshold) {
+                    start = i; break;
+                }
+            }
+            for (let i = rawData.length - 1; i >= 0; i--) {
+                if (Math.abs(rawData[i]) > threshold) {
+                    end = i; break;
+                }
+            }
+            
+            start = Math.max(0, start - 50); // Keep slight lead-in
+            end = Math.min(rawData.length, end + 100);
+
+            const length = end - start;
+            if (length <= 0) return buffer; 
+
+            const newBuffer = audioCtx.createBuffer(buffer.numberOfChannels, length, buffer.sampleRate);
+            for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+                 const oldData = buffer.getChannelData(channel);
+                 const newData = newBuffer.getChannelData(channel);
+                 for (let i = 0; i < length; i++) {
+                     newData[i] = oldData[i + start];
+                 }
+            }
+            return newBuffer;
         }
 
         async function loadSoundFiles() {
@@ -322,7 +344,7 @@
                     const arrayBuffer = await response.arrayBuffer();
                     const rawBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                     
-                    audioBuffers[key] = rawBuffer;
+                    audioBuffers[key] = trimSilence(rawBuffer); // Trim silence implemented
                     loadedCount++;
                 } catch (e) {
                     console.warn(`Error loading ${key}`, e);
@@ -336,7 +358,7 @@
             reverbGain = audioCtx.createGain();
             reverbGain.gain.value = 0.25; 
 
-            const length = audioCtx.sampleRate * 0.8; 
+            const length = audioCtx.sampleRate * 1.2; 
             const impulse = audioCtx.createBuffer(2, length, audioCtx.sampleRate);
             const left = impulse.getChannelData(0);
             const right = impulse.getChannelData(1);
@@ -352,32 +374,50 @@
             reverbGain.connect(reverbNode); 
         }
 
-        // --- Optimized PlaySound ---
+        // --- PlaySound (Modified for Pro Audio Chain) ---
         function playSound(type) {
             if (!audioCtx) return;
-            
             const t = audioCtx.currentTime;
             
-            // Check if audio buffer exists
+            // 1. Check if audio buffer exists
             if (audioBuffers[type]) {
                 const source = audioCtx.createBufferSource();
                 source.buffer = audioBuffers[type];
                 
-                const fileGain = audioCtx.createGain();
-                fileGain.gain.setValueAtTime(1.0, t); // Instant volume
+                // 2. Low-Pass Filter (Marching Bass Style)
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = "lowpass";
+                filter.frequency.value = 1400; // 1200–1800 Range
+                filter.Q.value = 0.9;
+
+                // 3. Envelope Gain (Synth Style)
+                const sampleGain = audioCtx.createGain();
+                const vol = 1.0;
+                const attack = 0.008; // 8ms (ยังแรง)
+                const decay = 0.55;   // หางกลม
+
+                // Envelope Logic
+                sampleGain.gain.cancelScheduledValues(t);
+                sampleGain.gain.setValueAtTime(0, t);
+                sampleGain.gain.linearRampToValueAtTime(vol, t + attack);
+                sampleGain.gain.exponentialRampToValueAtTime(0.001, t + decay);
                 
-                source.connect(fileGain);
-                fileGain.connect(masterGain);
-                if(reverbGain) fileGain.connect(reverbGain);
+                // 4. Connect Chain: source -> filter -> sampleGain -> master
+                source.connect(filter);
+                filter.connect(sampleGain);
+                sampleGain.connect(masterGain);
+                if(reverbGain) sampleGain.connect(reverbGain);
 
                 source.start(0);
 
+                // Auto cleanup
                 source.onended = function() {
                     source.disconnect();
-                    fileGain.disconnect();
+                    filter.disconnect();
+                    sampleGain.disconnect();
                 };
             } else {
-                // Robust Fallback Synth
+                // Fallback Synth (Simple Triangle/Square)
                 const osc = audioCtx.createOscillator();
                 const g = audioCtx.createGain();
                 osc.connect(g);
@@ -386,30 +426,25 @@
                 if (type === 'bom') {
                     osc.frequency.value = 150; 
                     osc.type = 'triangle';
-                } else if (type === 'pa') {
-                    osc.frequency.value = 300;
-                    osc.type = 'triangle';
                 } else {
                     osc.frequency.value = 600;
                     osc.type = 'square';
                 }
-                
                 g.gain.setValueAtTime(1, t);
-                g.gain.exponentialRampToValueAtTime(0.01, t + 0.25); // Slightly shorter decay for speed
-                
+                g.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
                 osc.start(t);
                 osc.stop(t + 0.25);
             }
         }
 
-        // --- Visual Animation (Non-blocking) ---
+        // --- Visual Animation ---
         function triggerDrumAnimation() {
             drum.animate([
                 { transform: 'scale(1)' },
-                { transform: 'scale(0.98)' },
+                { transform: 'scale(0.97)' },
                 { transform: 'scale(1)' }
             ], {
-                duration: 60, // Faster visual response
+                duration: 60,
                 easing: 'ease-out'
             });
         }
@@ -427,29 +462,25 @@
             const len = touches.length;
             let visualTriggered = false;
 
-            // Audio processing loop (FASTEST PRIORITY)
             for (let i = 0; i < len; i++) {
                 const t = touches[i];
-                // Math optimized to use pre-calculated globals and avoid sqrt
+                // Math optimized
                 const dx = t.clientX - drumCenterX;
                 const dy = t.clientY - drumCenterY;
                 const distSq = dx*dx + dy*dy;
                 const normalizedDistSq = distSq / drumRadiusSq;
 
-                if (normalizedDistSq < 0.16) { // 0.4 * 0.4
+                // Zone Logic: Center radius 45% = 0.45 * 0.45 = 0.2025
+                if (normalizedDistSq < 0.2025) { 
                     playSound('bom');
-                } else if (normalizedDistSq > 0.5625) { // 0.75 * 0.75
-                    playSound('poeng');
                 } else {
-                    playSound('pa');
+                    playSound('poeng');
                 }
                 
-                // Draw ripple later
                 requestAnimationFrame(() => createRipple(t.clientX, t.clientY));
                 visualTriggered = true;
             }
 
-            // Animate drum once per batch
             if (visualTriggered) {
                 requestAnimationFrame(triggerDrumAnimation);
             }
