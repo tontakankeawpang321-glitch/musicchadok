@@ -167,15 +167,15 @@
         }
 
         /* --- Animations --- */
-        .shake-anim { animation: shake-hard 0.35s cubic-bezier(.36,.07,.19,.97) both; }
+        /* Animation เขย่าแบบกระชับ (One-shot) */
+        .shake-anim { animation: shake-hard 0.3s ease-out; }
         
         @keyframes shake-hard {
             0% { transform: translate3d(0, 0, 0) rotate(0deg); }
-            15% { transform: translate3d(-10px, -5px, 0) rotate(-8deg); }
-            30% { transform: translate3d(8px, 5px, 0) rotate(6deg); }
-            45% { transform: translate3d(-6px, -3px, 0) rotate(-4deg); }
-            60% { transform: translate3d(4px, 2px, 0) rotate(3deg); }
-            75% { transform: translate3d(-2px, -1px, 0) rotate(-1deg); }
+            20% { transform: translate3d(-8px, -4px, 0) rotate(-6deg); }
+            40% { transform: translate3d(6px, 3px, 0) rotate(4deg); }
+            60% { transform: translate3d(-4px, -2px, 0) rotate(-2deg); }
+            80% { transform: translate3d(2px, 1px, 0) rotate(1deg); }
             100% { transform: translate3d(0, 0, 0) rotate(0deg); }
         }
 
@@ -215,7 +215,7 @@
 
     <div id="start-overlay">
         <h1 style="font-weight: 300; letter-spacing: 2px; margin-bottom: 0;">PRO TAMBOURINE</h1>
-        <p style="color: #aaa; margin-top: 5px;">Realistic Physics & Real Audio Only</p>
+        <p style="color: #aaa; margin-top: 5px;">One-Shot Rhythm & Real Audio</p>
         <button id="btn-start-init" class="btn-start" onclick="initAudio()" ontouchstart="initAudio()">START ENGINE</button>
         <div id="loading-text" style="margin-top:20px; font-size: 0.8rem; opacity: 0.7;">Ready to Load</div>
     </div>
@@ -252,7 +252,6 @@
         let audioCtx;
         let masterGain;
         let audioBuffers = { hit: null, shake: null };
-        // Store trim offsets { key: startOffset }
         let bufferOffsets = { hit: 0, shake: 0 }; 
 
         // State
@@ -261,9 +260,15 @@
         let audioChunks = [];
         let destNode; 
 
-        // Motion
-        let lastX=0, lastY=0, lastZ=0, lastTime=0, lastShakeTime=0;
-        const SHAKE_THRESHOLD = 250; // Sensitivity
+        // Motion & Timing Variables
+        let lastX=0, lastY=0, lastZ=0, lastTime=0;
+        let lastShakeTime = 0;
+        let lastHitTime = 0; // เพิ่มตัวแปรสำหรับคุมจังหวะการกด
+        
+        // Settings for "Single Rhythm"
+        const SHAKE_THRESHOLD = 300; // เพิ่มความแรงขั้นต่ำเพื่อให้เขย่าจริงๆ ถึงจะดัง
+        const SHAKE_COOLDOWN = 500; // (ms) หน่วงเวลาเขย่านานขึ้น (0.5วิ) เพื่อให้ดังแค่ทีเดียวต่อการสะบัด
+        const HIT_COOLDOWN = 80;    // (ms) ป้องกันการกดเบิ้ลเร็วเกินไป (Bounce)
 
         // UI Initialization
         function createZils() {
@@ -281,14 +286,12 @@
 
         // --- Audio Processing Logic ---
 
-        // ฟังก์ชันหาจุดเริ่มต้นของเสียงจริง (Trim Silence)
         function detectSilence(audioBuffer) {
-            const rawData = audioBuffer.getChannelData(0); // Check channel 1
-            const threshold = 0.01; // Noise floor threshold
-            
+            const rawData = audioBuffer.getChannelData(0); 
+            const threshold = 0.01; 
             for (let i = 0; i < rawData.length; i++) {
                 if (Math.abs(rawData[i]) > threshold) {
-                    return i / audioBuffer.sampleRate; // คืนค่าเป็นวินาที
+                    return i / audioBuffer.sampleRate;
                 }
             }
             return 0;
@@ -301,22 +304,17 @@
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const arrayBuffer = await response.arrayBuffer();
                 const decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-                
                 audioBuffers[key] = decodedBuffer;
-                
-                // คำนวณ Trim offset ทันทีหลังโหลดเสร็จ
                 bufferOffsets[key] = detectSilence(decodedBuffer);
-                console.log(`Loaded ${key}: Trimmed offset = ${bufferOffsets[key].toFixed(4)}s`);
-                
+                console.log(`Loaded ${key}`);
             } catch (error) {
-                console.warn(`Failed to load sound '${key}'. It will be silent.`);
+                console.warn(`Failed to load sound '${key}'.`);
             }
         }
 
         async function initAudio() {
             if (audioCtx) return;
             
-            // Check Mobile to show hint
             if (/Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent)) {
                 document.getElementById('shake-instruction').style.display = 'block';
             }
@@ -332,7 +330,6 @@
             masterGain = audioCtx.createGain();
             masterGain.connect(audioCtx.destination);
             
-            // Recorder setup
             destNode = audioCtx.createMediaStreamDestination();
             masterGain.connect(destNode);
             setupRecorder();
@@ -341,13 +338,11 @@
             startMotionSensor();
             setupInteractions();
 
-            // Preload Sounds (Wait for all to try loading)
             await Promise.all([
                 loadSound('hit', soundUrls.hit),
                 loadSound('shake', soundUrls.shake)
             ]);
 
-            // Animation out
             const overlay = document.getElementById('start-overlay');
             overlay.style.opacity = '0';
             setTimeout(() => overlay.remove(), 500);
@@ -357,48 +352,58 @@
             if (!audioCtx) return;
             if (audioCtx.state === 'suspended') audioCtx.resume();
 
-            // เล่นเฉพาะเมื่อมีไฟล์เสียงจริงเท่านั้น
             if (audioBuffers[type]) {
                 const source = audioCtx.createBufferSource();
                 source.buffer = audioBuffers[type];
 
-                // Create Envelope Gain (Fade In/Out)
                 const envelope = audioCtx.createGain();
-                
-                // Connect Graph: Source -> Envelope -> Master
                 source.connect(envelope);
                 envelope.connect(masterGain);
 
                 const now = audioCtx.currentTime;
                 const duration = source.buffer.duration;
-                const offset = bufferOffsets[type] || 0; // Use calculated silence offset
+                const offset = bufferOffsets[type] || 0; 
 
-                // ✅ Fade In: ป้องกันเสียงคลิกตอนเริ่ม (2ms)
+                // Fast Attack for responsiveness
                 envelope.gain.setValueAtTime(0, now);
-                envelope.gain.linearRampToValueAtTime(1, now + 0.005); // 5ms attack
+                envelope.gain.linearRampToValueAtTime(1, now + 0.005); 
                 
-                // ✅ Fade Out: ป้องกันเสียงคลิกตอนจบ
+                // Clean Decay
                 if (duration - offset > 0.02) {
                     envelope.gain.setValueAtTime(1, now + duration - offset - 0.015);
                     envelope.gain.exponentialRampToValueAtTime(0.001, now + duration - offset - 0.005);
                 }
 
-                // ✅ Play with Offset (Trim Silence)
                 source.start(now, offset); 
             } 
-            // ❌ เอา playBackupBeep ออก: ถ้าไม่มีไฟล์จะเงียบไปเลย
         }
 
-        // --- Interaction Logic (3D Physics) ---
+        // --- Interaction Logic (3D Physics & Debounce) ---
 
         function setupInteractions() {
             const tambourine = document.getElementById('tambourine');
             
             const startHandler = (e) => {
+                // ป้องกันการกดปุ่มควบคุม
                 if (e.target.closest('.controls')) return;
                 
-                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                // 🛑 Prevent Double Trigger (Touch followed by Mouse on mobile)
+                if (e.cancelable) e.preventDefault(); 
+                
+                // 🛑 Debounce Logic: ถ้ากดรัวเกินไป (80ms) ไม่ให้เล่น
+                const now = Date.now();
+                if (now - lastHitTime < HIT_COOLDOWN) return;
+                lastHitTime = now;
+
+                // Physics coords
+                let clientX, clientY;
+                if (e.touches && e.touches.length > 0) {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
                 
                 isPressed = true;
                 playSound('hit');
@@ -408,17 +413,29 @@
 
             const moveHandler = (e) => {
                 if (!isPressed) return;
-                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                
+                // ป้องกันการลากเลื่อนหน้าจอ (Scrolling) ขณะเล่น
+                if (e.cancelable) e.preventDefault();
+
+                let clientX, clientY;
+                if (e.touches && e.touches.length > 0) {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
                 calculateTilt(clientX, clientY);
             };
 
-            const endHandler = () => {
+            const endHandler = (e) => {
+                if (e.cancelable) e.preventDefault(); // กันเด้ง
                 isPressed = false;
                 tambourine.classList.remove('metal-active');
                 tambourine.style.transform = 'rotateX(0deg) rotateY(0deg) scale(1)';
             };
 
+            // ใช้ Passive: false เพื่อให้ preventDefault() ทำงานได้
             // Mouse
             document.addEventListener('mousedown', startHandler);
             document.addEventListener('mousemove', moveHandler);
@@ -427,7 +444,7 @@
             // Touch
             document.addEventListener('touchstart', startHandler, {passive: false});
             document.addEventListener('touchmove', moveHandler, {passive: false});
-            document.addEventListener('touchend', endHandler);
+            document.addEventListener('touchend', endHandler, {passive: false});
         }
 
         let isPressed = false;
@@ -438,8 +455,7 @@
             const centerX = rect.left + rect.width / 2;
             const centerY = rect.top + rect.height / 2;
 
-            // Physics params
-            const maxTilt = 15; // Degrees
+            const maxTilt = 15; 
             const percentX = (clientX - centerX) / (rect.width / 2);
             const percentY = (clientY - centerY) / (rect.height / 2);
 
@@ -449,7 +465,7 @@
             tambourine.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(0.96)`;
         }
 
-        // --- Motion Sensor & Shake Logic ---
+        // --- Motion Sensor & Shake Logic (Single Beat) ---
         function startMotionSensor() {
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                 DeviceMotionEvent.requestPermission()
@@ -473,7 +489,10 @@
                 const delta = Math.sqrt((acc.x-lastX)**2 + (acc.y-lastY)**2 + (acc.z-lastZ)**2);
                 const speed = delta / (now - lastTime) * 1000;
 
-                if (speed > SHAKE_THRESHOLD && (now - lastShakeTime > 200)) {
+                // 🛑 Shake Logic: 
+                // 1. SHAKE_THRESHOLD = 300 (แรงขึ้นเพื่อป้องกันเสียงรบกวน)
+                // 2. SHAKE_COOLDOWN = 500ms (เว้นระยะนานขึ้นเพื่อให้สะบัด 1 ที ได้ 1 เสียงเท่านั้น)
+                if (speed > SHAKE_THRESHOLD && (now - lastShakeTime > SHAKE_COOLDOWN)) {
                     playSound('shake');
                     
                     const wrapper = document.getElementById('shaker-wrapper');
