@@ -13,9 +13,9 @@
             font-family: 'Sarabun', sans-serif;
             background-color: #2d1b0e; /* Dark wood color */
             background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20.5V18H0v-2h20v5.1L6 4.1 7.4 2.8 21.6 17l4.4-4.4L11.8.8 13.2-.6 27.5 13.7 34 7.3 35.4 8.7 29 15.1l8.1 8.1-1.4 1.4-8.1-8.1-5.3 5.3 14.2 14.2-1.4 1.4-14.2-14.2-4.4 4.4 14.2 14.2-1.4 1.4-14.2-14.2L2.6 37.4 1.2 36l14.2-14.2L0 20.5h20z' fill='%234a3018' fill-opacity='0.15' fill-rule='evenodd'/%3E%3C/svg%3E");
-            touch-action: none; /* Prevent browser zooming/scrolling strictly */
-            overflow: hidden; /* Prevent scrollbars */
-            user-select: none; /* Prevent text selection */
+            touch-action: none; /* ห้ามการซูมและการเลื่อนโดยเด็ดขาด */
+            overflow: hidden; 
+            user-select: none;
             -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
             overscroll-behavior: none;
@@ -33,7 +33,7 @@
             position: relative;
             cursor: pointer;
             touch-action: none;
-            will-change: transform; /* Hint browser to optimize compositing */
+            will-change: transform;
             transform-origin: center center;
         }
 
@@ -51,8 +51,8 @@
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            width: 35%; 
-            height: 35%;
+            width: 40%;
+            height: 40%;
             background: radial-gradient(circle, #3e2723 0%, #5d4037 80%, transparent 100%);
             border-radius: 50%;
             opacity: 0.8;
@@ -87,8 +87,7 @@
             pointer-events: none;
             will-change: transform, opacity;
             z-index: 40;
-            /* Use CSS animation directly for performance */
-            animation: ripple 0.2s ease-out forwards;
+            animation: ripple 0.15s ease-out forwards;
         }
 
         /* Note labels */
@@ -220,12 +219,11 @@
     </div>
 
     <script>
-        // --- Configuration: External Sound URLs ---
-        // ⚠️ สำคัญ: ใส่ลิงก์ตรงนี้ (ต้องเป็นลิงก์ตรง .mp3/.wav)
+        // --- Configuration ---
         const soundUrls = {
-            bom: 'konglong/momlong.wav',    // เสียง "บ่อม" (กลาง)
-            pa: 'konglong/paklong.wav',     // เสียง "ปะ" (ล่างวงกลม/ตบ)
-            poeng: 'konglong/pengkob.wav'   // เสียง "เปิง"
+            bom: 'konglong/momlong.wav',
+            pa: 'konglong/paklong.wav',
+            poeng: 'konglong/pengkob.wav'
         };
 
         // --- Global Variables ---
@@ -243,43 +241,40 @@
 
         let audioBuffers = { bom: null, pa: null, poeng: null };
 
-        // CACHING DRUM GEOMETRY (Optimization)
+        // PRE-CALCULATED GEOMETRY (Optimization)
         const drum = document.getElementById('drum');
-        let drumRect = drum.getBoundingClientRect();
-        let drumRadius = drumRect.width / 2;
-        let drumCenterX = drumRect.left + drumRadius;
-        let drumCenterY = drumRect.top + drumRadius;
+        let drumRect, drumRadius, drumCenterX, drumCenterY, drumRadiusSq;
 
-        window.addEventListener('resize', updateDrumGeometry);
         function updateDrumGeometry() {
             drumRect = drum.getBoundingClientRect();
             drumRadius = drumRect.width / 2;
+            drumRadiusSq = drumRadius * drumRadius; // Pre-calc squared radius
             drumCenterX = drumRect.left + drumRadius;
             drumCenterY = drumRect.top + drumRadius;
         }
+        window.addEventListener('resize', updateDrumGeometry);
+        // Call immediately
+        updateDrumGeometry();
 
         async function initAudio() {
             if (!audioCtx) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
-                // Optimization: latencyHint 'interactive' is key for drumming apps
-                audioCtx = new AudioContext({
-                    latencyHint: 'interactive',
-                });
+                audioCtx = new AudioContext({ latencyHint: 'interactive' });
                 
-                // Silent warm-up buffer (Wake up audio thread)
+                // Silent warm-up
                 const buffer = audioCtx.createBuffer(1, 1, 22050);
                 const source = audioCtx.createBufferSource();
                 source.buffer = buffer;
                 source.connect(audioCtx.destination);
                 source.start();
 
-                // 1. Create Compressor (Fast attack/release for percussive sounds)
+                // 1. Compressor
                 compressor = audioCtx.createDynamicsCompressor();
                 compressor.threshold.value = -10;
                 compressor.knee.value = 30;
                 compressor.ratio.value = 8; 
                 compressor.attack.value = 0.001; 
-                compressor.release.value = 0.05; // Fast release prevents pumping
+                compressor.release.value = 0.05; 
                 compressor.connect(audioCtx.destination);
 
                 // 2. Master Gain
@@ -287,13 +282,12 @@
                 masterGain.gain.value = 1.2;
                 masterGain.connect(compressor);
 
-                // 3. Setup Reverb
+                // 3. Reverb
                 await setupReverb();
 
-                // 4. Load External Sounds
+                // 4. Load Files
                 await loadSoundFiles();
 
-                // Setup Stream for Recording
                 destStream = audioCtx.createMediaStreamDestination();
                 compressor.connect(destStream);
 
@@ -358,12 +352,10 @@
             reverbGain.connect(reverbNode); 
         }
 
-        // --- Standard PlaySound (Instant & Stable) ---
+        // --- Optimized PlaySound ---
         function playSound(type) {
             if (!audioCtx) return;
-            // Ensure audio context is running (Fixes iOS/Chrome auto-suspend issues)
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-
+            
             const t = audioCtx.currentTime;
             
             // Check if audio buffer exists
@@ -372,15 +364,14 @@
                 source.buffer = audioBuffers[type];
                 
                 const fileGain = audioCtx.createGain();
-                fileGain.gain.value = 1.0; 
+                fileGain.gain.setValueAtTime(1.0, t); // Instant volume
                 
                 source.connect(fileGain);
                 fileGain.connect(masterGain);
                 if(reverbGain) fileGain.connect(reverbGain);
 
-                source.start(0); // Start Immediately
+                source.start(0);
 
-                // Memory cleanup
                 source.onended = function() {
                     source.disconnect();
                     fileGain.disconnect();
@@ -404,29 +395,29 @@
                 }
                 
                 g.gain.setValueAtTime(1, t);
-                g.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+                g.gain.exponentialRampToValueAtTime(0.01, t + 0.25); // Slightly shorter decay for speed
                 
                 osc.start(t);
-                osc.stop(t + 0.3);
+                osc.stop(t + 0.25);
             }
         }
 
-        // --- Optimized Visual Animation (Web Animations API) ---
+        // --- Visual Animation (Non-blocking) ---
         function triggerDrumAnimation() {
-            // .animate() works better with rapid firing than CSS classes/setTimeout
             drum.animate([
                 { transform: 'scale(1)' },
                 { transform: 'scale(0.98)' },
                 { transform: 'scale(1)' }
             ], {
-                duration: 80,
+                duration: 60, // Faster visual response
                 easing: 'ease-out'
             });
         }
 
-        // --- Touch Handler ---
+        // --- Hyper Optimized Touch Handler ---
         function handleHit(e) {
             if (e.cancelable) e.preventDefault();
+            
             if (!audioCtx) {
                 initAudio();
                 return;
@@ -434,32 +425,34 @@
 
             const touches = e.changedTouches;
             const len = touches.length;
+            let visualTriggered = false;
 
-            // Audio Loop (Priority 1)
+            // Audio processing loop (FASTEST PRIORITY)
             for (let i = 0; i < len; i++) {
                 const t = touches[i];
+                // Math optimized to use pre-calculated globals and avoid sqrt
                 const dx = t.clientX - drumCenterX;
                 const dy = t.clientY - drumCenterY;
                 const distSq = dx*dx + dy*dy;
-                const radiusSq = drumRadius * drumRadius;
-                const normalizedDistSq = distSq / radiusSq;
+                const normalizedDistSq = distSq / drumRadiusSq;
 
-                if (normalizedDistSq < 0.1225) {
+                if (normalizedDistSq < 0.16) { // 0.4 * 0.4
                     playSound('bom');
-                } else if (normalizedDistSq > 0.5625) {
+                } else if (normalizedDistSq > 0.5625) { // 0.75 * 0.75
                     playSound('poeng');
                 } else {
                     playSound('pa');
                 }
+                
+                // Draw ripple later
+                requestAnimationFrame(() => createRipple(t.clientX, t.clientY));
+                visualTriggered = true;
             }
 
-            // Visual Loop (Priority 2 - De-coupled from audio for speed)
-            requestAnimationFrame(() => {
-                for (let i = 0; i < len; i++) {
-                    createRipple(touches[i].clientX, touches[i].clientY);
-                }
-                triggerDrumAnimation();
-            });
+            // Animate drum once per batch
+            if (visualTriggered) {
+                requestAnimationFrame(triggerDrumAnimation);
+            }
         }
 
         function createRipple(x, y) {
@@ -468,7 +461,6 @@
             el.style.left = x + 'px';
             el.style.top = y + 'px';
             document.body.appendChild(el);
-            // CSS Animation handles the movement, we just cleanup
             setTimeout(() => {
                 el.remove();
             }, 200);
