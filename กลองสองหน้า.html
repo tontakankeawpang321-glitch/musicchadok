@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>กลองสองหน้า - เสียงสมจริง</title>
+    <title>กลองสองหน้า - Sample Playback</title>
     <style>
         /* รีเซ็ตและตั้งค่าพื้นฐาน */
         * {
@@ -73,6 +73,19 @@
             cursor: not-allowed;
         }
 
+        /* สถานะการโหลด */
+        .loading-status {
+            position: absolute;
+            top: 70px;
+            color: #aaa;
+            font-size: 12px;
+            background: rgba(0,0,0,0.5);
+            padding: 4px 8px;
+            border-radius: 4px;
+            pointer-events: none;
+            transition: opacity 0.5s;
+        }
+
         /* ตัวกลอง */
         .drum-container {
             display: flex;
@@ -124,7 +137,7 @@
             justify-content: center;
             align-items: center;
             -webkit-tap-highlight-color: transparent;
-            overflow: hidden; /* เพื่อให้ ripple ไม่ล้น */
+            overflow: hidden; 
         }
 
         .drum-head:active, .drum-head.active {
@@ -178,7 +191,6 @@
             opacity: 1;
         }
 
-        /* Visual Feedback effect */
         .ripple {
             position: absolute;
             border-radius: 50%;
@@ -208,7 +220,6 @@
             font-size: 12px;
             text-align: center;
         }
-
     </style>
 </head>
 <body>
@@ -220,6 +231,8 @@
         <button class="btn" id="btnPlay" disabled>▶️ เล่น</button>
         <button class="btn" id="btnDownload" disabled>⬇️ โหลด</button>
     </div>
+
+    <div id="loadingStatus" class="loading-status">กำลังเตรียมระบบเสียง...</div>
 
     <div class="drum-container" id="drumContainer">
         <div class="drum-body">
@@ -244,225 +257,167 @@
 
     <div class="footer-text">
         ตีตรงกลาง: เสียงสั้นกระชับ | ตีขอบ: เสียงโลหะ/Slap<br>
-        รองรับ Multi-touch ตีพร้อมกันได้
+        รองรับ Sample Playback
     </div>
 
     <script>
+        // --- 1. Sound Configuration ---
+        // ใส่ลิงก์ไฟล์เสียงของคุณตรงนี้ (.mp3, .wav, .webm)
+        // หากปล่อยว่าง ระบบจะใช้เสียงสังเคราะห์สำรองให้แทนเพื่อให้แอปใช้งานได้
+        const soundUrls = {
+            leftCenter: "kongkang/joman.wav", // เช่น "sounds/drum_low.mp3"
+            leftRim:    "kongkang/thingman.wav", // เช่น "sounds/rim_metal.mp3"
+            rightCenter:"kongkang/thingwo.wav", // เช่น "sounds/drum_high.mp3"
+            rightRim:   "kongkang/jowo.wav"  // เช่น "sounds/slap.mp3"
+        };
+
+        // --- 2. System Setup ---
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
         let masterGain;
         let limiter;
-        let reverbNode;
-        let reverbFilter;
-        let dryGain;
-        let wetGain;
         let dest;
         let mediaRecorder;
         let chunks = [];
         let recordedBlob;
         let audioURL;
         let playbackAudio = new Audio();
-
-        function createReverbBuffer() {
-            // Reverb แบบสั้นมาก (Short Room) เพื่อไม่ให้เบสบวม
-            const duration = 0.4; // ลดลงอีกเหลือ 0.4 เพื่อความกระชับที่สุด
-            const decay = 5.0;    // หายเร็วขึ้น
-            const rate = audioCtx.sampleRate;
-            const length = rate * duration;
-            const impulse = audioCtx.createBuffer(2, length, rate);
-            const left = impulse.getChannelData(0);
-            const right = impulse.getChannelData(1);
-
-            for (let i = 0; i < length; i++) {
-                const n = i / length;
-                left[i] = (Math.random() * 2 - 1) * Math.pow(1 - n, decay);
-                right[i] = (Math.random() * 2 - 1) * Math.pow(1 - n, decay);
-            }
-            return impulse;
-        }
+        
+        // ตัวเก็บ Buffer เสียงที่โหลดเสร็จแล้ว
+        const soundBuffers = {
+            leftCenter: null,
+            leftRim: null,
+            rightCenter: null,
+            rightRim: null
+        };
 
         function initAudio() {
             if (!audioCtx) {
                 audioCtx = new AudioContext();
                 
+                // Limiter ป้องกันเสียงแตก
                 limiter = audioCtx.createDynamicsCompressor();
-                limiter.threshold.value = -3;
+                limiter.threshold.value = -2;
                 limiter.ratio.value = 12;
                 limiter.attack.value = 0.002;
 
                 masterGain = audioCtx.createGain();
                 masterGain.gain.value = 1.0;
 
-                reverbNode = audioCtx.createConvolver();
-                reverbNode.buffer = createReverbBuffer();
-                
-                reverbFilter = audioCtx.createBiquadFilter();
-                reverbFilter.type = 'lowpass';
-                reverbFilter.frequency.value = 800; // กรองความถี่สูงออก เพื่อให้เหลือแต่บรรยากาศทุ้มๆ
-
-                wetGain = audioCtx.createGain();
-                wetGain.gain.value = 0.3; // Reverb บางๆ พอมีมิติ
-                
-                dryGain = audioCtx.createGain();
-                dryGain.gain.value = 1.0;
-
-                reverbNode.connect(reverbFilter);
-                reverbFilter.connect(wetGain);
-                
-                wetGain.connect(masterGain);
-                dryGain.connect(masterGain);
-                
                 masterGain.connect(limiter);
                 limiter.connect(audioCtx.destination);
 
                 dest = audioCtx.createMediaStreamDestination();
                 masterGain.connect(dest);
+
+                // เริ่มโหลดเสียงทันทีที่ User Interact ครั้งแรก (เพื่อแก้ปัญหา Autoplay Policy)
+                loadAllSounds();
             }
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
         }
 
-        // --- Sound Synthesis ---
-        
-        function playSound(type, zoneFactor) {
-            initAudio();
-            const t = audioCtx.currentTime;
+        // --- 3. Loader & Decoder Logic ---
+
+        async function loadAllSounds() {
+            const status = document.getElementById('loadingStatus');
+            status.textContent = "กำลังโหลดไฟล์เสียง...";
             
-            const hitGain = audioCtx.createGain();
-            hitGain.connect(dryGain);
-            hitGain.connect(reverbNode);
-            hitGain.gain.setValueAtTime(1.0, t);
+            const promises = Object.keys(soundUrls).map(key => loadSound(key, soundUrls[key]));
+            await Promise.all(promises);
+            
+            status.textContent = "พร้อมใช้งาน!";
+            setTimeout(() => status.style.opacity = 0, 2000);
+        }
 
-            if (type === 'left') { 
-                // ซ้าย: ทุ้ม + สั้น (Deep Thud)
-                
-                if (zoneFactor < 0.6) { // === CENTER / ตุ้ม ===
-                    // 1. Sub Bass (Deep & Short)
-                    const oscSub = audioCtx.createOscillator();
-                    const gainSub = audioCtx.createGain();
-                    oscSub.frequency.setValueAtTime(60, t); // ลดความถี่ลง (Deep) เริ่มที่ 60Hz
-                    oscSub.frequency.exponentialRampToValueAtTime(30, t + 0.2); // ลงลึกไปถึง 30Hz
-                    
-                    gainSub.gain.setValueAtTime(1.5, t);
-                    gainSub.gain.exponentialRampToValueAtTime(0.01, t + 0.15); // สั้น! (Short)
+        async function loadSound(key, url) {
+            if (!url) {
+                // ถ้าไม่มี URL ให้สร้างเสียงสังเคราะห์สำรอง (Fallback)
+                soundBuffers[key] = createFallbackBuffer(key);
+                return;
+            }
 
-                    // 2. Impact (หัวเสียงหนักๆ)
-                    const oscImpact = audioCtx.createOscillator();
-                    const gainImpact = audioCtx.createGain();
-                    oscImpact.type = 'square'; // Square ให้เนื้อที่หนากว่า Sine
-                    oscImpact.frequency.setValueAtTime(100, t); // หัวเสียงต่ำลง
-                    oscImpact.frequency.exponentialRampToValueAtTime(40, t + 0.08);
-                    
-                    gainImpact.gain.setValueAtTime(1.0, t);
-                    gainImpact.gain.exponentialRampToValueAtTime(0.01, t + 0.08); // สั้นมาก
-
-                    oscSub.connect(gainSub).connect(hitGain);
-                    oscImpact.connect(gainImpact).connect(hitGain);
-                    
-                    oscSub.start(t); oscSub.stop(t + 0.25);
-                    oscImpact.start(t); oscImpact.stop(t + 0.1);
-
-                } else { // === RIM / ขอบ (Metallic but Heavy) ===
-                    // เสียงขอบที่หนักขึ้น ให้เข้ากับความทุ้ม
-                    const carrier = audioCtx.createOscillator();
-                    const modulator = audioCtx.createOscillator();
-                    const modGain = audioCtx.createGain();
-                    const carrierGain = audioCtx.createGain();
-
-                    carrier.type = 'sine';
-                    carrier.frequency.setValueAtTime(600, t); // ลดความถี่ขอบลงให้หนาขึ้น
-                    
-                    modulator.type = 'square';
-                    modulator.frequency.value = 840;
-                    
-                    modGain.gain.setValueAtTime(800, t);
-                    modGain.gain.exponentialRampToValueAtTime(1, t + 0.1);
-
-                    carrierGain.gain.setValueAtTime(0.8, t);
-                    carrierGain.gain.exponentialRampToValueAtTime(0.01, t + 0.2); // หางสั้น
-
-                    // Impact
-                    const oscClick = audioCtx.createOscillator();
-                    const gainClick = audioCtx.createGain();
-                    oscClick.type = 'triangle';
-                    oscClick.frequency.setValueAtTime(2000, t);
-                    oscClick.frequency.exponentialRampToValueAtTime(200, t + 0.05);
-                    gainClick.gain.setValueAtTime(0.8, t);
-                    gainClick.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
-                    
-                    modulator.connect(modGain);
-                    modGain.connect(carrier.frequency);
-                    carrier.connect(carrierGain).connect(hitGain);
-                    oscClick.connect(gainClick).connect(hitGain);
-
-                    carrier.start(t); carrier.stop(t + 0.3);
-                    modulator.start(t); modulator.stop(t + 0.3);
-                    oscClick.start(t); oscClick.stop(t + 0.1);
-                }
-
-            } else if (type === 'right') { 
-                // ขวา: ตึง (ยังคงคาแรคเตอร์ไว้ แต่ปรับให้เข้ากับความทุ้ม)
-                
-                if (zoneFactor < 0.6) { // === CENTER ===
-                    const oscTone = audioCtx.createOscillator();
-                    const gainTone = audioCtx.createGain();
-                    oscTone.type = 'sine';
-                    oscTone.frequency.setValueAtTime(220, t); // ลดลงนิดหน่อยให้มีเนื้อ (จาก 340 -> 220)
-                    oscTone.frequency.exponentialRampToValueAtTime(120, t + 0.15);
-                    gainTone.gain.setValueAtTime(1.0, t);
-                    gainTone.gain.exponentialRampToValueAtTime(0.01, t + 0.15); // สั้น
-
-                    const oscWood = audioCtx.createOscillator();
-                    const gainWood = audioCtx.createGain();
-                    oscWood.type = 'triangle';
-                    oscWood.frequency.setValueAtTime(350, t);
-                    gainWood.gain.setValueAtTime(0.3, t);
-                    gainWood.gain.linearRampToValueAtTime(0.0, t + 0.1);
-
-                    oscTone.connect(gainTone).connect(hitGain);
-                    oscWood.connect(gainWood).connect(hitGain);
-                    
-                    oscTone.start(t); oscTone.stop(t + 0.2);
-                    oscWood.start(t); oscWood.stop(t + 0.15);
-
-                } else { // === RIM ===
-                    const oscSlap = audioCtx.createOscillator();
-                    const gainSlap = audioCtx.createGain();
-                    oscSlap.type = 'sawtooth';
-                    oscSlap.frequency.setValueAtTime(1200, t);
-                    oscSlap.frequency.exponentialRampToValueAtTime(150, t + 0.05);
-                    gainSlap.gain.setValueAtTime(0.7, t);
-                    gainSlap.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
-
-                    const bufferSize = audioCtx.sampleRate * 0.02; 
-                    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-                    const data = buffer.getChannelData(0);
-                    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-                    
-                    const noise = audioCtx.createBufferSource();
-                    noise.buffer = buffer;
-                    const noiseFilter = audioCtx.createBiquadFilter();
-                    noiseFilter.type = 'highpass';
-                    noiseFilter.frequency.value = 3000;
-                    
-                    const gainNoise = audioCtx.createGain();
-                    gainNoise.gain.setValueAtTime(0.6, t);
-                    gainNoise.gain.exponentialRampToValueAtTime(0.01, t + 0.02);
-
-                    oscSlap.connect(gainSlap).connect(hitGain);
-                    noise.connect(noiseFilter).connect(gainNoise).connect(hitGain);
-                    
-                    oscSlap.start(t); oscSlap.stop(t + 0.1);
-                    noise.start(t);
-                }
+            try {
+                const response = await fetch(url);
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                soundBuffers[key] = audioBuffer;
+            } catch (e) {
+                console.warn(`โหลดไฟล์ ${key} ไม่สำเร็จ ใช้เสียงสำรองแทน`, e);
+                soundBuffers[key] = createFallbackBuffer(key);
             }
         }
 
-        // --- Interaction Logic with Position Detection ---
+        // ฟังก์ชันสร้างเสียงสำรองกรณีไม่มีไฟล์ (เพื่อให้หน้า Preview ทำงานได้)
+        function createFallbackBuffer(type) {
+            const sr = audioCtx.sampleRate;
+            let duration = 0.5;
+            if (type.includes('Rim')) duration = 0.3;
+            
+            const buffer = audioCtx.createBuffer(1, sr * duration, sr);
+            const data = buffer.getChannelData(0);
+            
+            for (let i = 0; i < buffer.length; i++) {
+                const t = i / sr;
+                // สร้างเสียงแบบง่ายๆ ตามประเภท
+                if (type === 'leftCenter') {
+                    // Low Sine + Noise
+                    data[i] = (Math.sin(2 * Math.PI * 60 * t) * Math.exp(-10 * t)) + (Math.random() * 0.1 * Math.exp(-20 * t));
+                } else if (type === 'leftRim') {
+                    // Metallic FM
+                    data[i] = (Math.sin(2 * Math.PI * 800 * t + Math.sin(2 * Math.PI * 1200 * t)*5) * Math.exp(-15 * t));
+                } else if (type === 'rightCenter') {
+                    // High Sine
+                    data[i] = (Math.sin(2 * Math.PI * 220 * t) * Math.exp(-15 * t)) + (Math.random() * 0.1 * Math.exp(-30 * t));
+                } else if (type === 'rightRim') {
+                    // Slap Noise
+                    data[i] = (Math.random() * 2 - 1) * Math.exp(-40 * t);
+                }
+            }
+            return buffer;
+        }
+
+        // --- 4. Playback Engine with Envelopes ---
+
+        function playBuffer(bufferName) {
+            initAudio(); // Ensure context is ready
+            
+            const buffer = soundBuffers[bufferName];
+            if (!buffer) return;
+
+            const source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+
+            // Envelope Gain (Fade In/Out)
+            const envGain = audioCtx.createGain();
+            
+            // Wiring
+            source.connect(envGain);
+            envGain.connect(masterGain);
+
+            const t = audioCtx.currentTime;
+            const duration = buffer.duration;
+
+            // --- Fade Logic (ปิดเสียงอากาศ) ---
+            // 1. เริ่มต้นที่ 0 (เงียบ)
+            envGain.gain.setValueAtTime(0, t);
+            
+            // 2. Fade In เร็วมาก (2ms) เพื่อลบเสียงคลิกที่หัวไฟล์
+            envGain.gain.linearRampToValueAtTime(1.0, t + 0.002);
+
+            // 3. Fade Out ที่ปลายเสียง (10ms ก่อนจบ) เพื่อลบเสียงซ่าท้ายไฟล์
+            if (duration > 0.02) {
+                envGain.gain.setValueAtTime(1.0, t + duration - 0.015);
+                envGain.gain.linearRampToValueAtTime(0, t + duration);
+            }
+
+            source.start(t);
+        }
+
+        // --- 5. Interaction Logic ---
         
         function handleInteraction(event, padId, type) {
-            // ป้องกันการทำงานซ้ำซ้อนในบางเบราว์เซอร์
             if(event.type === 'touchstart') event.preventDefault();
             
             const pad = document.getElementById(padId);
@@ -470,35 +425,36 @@
             const centerX = rect.left + rect.width / 2;
             const centerY = rect.top + rect.height / 2;
 
-            // รองรับ Multi-touch
             let touches = event.changedTouches ? Array.from(event.changedTouches) : [{clientX: event.clientX, clientY: event.clientY}];
 
             touches.forEach(touch => {
-                // ตรวจสอบว่า touch นี้อยู่ใน element นี้หรือไม่ (สำหรับ multi-touch)
-                // สำหรับ mouse event เราข้ามการเช็คนี้เพราะมัน trigger บน element อยู่แล้ว
                 if (event.changedTouches) {
                     const touchTarget = document.elementFromPoint(touch.clientX, touch.clientY);
                     if (touchTarget !== pad && !pad.contains(touchTarget)) return;
                 }
 
-                // คำนวณระยะห่างจากจุดศูนย์กลาง (0.0 - 1.0)
                 const dx = touch.clientX - centerX;
                 const dy = touch.clientY - centerY;
                 const distance = Math.sqrt(dx*dx + dy*dy);
                 const maxRadius = rect.width / 2;
-                
-                // Normalized distance (0 = center, 1 = edge)
                 let zoneFactor = Math.min(distance / maxRadius, 1.0);
 
-                playSound(type, zoneFactor);
+                // เลือกไฟล์ที่จะเล่นตามโซน
+                let soundKey = "";
+                if (type === 'left') {
+                    soundKey = zoneFactor < 0.6 ? 'leftCenter' : 'leftRim';
+                } else {
+                    soundKey = zoneFactor < 0.6 ? 'rightCenter' : 'rightRim';
+                }
+
+                playBuffer(soundKey);
 
                 // Visual Feedback
                 pad.classList.remove('active');
-                void pad.offsetWidth; // Trigger reflow
+                void pad.offsetWidth; 
                 pad.classList.add('active');
                 setTimeout(() => pad.classList.remove('active'), 100);
 
-                // Ripple at touch point
                 const ripple = document.createElement('div');
                 ripple.className = 'ripple';
                 ripple.style.left = (touch.clientX - rect.left) + 'px';
@@ -512,26 +468,18 @@
         const padRight = document.getElementById('padRight');
         const container = document.getElementById('drumContainer');
 
-        // Touch Events
         padLeft.addEventListener('touchstart', (e) => handleInteraction(e, 'padLeft', 'left'), {passive: false});
         padRight.addEventListener('touchstart', (e) => handleInteraction(e, 'padRight', 'right'), {passive: false});
-
-        // Mouse Events
         padLeft.addEventListener('mousedown', (e) => handleInteraction(e, 'padLeft', 'left'));
         padRight.addEventListener('mousedown', (e) => handleInteraction(e, 'padRight', 'right'));
 
-        // Keyboard Support (Fixed zones for keyboard)
+        // Keyboard Support
         document.addEventListener('keydown', (e) => {
             if (e.repeat) return;
-            // A = Left Center, Z = Left Rim
-            if (e.key === 'a') playSound('left', 0.0); // Center
-            if (e.key === 'z') playSound('left', 0.8); // Rim
-            
-            // D = Right Center, C = Right Rim
-            if (e.key === 'd') playSound('right', 0.0); // Center
-            if (e.key === 'c') playSound('right', 0.8); // Rim
-            
-            // Visual feedback for keyboard is tricky without mapping, simplified here
+            if (e.key === 'a') playBuffer('leftCenter');
+            if (e.key === 'z') playBuffer('leftRim');
+            if (e.key === 'd') playBuffer('rightCenter');
+            if (e.key === 'c') playBuffer('rightRim');
         });
 
         // --- Controls Logic ---
@@ -592,7 +540,7 @@
                 const a = document.createElement('a');
                 a.style.display = 'none';
                 a.href = audioURL;
-                a.download = 'thud-drum-solo.webm';
+                a.download = 'my-drum-solo.webm';
                 document.body.appendChild(a);
                 a.click();
                 setTimeout(() => document.body.removeChild(a), 100);
