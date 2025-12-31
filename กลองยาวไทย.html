@@ -369,7 +369,7 @@
                     statusDiv.classList.remove('hidden');
 
                     const response = await fetch(url);
-                    if (!response.ok) throw new Error("File not found"); // Check for 404
+                    if (!response.ok) throw new Error("File not found"); 
                     
                     const arrayBuffer = await response.arrayBuffer();
                     const rawBuffer = await audioCtx.decodeAudioData(arrayBuffer);
@@ -421,7 +421,7 @@
             // 1. Create Filter
             const filter = audioCtx.createBiquadFilter();
             filter.type = "lowpass";
-            filter.frequency.value = 1800; 
+            filter.frequency.value = 2200; // เพิ่มความถี่ Cutoff เล็กน้อยเพื่อให้เสียงสว่างขึ้น
             filter.Q.value = 0.8;
 
             // 2. Create Gain
@@ -440,13 +440,14 @@
                 source = audioCtx.createBufferSource();
                 source.buffer = audioBuffers[type];
             } else {
-                // FALLBACK SYNTH (ปรับปรุงให้ดังและชัดเจนขึ้น)
+                // FALLBACK SYNTH (ปรับปรุงให้ดังและชัดเจนขึ้นสำหรับมือถือ)
                 source = audioCtx.createOscillator();
                 if (type === 'bom') {
-                    // ปรับเสียงบ่อม: ใช้ Triangle wave ให้เสียงหนาขึ้น + เริ่มต้นสูงขึ้น
-                    source.frequency.value = 160; 
-                    source.type = 'triangle'; 
-                    source.frequency.exponentialRampToValueAtTime(60, t + 0.2); 
+                    // ปรับเสียงบ่อม: ใช้ Square wave (สี่เหลี่ยม) ให้เสียงหนาและดังกว่า Triangle
+                    // และเพิ่มความถี่เริ่มต้นให้สูงขึ้น เพื่อให้ลำโพงเล็กๆ ขับเสียงออก
+                    source.frequency.value = 220; 
+                    source.type = 'square'; 
+                    source.frequency.exponentialRampToValueAtTime(80, t + 0.2); 
                 } else if (type === 'pa') {
                     source.frequency.value = 350;
                     source.type = 'triangle';
