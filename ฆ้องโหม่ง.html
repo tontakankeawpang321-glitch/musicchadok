@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>โหม่งไทย (Sampler) - Black & Yellow</title>
+    <title>โหม่งไทย (Synth Style) - Black & Yellow</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
 
@@ -261,7 +261,7 @@
 <body>
 
     <header>
-        <h1>โหม่ง (Sampler)</h1>
+        <h1>โหม่ง (Synth Style)</h1>
         <div class="controls">
             <button class="btn" id="toggleNotesBtn">
                 <span>👁️</span> ชื่อ
@@ -294,7 +294,6 @@
         // 1. CONFIGURATION: ใส่ลิงก์ไฟล์เสียงของคุณที่นี่
         const soundUrls = {
             // ใส่ URL ไฟล์เสียงจริงที่นี่ (ต้องรองรับ CORS ถ้าอยู่คนละโดเมน)
-            // ตัวอย่าง: "https://mysite.com/audio/mong.wav"
             mong: "mong/mog.wav" 
         };
 
@@ -302,6 +301,7 @@
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
         let masterGain;
+        let compressor; // เพิ่ม Compressor
         let destination;
         let recorder;
         let audioChunks = [];
@@ -350,25 +350,19 @@
             try {
                 if (!soundUrls.mong) {
                     console.log("No URL provided");
-                    // ยังไม่โหลดแต่ตั้งค่าให้ระบบพร้อมทำงานเมื่อมีไฟล์
                     document.getElementById('statusBar').innerText = "กรุณาใส่ลิงก์ไฟล์เสียงในโค้ด";
-                    isLoaded = true; // Mark as processed to stop retrying immediately
+                    isLoaded = true;
                     overlay.style.display = 'none';
                     return;
                 }
 
-                // Preload
                 const response = await fetch(soundUrls.mong);
                 const arrayBuffer = await response.arrayBuffer();
-                
-                // Decode
                 const decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-                
-                // Trim Silence
                 audioBuffers.mong = trimSilence(decodedBuffer);
                 
                 isLoaded = true;
-                document.getElementById('statusBar').innerText = "พร้อมใช้งาน (Sample Mode)";
+                document.getElementById('statusBar').innerText = "พร้อมใช้งาน (Synth Mode)";
             } catch (error) {
                 console.error("Error loading sound:", error);
                 document.getElementById('statusBar').innerText = "โหลดไฟล์ล้มเหลว";
@@ -381,18 +375,25 @@
             if (!audioCtx) {
                 audioCtx = new AudioContext();
                 
-                // 1. ความดังหลัก (Volume)
+                // 3️⃣ Soft Limiter (Compressor) - คุมความดังให้นิ่งแบบ Synth
+                compressor = audioCtx.createDynamicsCompressor();
+                compressor.threshold.value = -18;
+                compressor.knee.value = 12;
+                compressor.ratio.value = 4;
+                compressor.attack.value = 0.003;
+                compressor.release.value = 0.25;
+
+                // Master Gain
                 masterGain = audioCtx.createGain();
                 masterGain.gain.value = 2.5; 
                 
                 destination = audioCtx.createMediaStreamDestination();
+                
+                // Chain: Compressor -> Master -> Destination
+                compressor.connect(masterGain);
                 masterGain.connect(audioCtx.destination);
                 masterGain.connect(destination);
 
-                // --- REMOVED ECHO/DELAY NODES HERE ---
-                // ตัดเสียง Echo ออกทั้งหมด เพื่อให้เสียง Clean
-
-                // เริ่มโหลดเสียงเมื่อ User Interact ครั้งแรก
                 loadSounds();
             }
             if (audioCtx.state === 'suspended') {
@@ -404,11 +405,9 @@
         function playSound() {
             if (!audioCtx) initAudio();
             
-            // เล่นเฉพาะเมื่อมีไฟล์เท่านั้น (ตัด Synth ออกแล้ว)
             if (audioBuffers.mong) {
                 playSample(audioBuffers.mong);
             } else {
-                // ถ้าไม่มีไฟล์ ให้แจ้งเตือน หรือเงียบไป
                 if(!soundUrls.mong) {
                      alert("กรุณาใส่ลิงก์ไฟล์เสียงในตัวแปร soundUrls ในโค้ด");
                 }
@@ -418,27 +417,33 @@
         function playSample(buffer) {
             const t = audioCtx.currentTime;
             
-            // สร้าง Source Node
             const source = audioCtx.createBufferSource();
             source.buffer = buffer;
             
-            // สร้าง Gain Node สำหรับ Fade In (ลบเสียงคลิกหัวเสียง)
+            // 4️⃣ ทำให้เหมือน Oscillator (คงที่)
+            source.playbackRate.value = 1.0; 
+
+            // 1️⃣ Low-pass Filter (หัวใจของเสียง Synth)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = "lowpass";
+            filter.frequency.value = 2200; // ค่านี้ทำให้เสียงนวลเนียน
+            filter.Q.value = 0.7;
+            
             const fadeGain = audioCtx.createGain();
             
-            // เชื่อมต่อ: Source -> FadeGain -> Master
-            source.connect(fadeGain);
-            fadeGain.connect(masterGain);
+            // Connections: Source -> Filter -> FadeGain -> Compressor
+            source.connect(filter);
+            filter.connect(fadeGain);
+            fadeGain.connect(compressor);
 
-            // --- REMOVED ECHO SEND ---
-            
-            // Fade In Settings (Attack)
-            // เพิ่ม Attack Time เป็น 0.02s (20ms) เพื่อลบเสียง "คลิก" หรือเสียงกดปุ่มตอนเริ่มให้หายไป
-            const attackTime = 0.02; 
+            // 2️⃣ Envelope แบบ Synth (Decay / Release)
+            const attack = 0.015;
+            const decay = 3.0; // ปรับให้ยาวขึ้นสำหรับโหม่ง (จาก 0.35 ในตัวอย่าง synth ทั่วไป) เพื่อไม่ให้ห้วนเกินไป
             
             fadeGain.gain.setValueAtTime(0, t);
-            fadeGain.gain.linearRampToValueAtTime(1.0, t + attackTime);
+            fadeGain.gain.linearRampToValueAtTime(1.0, t + attack);
+            fadeGain.gain.exponentialRampToValueAtTime(0.001, t + decay);
             
-            // Start Playing
             source.start(t);
         }
 
@@ -459,10 +464,9 @@
         const hit = (e) => {
             if(e.type === 'touchstart') e.preventDefault();
             
-            initAudio(); // เรียกโหลดไฟล์ถ้ายังไม่โหลด
+            initAudio(); 
             playSound();
             
-            // Visual feedback
             gong.classList.remove('active');
             void gong.offsetWidth;
             gong.classList.add('active');
@@ -505,7 +509,7 @@
                     playBtn.disabled = false;
                     downloadBtn.style.display = 'flex';
                     downloadLink.href = audioUrl;
-                    downloadLink.download = 'mong_sampler.webm';
+                    downloadLink.download = 'mong_synth.webm';
                 };
                 recorder.start();
                 isRecording = true;
