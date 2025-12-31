@@ -188,7 +188,7 @@
 
             <button id="btn-record" class="btn-control flex flex-col items-center justify-center w-20 h-20 rounded-full bg-red-600/80 text-white shadow-lg border-4 border-red-900/50" onclick="toggleRecord()">
                 <i class="fas fa-microphone text-2xl mb-1"></i>
-                <span class="text-[10px]" id="rec-text">อัดเสียง</span>
+                <span class="text-[10px]">อัดเสียง</span>
             </button>
 
             <div class="flex gap-2">
@@ -208,9 +208,9 @@
 
     <script>
         // --- Configuration ---
-        // ใส่ลิงก์สำหรับ 2 เสียงตรงนี้
+        // ⚠️ ใส่ลิงก์ไฟล์เสียงตรงนี้ (Bom = เสียงบ่อม, Poeng = เสียงเปิง)
         const soundUrls = {
-            bom: 'konglong/momlong.wav',    // เสียง "บ่อม" (กลาง)
+         bom: 'konglong/momlong.wav',    // เสียง "บ่อม" (กลาง)
             poeng: 'konglong/pengkob.wav'   // เสียง "เปิง" (ขอบ)
         };
 
@@ -255,13 +255,13 @@
                 source.connect(audioCtx.destination);
                 source.start();
 
-                // 1. Compressor (Drum Pro Settings)
+                // 1. Compressor
                 compressor = audioCtx.createDynamicsCompressor();
-                compressor.threshold.value = -14;
-                compressor.knee.value = 18;
-                compressor.ratio.value = 4; // จาก 12 -> 4 (ไม่บี้)
-                compressor.attack.value = 0.004;
-                compressor.release.value = 0.18; 
+                compressor.threshold.value = -18; // แก้ไขตามข้อ 3: ป้องกัน compressor กดเสียงเบสมากเกินไป
+                compressor.knee.value = 30;
+                compressor.ratio.value = 3; // แก้ไขตามข้อ 3
+                compressor.attack.value = 0.001; 
+                compressor.release.value = 0.05; 
                 compressor.connect(audioCtx.destination);
 
                 // 2. Master Gain
@@ -287,34 +287,47 @@
             }
         }
 
-        // --- Trim Silence (นำกลับมาตามคำขอ) ---
+        // --- Safe Trim Silence (สำหรับไฟล์เสียงเบส) ---
         function trimSilence(buffer) {
-            const rawData = buffer.getChannelData(0); 
-            const threshold = 0.001; // Low threshold for sensitivity
-            let start = 0;
-            let end = rawData.length;
+            // Threshold ต่ำมากเพื่อให้จับเสียงเบสทุ้มๆ ได้
+            const threshold = 0.0002; 
+            let start = buffer.length;
+            let end = 0;
+            const numChannels = buffer.numberOfChannels;
 
-            for (let i = 0; i < rawData.length; i++) {
-                if (Math.abs(rawData[i]) > threshold) {
-                    start = i; break;
+            // ตรวจสอบทุก Channel (ซ้าย/ขวา) เพื่อความชัวร์
+            for (let c = 0; c < numChannels; c++) {
+                const data = buffer.getChannelData(c);
+                for (let i = 0; i < data.length; i++) {
+                    if (Math.abs(data[i]) > threshold) {
+                        if (i < start) start = i;
+                        break;
+                    }
                 }
-            }
-            for (let i = rawData.length - 1; i >= 0; i--) {
-                if (Math.abs(rawData[i]) > threshold) {
-                    end = i; break;
+                for (let i = data.length - 1; i >= 0; i--) {
+                    if (Math.abs(data[i]) > threshold) {
+                        if (i > end) end = i;
+                        break;
+                    }
                 }
             }
             
-            start = Math.max(0, start - 50); // Keep slight lead-in
-            end = Math.min(rawData.length, end + 100);
+            // Safety 1: ถ้าหาเสียงไม่เจอเลย (Start ไม่ขยับ) ให้ใช้ไฟล์เดิม
+            if (start >= buffer.length || end === 0) return buffer;
+
+            // Padding: เผื่อหน้าไว้นิดหน่อยกันหัวเสียงขาด
+            start = Math.max(0, start - 100); 
+            end = Math.min(buffer.length, end + 200);
 
             const length = end - start;
-            if (length <= 0) return buffer; 
+            
+            // Safety 2: ถ้าตัดแล้วเหลือสั้นเกินไป (ผิดปกติ) ให้ใช้ไฟล์เดิม
+            if (length < 100) return buffer; 
 
-            const newBuffer = audioCtx.createBuffer(buffer.numberOfChannels, length, buffer.sampleRate);
-            for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
-                 const oldData = buffer.getChannelData(channel);
-                 const newData = newBuffer.getChannelData(channel);
+            const newBuffer = audioCtx.createBuffer(numChannels, length, buffer.sampleRate);
+            for (let c = 0; c < numChannels; c++) {
+                 const oldData = buffer.getChannelData(c);
+                 const newData = newBuffer.getChannelData(c);
                  for (let i = 0; i < length; i++) {
                      newData[i] = oldData[i + start];
                  }
@@ -344,7 +357,8 @@
                     const arrayBuffer = await response.arrayBuffer();
                     const rawBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                     
-                    audioBuffers[key] = trimSilence(rawBuffer); // Trim silence implemented
+                    // ใช้ Safe Trim
+                    audioBuffers[key] = trimSilence(rawBuffer);
                     loadedCount++;
                 } catch (e) {
                     console.warn(`Error loading ${key}`, e);
@@ -374,66 +388,73 @@
             reverbGain.connect(reverbNode); 
         }
 
-        // --- PlaySound (Modified for Pro Audio Chain) ---
+        // --- PlaySound Logic ---
         function playSound(type) {
             if (!audioCtx) return;
             const t = audioCtx.currentTime;
             
-            // 1. Check if audio buffer exists
+            // 1. ตรวจสอบว่ามีไฟล์เสียงโหลดไว้หรือไม่ (Priority สูงสุด)
             if (audioBuffers[type]) {
                 const source = audioCtx.createBufferSource();
                 source.buffer = audioBuffers[type];
                 
-                // 2. Low-Pass Filter (Marching Bass Style)
-                const filter = audioCtx.createBiquadFilter();
-                filter.type = "lowpass";
-                filter.frequency.value = 1400; // 1200–1800 Range
-                filter.Q.value = 0.9;
-
-                // 3. Envelope Gain (Synth Style)
-                const sampleGain = audioCtx.createGain();
-                const vol = 1.0;
-                const attack = 0.008; // 8ms (ยังแรง)
-                const decay = 0.55;   // หางกลม
-
-                // Envelope Logic
-                sampleGain.gain.cancelScheduledValues(t);
-                sampleGain.gain.setValueAtTime(0, t);
-                sampleGain.gain.linearRampToValueAtTime(vol, t + attack);
-                sampleGain.gain.exponentialRampToValueAtTime(0.001, t + decay);
+                const fileGain = audioCtx.createGain();
                 
-                // 4. Connect Chain: source -> filter -> sampleGain -> master
-                source.connect(filter);
-                filter.connect(sampleGain);
-                sampleGain.connect(masterGain);
-                if(reverbGain) sampleGain.connect(reverbGain);
+                // แก้ไขตามข้อ 2 + 5: ปรับ Gain Envelope ให้เสียงบ่อมดังและแน่น
+                fileGain.gain.setValueAtTime(0, t);
+                fileGain.gain.linearRampToValueAtTime(
+                    type === 'bom' ? 1.5 : 1.0,
+                    t + 0.02
+                );
+                fileGain.gain.exponentialRampToValueAtTime(
+                    0.001,
+                    t + (type === 'bom' ? 0.8 : 0.4)
+                );
+                
+                source.connect(fileGain);
+                fileGain.connect(masterGain);
+                if(reverbGain) fileGain.connect(reverbGain);
 
                 source.start(0);
 
-                // Auto cleanup
                 source.onended = function() {
                     source.disconnect();
-                    filter.disconnect();
-                    sampleGain.disconnect();
+                    fileGain.disconnect();
                 };
             } else {
-                // Fallback Synth (Simple Triangle/Square)
+                // 2. Fallback Synth (ถ้าไม่มีไฟล์เสียง ให้ใช้เสียงสังเคราะห์)
                 const osc = audioCtx.createOscillator();
                 const g = audioCtx.createGain();
                 osc.connect(g);
                 g.connect(masterGain);
                 
+                // แก้ไขตามข้อ 4: Fallback Synth สำหรับบ่อมต้องได้ยินชัดเจน
                 if (type === 'bom') {
-                    osc.frequency.value = 150; 
-                    osc.type = 'triangle';
+                    osc.type = 'square';
+                    osc.frequency.value = 240;
+                    osc.frequency.exponentialRampToValueAtTime(120, t + 0.25);
                 } else {
+                    // ปรับเสียงเปิง: ใช้ Square wave ความถี่สูง
                     osc.frequency.value = 600;
                     osc.type = 'square';
+                    // Envelope เดิมสำหรับเสียงเปิง (ไม่ได้แก้)
+                    g.gain.setValueAtTime(1, t);
+                    g.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
                 }
-                g.gain.setValueAtTime(1, t);
-                g.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+                
+                // ถ้าเป็นบ่อม เราใช้ envelope ใน if block ไม่ได้ เพราะมัน control oscillator ไม่ใช่ gain
+                // ดังนั้นสำหรับบ่อม fallback เราจะตั้ง gain แยกต่างหาก หรือใช้ envelope ร่วมกันก็ได้
+                // แต่ในกรณีนี้เพื่อให้ง่าย เราใช้ gain envelope ร่วมกันสำหรับ fallback ทั้งหมด แต่ปรับตาม type นิดหน่อย
+                if (type !== 'bom') { // ถ้าไม่ใช่บ่อม ใช้ envelope ปกติ
+                     // (code above already handled frequency/type)
+                } else {
+                     // สำหรับบ่อม fallback ปรับ gain ให้เหมาะสมกับ square wave
+                     g.gain.setValueAtTime(0.5, t); // Square ดังกว่า triangle ลด gain ลงนิดหน่อย
+                     g.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+                }
+                
                 osc.start(t);
-                osc.stop(t + 0.25);
+                osc.stop(t + 0.5);
             }
         }
 
@@ -449,12 +470,13 @@
             });
         }
 
-        // --- Hyper Optimized Touch Handler ---
+        // --- Optimized Touch Handler ---
         function handleHit(e) {
             if (e.cancelable) e.preventDefault();
             
+            // แก้ไขตามข้อ 1: แก้ปัญหาตีครั้งแรกเงียบ
             if (!audioCtx) {
-                initAudio();
+                initAudio().then(() => handleHit(e));
                 return;
             }
 
@@ -464,7 +486,6 @@
 
             for (let i = 0; i < len; i++) {
                 const t = touches[i];
-                // Math optimized
                 const dx = t.clientX - drumCenterX;
                 const dy = t.clientY - drumCenterY;
                 const distSq = dx*dx + dy*dy;
