@@ -295,13 +295,14 @@
         const soundUrls = {
             // ใส่ URL ไฟล์เสียงจริงที่นี่ (ต้องรองรับ CORS ถ้าอยู่คนละโดเมน)
             // ตัวอย่าง: "https://mysite.com/audio/mong.wav"
-            mong: "mong/mog.wav" // หากว่าง จะใช้เสียงสังเคราะห์ fallback
+            mong: "" 
         };
 
         // --- Audio Context & Engine ---
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
         let masterGain;
+        let echoNode; // เก็บ Echo Node ไว้ใช้
         let destination;
         let recorder;
         let audioChunks = [];
@@ -317,28 +318,19 @@
         const mongNote = { note: "โหม่ง", id: 1 };
 
         // --- Helper: Trim Silence ---
-        // ตัดเสียงเงียบหัว-ท้ายไฟล์อัตโนมัติ
         function trimSilence(buffer, threshold = 0.005) {
-            const rawData = buffer.getChannelData(0); // ตรวจสอบ Channel แรก
+            const rawData = buffer.getChannelData(0); 
             let start = 0;
             let end = rawData.length;
 
-            // หาจุดเริ่มเสียง
-            while (start < end && Math.abs(rawData[start]) < threshold) {
-                start++;
-            }
+            while (start < end && Math.abs(rawData[start]) < threshold) start++;
+            while (end > start && Math.abs(rawData[end - 1]) < threshold) end--;
 
-            // หาจุดจบเสียง
-            while (end > start && Math.abs(rawData[end - 1]) < threshold) {
-                end--;
-            }
-
-            if (start >= end) return buffer; // ไฟล์เงียบสนิท คืนค่าเดิม
+            if (start >= end) return buffer; 
 
             const newLength = end - start;
             const newBuffer = audioCtx.createBuffer(buffer.numberOfChannels, newLength, buffer.sampleRate);
 
-            // Copy ข้อมูลตัดเฉพาะส่วนที่มีเสียง
             for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
                 const channelData = buffer.getChannelData(channel);
                 const newChannelData = newBuffer.getChannelData(channel);
@@ -357,10 +349,11 @@
             overlay.style.display = 'flex';
             
             try {
-                // ถ้าไม่มี URL ให้ข้ามไปใช้ Synth (Demo Mode)
                 if (!soundUrls.mong) {
-                    console.log("No URL provided, using Synthesis Fallback");
-                    isLoaded = true;
+                    console.log("No URL provided");
+                    // ยังไม่โหลดแต่ตั้งค่าให้ระบบพร้อมทำงานเมื่อมีไฟล์
+                    document.getElementById('statusBar').innerText = "กรุณาใส่ลิงก์ไฟล์เสียงในโค้ด";
+                    isLoaded = true; // Mark as processed to stop retrying immediately
                     overlay.style.display = 'none';
                     return;
                 }
@@ -379,7 +372,7 @@
                 document.getElementById('statusBar').innerText = "พร้อมใช้งาน (Sample Mode)";
             } catch (error) {
                 console.error("Error loading sound:", error);
-                document.getElementById('statusBar').innerText = "โหลดไฟล์ล้มเหลว ใช้ระบบสังเคราะห์แทน";
+                document.getElementById('statusBar').innerText = "โหลดไฟล์ล้มเหลว";
             } finally {
                 overlay.style.display = 'none';
             }
@@ -388,12 +381,34 @@
         function initAudio() {
             if (!audioCtx) {
                 audioCtx = new AudioContext();
+                
+                // 1. เพิ่มความดัง (Volume Boost)
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 1.0; 
+                masterGain.gain.value = 2.5; // เพิ่มจาก 1.0 เป็น 2.5
                 
                 destination = audioCtx.createMediaStreamDestination();
                 masterGain.connect(audioCtx.destination);
                 masterGain.connect(destination);
+
+                // 2. สร้างระบบ Echo/Resonance (เพิ่มความกังวาล)
+                const delay = audioCtx.createDelay();
+                delay.delayTime.value = 0.4; // ระยะเวลา Echo (ก้องกังวาน)
+                
+                const feedback = audioCtx.createGain();
+                feedback.gain.value = 0.5; // ความยาวของหางเสียง (0.0 - 0.9)
+
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 800; // ตัดเสียงแหลมของ Echo ให้ทุ้มอุ่น
+
+                // เชื่อมต่อวงจร Echo
+                delay.connect(filter);
+                filter.connect(feedback);
+                feedback.connect(delay);
+                filter.connect(masterGain); // ส่งเสียง Echo ไปที่ Master
+
+                // เก็บ Input ของ Echo ไว้เพื่อให้ Sample ส่งเสียงเข้ามาได้
+                echoNode = delay;
 
                 // เริ่มโหลดเสียงเมื่อ User Interact ครั้งแรก
                 loadSounds();
@@ -407,12 +422,14 @@
         function playSound() {
             if (!audioCtx) initAudio();
             
-            // 1. ถ้ามี Buffer (โหลดไฟล์สำเร็จ) ให้เล่นไฟล์
+            // เล่นเฉพาะเมื่อมีไฟล์เท่านั้น (ตัด Synth ออกแล้ว)
             if (audioBuffers.mong) {
                 playSample(audioBuffers.mong);
             } else {
-                // 2. ถ้าไม่มีไฟล์ (หรือโหลดไม่เสร็จ) ให้เล่นเสียงสังเคราะห์แทน
-                playSynthFallback();
+                // ถ้าไม่มีไฟล์ ให้แจ้งเตือน หรือเงียบไป
+                if(!soundUrls.mong) {
+                     alert("กรุณาใส่ลิงก์ไฟล์เสียงในตัวแปร soundUrls ในโค้ด");
+                }
             }
         }
 
@@ -423,56 +440,29 @@
             const source = audioCtx.createBufferSource();
             source.buffer = buffer;
             
-            // สร้าง Gain Node สำหรับ Fade In/Out
+            // สร้าง Gain Node สำหรับ Fade In (ลบเสียงคลิก)
             const fadeGain = audioCtx.createGain();
             
-            // เชื่อมต่อ: Source -> Gain -> Master
+            // เชื่อมต่อ 1: ส่งเสียงตรงไปที่ Master (เสียงหลัก)
             source.connect(fadeGain);
             fadeGain.connect(masterGain);
+
+            // เชื่อมต่อ 2: ส่งเสียงไปที่ Echo (สร้างความกังวาลเพิ่ม)
+            if (echoNode) {
+                const echoSend = audioCtx.createGain();
+                echoSend.gain.value = 0.6; // ส่งเสียงไป Echo 60%
+                fadeGain.connect(echoSend);
+                echoSend.connect(echoNode);
+            }
             
-            // Fade Settings (ms)
-            const attackTime = 0.005; // 5ms Fade In (ลบเสียงคลิกหัว)
-            const releaseTime = 0.1;  // Fade Out ตอนจบ (ถ้าต้องการ, แต่ปกติโหม่งปล่อยยาว)
+            // Fade In Settings
+            const attackTime = 0.005; // 5ms
             
-            // Apply Fade In
             fadeGain.gain.setValueAtTime(0, t);
             fadeGain.gain.linearRampToValueAtTime(1.0, t + attackTime);
             
             // Start Playing
             source.start(t);
-            
-            // Note: ปกติ Sample โหม่งเราจะปล่อยจนจบไฟล์ (One-shot) 
-            // แต่ถ้าต้องการตัดเสียง (Choke) สามารถเรียก stop() แล้ว fade out ได้
-        }
-
-        // --- Synthesis Fallback (เผื่อลิงก์เสียหรือยังไม่ได้ใส่) ---
-        function playSynthFallback() {
-            const t = audioCtx.currentTime;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            
-            // Sabat Chai Formula
-            osc.frequency.value = 220; 
-            gain.gain.setValueAtTime(0, t);
-            gain.gain.linearRampToValueAtTime(1.0, t + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.001, t + 4.0);
-
-            osc.connect(gain);
-            gain.connect(masterGain);
-            osc.start(t);
-            osc.stop(t + 4.0);
-            
-            // Add Harmonic
-            const osc2 = audioCtx.createOscillator();
-            const gain2 = audioCtx.createGain();
-            osc2.frequency.value = 280;
-            gain2.gain.setValueAtTime(0, t);
-            gain2.gain.linearRampToValueAtTime(0.5, t + 0.02);
-            gain2.gain.exponentialRampToValueAtTime(0.001, t + 3.0);
-            osc2.connect(gain2);
-            gain2.connect(masterGain);
-            osc2.start(t);
-            osc2.stop(t + 3.0);
         }
 
         // --- UI Generation ---
