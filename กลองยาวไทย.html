@@ -311,7 +311,8 @@
 
         function trimSilence(buffer) {
             const rawData = buffer.getChannelData(0); 
-            const threshold = 0.005; 
+            // Reduced threshold to preserve quiet bass sounds
+            const threshold = 0.002; 
             let start = 0;
             let end = rawData.length;
 
@@ -398,33 +399,52 @@
 
         // --- Highly Optimized PlaySound ---
         function playSound(type) {
-            if (!audioCtx || !audioBuffers[type]) return;
-
-            // AudioContext Auto-Resume (Fail-safe)
+            // Check for AudioContext first
+            if (!audioCtx) return;
             if (audioCtx.state === 'suspended') audioCtx.resume();
 
             const t = audioCtx.currentTime;
             
-            // Create nodes lightweight
-            const source = audioCtx.createBufferSource();
-            source.buffer = audioBuffers[type];
-            
-            // 1. เพิ่ม Low-Pass Filter (หัวใจของเสียง synth)
+            // 1. Create Filter (LowPass) - Apply to both File and Synth
             const filter = audioCtx.createBiquadFilter();
             filter.type = "lowpass";
-            filter.frequency.value = 1800; // ค่าที่เหมาะกับกลองยาว
+            filter.frequency.value = 1800; 
             filter.Q.value = 0.8;
 
-            // 2. Create Gain Node
+            // 2. Create Gain Node (Envelope)
             const fileGain = audioCtx.createGain();
-
-            // 3. ใส่ Envelope (Attack + Decay)
+            
+            // 3. Envelope Settings (Attack + Decay)
             fileGain.gain.cancelScheduledValues(t);
             fileGain.gain.setValueAtTime(0, t);
             fileGain.gain.linearRampToValueAtTime(1.0, t + 0.015); // Attack 15ms
             fileGain.gain.exponentialRampToValueAtTime(0.001, t + 0.45); // Decay
+
+            let source;
+
+            // CHECK: Does the file buffer exist?
+            if (audioBuffers[type]) {
+                // Case 1: Use loaded file
+                source = audioCtx.createBufferSource();
+                source.buffer = audioBuffers[type];
+            } else {
+                // Case 2: FALLBACK SYNTH (Fix for missing sound)
+                // ถ้าไฟล์โหลดไม่ได้ (เช่นไม่มีไฟล์จริง) ให้ใช้เสียงสังเคราะห์แทน เพื่อให้แอปไม่เงียบ
+                source = audioCtx.createOscillator();
+                if (type === 'bom') {
+                    source.frequency.value = 130;
+                    source.type = 'sine';
+                    source.frequency.exponentialRampToValueAtTime(60, t + 0.2); // Kick drop
+                } else if (type === 'pa') {
+                    source.frequency.value = 300;
+                    source.type = 'triangle';
+                } else {
+                    source.frequency.value = 600;
+                    source.type = 'square';
+                }
+            }
             
-            // 4. Update Connections: source -> filter -> fileGain -> master/reverb
+            // 4. Connect graph: Source -> Filter -> Gain -> Master/Reverb
             source.connect(filter);
             filter.connect(fileGain);
             fileGain.connect(masterGain);
@@ -433,12 +453,17 @@
             // Instant Start
             source.start(0);
 
-            // Cleanup on end (prevents memory leaks during long play)
+            // Cleanup
             source.onended = function() {
                 source.disconnect();
-                filter.disconnect(); // ตัดการเชื่อมต่อ Filter ด้วย
+                filter.disconnect(); 
                 fileGain.disconnect();
             };
+
+            // For oscillator fallback (needs manual stop)
+            if (!audioBuffers[type]) {
+                source.stop(t + 0.45);
+            }
         }
 
         // --- Optimized Touch Handler ---
