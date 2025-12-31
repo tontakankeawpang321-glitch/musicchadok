@@ -61,6 +61,18 @@
             border: 2px dashed rgba(255,255,255,0.1);
         }
 
+        /* Zone Guides */
+        .pa-zone-guide {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 75%;
+            height: 75%;
+            border-radius: 50%;
+            border: 1px dashed rgba(62, 39, 35, 0.1);
+            pointer-events: none;
+        }
+
         /* Hit animations */
         @keyframes ripple {
             0% { opacity: 0.8; transform: translate(-50%, -50%) scale(0.5); }
@@ -163,16 +175,16 @@
             <!-- Center Target (Bom) -->
             <div class="khoon"></div>
             
-            <!-- Note Labels (2 Zones Only) -->
-            <div class="note-label text-4xl text-white drop-shadow-lg" style="top: 50%; left: 50%; transform: translate(-50%, -50%);">
-                บ่อม
-            </div>
+            <!-- Middle Zone Guide (Pa) -->
+            <div class="pa-zone-guide"></div>
             
-            <!-- Rim Labels -->
-            <div class="note-label text-2xl" style="top: 10%; left: 50%; transform: translate(-50%, -50%);">เปิง</div>
-            <div class="note-label text-2xl" style="bottom: 10%; left: 50%; transform: translate(-50%, -50%);">เปิง</div>
-            <div class="note-label text-2xl" style="left: 10%; top: 50%; transform: translate(-50%, -50%);">เปิง</div>
-            <div class="note-label text-2xl" style="right: 10%; top: 50%; transform: translate(-50%, -50%);">เปิง</div>
+            <!-- Note Labels -->
+            <div class="note-label text-3xl text-white drop-shadow-lg" style="top: 50%; left: 50%; transform: translate(-50%, -50%);">บ่อม</div>
+            <div class="note-label text-2xl" style="top: 70%; left: 50%; transform: translate(-50%, -50%);">ปะ</div>
+            <div class="note-label text-xl" style="top: 10%; left: 50%; transform: translate(-50%, -50%);">เปิง</div>
+            <div class="note-label text-xl" style="bottom: 10%; left: 50%; transform: translate(-50%, -50%);">เปิง</div>
+            <div class="note-label text-xl" style="left: 10%; top: 50%; transform: translate(-50%, -50%);">เปิง</div>
+            <div class="note-label text-xl" style="right: 10%; top: 50%; transform: translate(-50%, -50%);">เปิง</div>
             
         </div>
     </div>
@@ -188,7 +200,7 @@
 
             <button id="btn-record" class="btn-control flex flex-col items-center justify-center w-20 h-20 rounded-full bg-red-600/80 text-white shadow-lg border-4 border-red-900/50" onclick="toggleRecord()">
                 <i class="fas fa-microphone text-2xl mb-1"></i>
-                <span class="text-[10px]">อัดเสียง</span>
+                <span class="text-[10px]" id="rec-text">อัดเสียง</span>
             </button>
 
             <div class="flex gap-2">
@@ -207,10 +219,11 @@
     </div>
 
     <script>
-        // --- Configuration ---
+        // --- Configuration: External Sound URLs ---
         const soundUrls = {
-     bom: 'konglong/momlong.wav',    // เสียง "บ่อม" (กลาง)
-            poeng: 'konglong/pengkob.wav'   // เสียง "เปิง" (ขอบ)
+            bom: 'konglong/momlong.wav',    // เสียง "บ่อม" (กลาง)
+            pa: 'konglong/paklong.wav',     // เสียง "ปะ" (ล่างวงกลม/ตบ)
+            poeng: 'konglong/pengkob.wav'   // เสียง "เปิง"
         };
 
         // --- Global Variables ---
@@ -226,45 +239,29 @@
         let isRecording = false;
         let destStream;
 
-        let audioBuffers = { bom: null, poeng: null };
-        let globalSaturationCurve = null; // Cache curve
+        let audioBuffers = { bom: null, pa: null, poeng: null };
 
-        // PRE-CALCULATED GEOMETRY
+        // CACHING DRUM GEOMETRY
         const drum = document.getElementById('drum');
-        let drumRect, drumRadius, drumCenterX, drumCenterY, drumRadiusSq;
+        let drumRect = drum.getBoundingClientRect();
+        let drumRadius = drumRect.width / 2;
+        let drumCenterX = drumRect.left + drumRadius;
+        let drumCenterY = drumRect.top + drumRadius;
 
+        window.addEventListener('resize', updateDrumGeometry);
         function updateDrumGeometry() {
             drumRect = drum.getBoundingClientRect();
             drumRadius = drumRect.width / 2;
-            drumRadiusSq = drumRadius * drumRadius; 
             drumCenterX = drumRect.left + drumRadius;
             drumCenterY = drumRect.top + drumRadius;
-        }
-        window.addEventListener('resize', updateDrumGeometry);
-        updateDrumGeometry();
-
-        // 1️⃣ WAVE SHAPER (SATURATION) - สร้างฮาร์โมนิกให้เสียงหนา
-        function createSaturation(ctx) {
-            // สร้าง Curve ครั้งเดียวเพื่อประหยัด CPU
-            if (!globalSaturationCurve) {
-                const samples = 44100;
-                globalSaturationCurve = new Float32Array(samples);
-                for (let i = 0; i < samples; i++) {
-                    const x = (i * 2) / samples - 1;
-                    // Math.tanh ให้เสียงแตกแบบ Analog (Soft Clipping)
-                    globalSaturationCurve[i] = Math.tanh(x * 3); 
-                }
-            }
-            const shaper = ctx.createWaveShaper();
-            shaper.curve = globalSaturationCurve;
-            shaper.oversample = '4x'; // คุณภาพสูง
-            return shaper;
         }
 
         async function initAudio() {
             if (!audioCtx) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
-                audioCtx = new AudioContext({ latencyHint: 'interactive' });
+                audioCtx = new AudioContext({
+                    latencyHint: 'interactive',
+                });
                 
                 // Silent warm-up
                 const buffer = audioCtx.createBuffer(1, 1, 22050);
@@ -273,26 +270,27 @@
                 source.connect(audioCtx.destination);
                 source.start();
 
-                // 1. Compressor (ปรับไม่ให้กดเสียงเบส)
+                // 1. Create Compressor
                 compressor = audioCtx.createDynamicsCompressor();
-                compressor.threshold.value = -18; 
+                compressor.threshold.value = -10;
                 compressor.knee.value = 30;
-                compressor.ratio.value = 3; 
+                compressor.ratio.value = 8; 
                 compressor.attack.value = 0.001; 
-                compressor.release.value = 0.05; 
+                compressor.release.value = 0.05;
                 compressor.connect(audioCtx.destination);
 
                 // 2. Master Gain
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 1.0;
+                masterGain.gain.value = 1.2;
                 masterGain.connect(compressor);
 
-                // 3. Reverb
+                // 3. Setup Reverb
                 await setupReverb();
 
-                // 4. Load Files
+                // 4. Load External Sounds
                 await loadSoundFiles();
 
+                // Setup Stream for Recording
                 destStream = audioCtx.createMediaStreamDestination();
                 compressor.connect(destStream);
 
@@ -305,9 +303,10 @@
             }
         }
 
-        // --- Safe Trim Silence ---
+        // --- IMPROVED TRIM SILENCE ---
         function trimSilence(buffer) {
-            const threshold = 0.0002; 
+            // ใช้ threshold ที่ต่ำมากเพื่อให้จับเสียงเบสที่เบาได้
+            const threshold = 0.0005; 
             let start = buffer.length;
             let end = 0;
             const numChannels = buffer.numberOfChannels;
@@ -327,12 +326,16 @@
                     }
                 }
             }
-            
-            if (start >= buffer.length || end === 0) return buffer;
+
+            // ถ้าหาเสียงไม่เจอ หรือไฟล์สั้นผิดปกติ ให้คืนค่า null (เพื่อใช้ fallback หรือไฟล์เดิม)
+            if (start >= end) return null; 
+
+            // Padding: เผื่อหน้าไว้นิดหน่อยกันหัวเสียงขาด
             start = Math.max(0, start - 100); 
             end = Math.min(buffer.length, end + 200);
+
             const length = end - start;
-            if (length < 100) return buffer; 
+            if (length < 100) return null; 
 
             const newBuffer = audioCtx.createBuffer(numChannels, length, buffer.sampleRate);
             for (let c = 0; c < numChannels; c++) {
@@ -362,15 +365,23 @@
                     statusDiv.classList.remove('hidden');
 
                     const response = await fetch(url);
-                    if (!response.ok) throw new Error("File not found");
+                    if (!response.ok) throw new Error("File not found"); 
                     
                     const arrayBuffer = await response.arrayBuffer();
                     const rawBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                     
-                    audioBuffers[key] = trimSilence(rawBuffer);
+                    const trimmed = trimSilence(rawBuffer);
+                    
+                    // ถ้า trim แล้วมีปัญหา ให้ใช้ไฟล์ต้นฉบับเลย (Safety)
+                    if (trimmed) {
+                        audioBuffers[key] = trimmed;
+                    } else {
+                        console.warn(`Sound ${key} might be too quiet, using original.`);
+                        audioBuffers[key] = rawBuffer; 
+                    }
                     loadedCount++;
                 } catch (e) {
-                    console.warn(`Error loading ${key}`, e);
+                    console.warn(`Error loading ${key}, using synth.`, e);
                 }
             }
             document.getElementById('status-indicator').innerHTML = `<i class="fas fa-check-circle text-green-400 mr-1"></i>พร้อมใช้งาน (${loadedCount}/${total})`;
@@ -381,7 +392,7 @@
             reverbGain = audioCtx.createGain();
             reverbGain.gain.value = 0.25; 
 
-            const length = audioCtx.sampleRate * 1.2; 
+            const length = audioCtx.sampleRate * 0.8; 
             const impulse = audioCtx.createBuffer(2, length, audioCtx.sampleRate);
             const left = impulse.getChannelData(0);
             const right = impulse.getChannelData(1);
@@ -397,118 +408,113 @@
             reverbGain.connect(reverbNode); 
         }
 
-        // --- 2️⃣ PRO AUDIO ENGINE (With Saturation & Direct Routing) ---
+        // --- PlaySound (Tuned for Volume) ---
         function playSound(type) {
             if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
             const t = audioCtx.currentTime;
+            
+            // 1. Create Filter (LowPass) - Open up the filter a bit for cleaner attack
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = "lowpass";
+            filter.frequency.value = 2200; 
+            filter.Q.value = 0.8;
 
-            /* === GAIN === */
-            const gain = audioCtx.createGain();
+            // 2. Create Gain Node (Envelope)
+            const fileGain = audioCtx.createGain();
+            
+            // 3. Envelope Settings (VOLUME BOOST HERE)
+            fileGain.gain.cancelScheduledValues(t);
+            fileGain.gain.setValueAtTime(0, t);
+            
+            // ตรวจสอบชนิดเสียงและ Boost Gain
+            const isBom = type === 'bom';
+            const peakVolume = isBom ? 2.5 : 1.0; // Boost Bom 2.5 เท่า
+            const decayTime = isBom ? 0.6 : 0.45; // Bom หางเสียงยาวกว่านิดหน่อย
 
-            /* === SOURCE === */
+            fileGain.gain.linearRampToValueAtTime(peakVolume, t + 0.01); // Fast attack
+            fileGain.gain.exponentialRampToValueAtTime(0.001, t + decayTime);
+
             let source;
+
             if (audioBuffers[type]) {
+                // Use File
                 source = audioCtx.createBufferSource();
                 source.buffer = audioBuffers[type];
             } else {
+                // Fallback Synth
                 source = audioCtx.createOscillator();
-                // 3️⃣ ปรับความถี่ "บ่อม" ขึ้นตามสูตร (ห้ามต่ำกว่า 320)
                 if (type === 'bom') {
-                    source.type = 'square'; // สี่เหลี่ยมให้เสียงหนา
-                    source.frequency.value = 320; 
-                    source.frequency.exponentialRampToValueAtTime(180, t + 0.4);
+                    // Bom Synth: Triangle Wave (แน่นกว่า Sine)
+                    source.frequency.value = 160; 
+                    source.type = 'triangle'; 
+                    source.frequency.exponentialRampToValueAtTime(60, t + 0.2); 
+                } else if (type === 'pa') {
+                    source.frequency.value = 350;
+                    source.type = 'triangle';
                 } else {
-                    source.type = 'square';
                     source.frequency.value = 650;
+                    source.type = 'square';
                 }
             }
-
-            /* === ENVELOPE === */
-            gain.gain.setValueAtTime(0, t);
-            // 4️⃣ Boost Gain บ่อมเป็น 2.2
-            gain.gain.linearRampToValueAtTime(
-                type === 'bom' ? 2.2 : 1.0, 
-                t + 0.02
-            );
-            gain.gain.exponentialRampToValueAtTime(
-                0.001,
-                t + (type === 'bom' ? 1.0 : 0.35)
-            );
-
-            source.connect(gain);
-
-            /* === ROUTING (สำคัญที่สุด: บ่อม BYPASS Compressor) === */
-            if (type === 'bom') {
-                // 🔥 บ่อม: Gain -> Saturator -> Output (ตรง)
-                const saturator = createSaturation(audioCtx);
-                gain.connect(saturator);
-                saturator.connect(audioCtx.destination);
-            } else {
-                // เปิง: Gain -> Master (Compressor)
-                gain.connect(masterGain);
-            }
-
-            source.start(t);
             
-            // Auto-stop for oscillator fallback
-            if (!audioBuffers[type]) source.stop(t + 1.0);
-            
-            source.onended = () => {
+            // 4. Connect
+            source.connect(filter);
+            filter.connect(fileGain);
+            fileGain.connect(masterGain);
+            if(reverbGain) fileGain.connect(reverbGain);
+
+            // Start
+            source.start(0);
+
+            // Cleanup
+            source.onended = function() {
                 source.disconnect();
-                gain.disconnect();
+                filter.disconnect(); 
+                fileGain.disconnect();
+            };
+
+            if (!audioBuffers[type]) {
+                source.stop(t + 0.45);
             }
         }
 
-        // --- Visual Animation ---
-        function triggerDrumAnimation() {
-            drum.animate([
-                { transform: 'scale(1)' },
-                { transform: 'scale(0.97)' },
-                { transform: 'scale(1)' }
-            ], {
-                duration: 60,
-                easing: 'ease-out'
-            });
-        }
-
-        // --- Optimized Touch Handler ---
+        // --- Touch Handler ---
         function handleHit(e) {
             if (e.cancelable) e.preventDefault();
-
             if (!audioCtx) {
-                initAudio().then(() => handleHit(e));
+                initAudio();
                 return;
             }
 
-            // ✅ รองรับทั้ง Touch และ Mouse
-            const points = e.changedTouches ? e.changedTouches : [e];
+            const touches = e.changedTouches;
+            const len = touches.length;
 
-            let visualTriggered = false;
+            for (let i = 0; i < len; i++) {
+                const t = touches[i];
+                const dx = t.clientX - drumCenterX;
+                const dy = t.clientY - drumCenterY;
+                const distSq = dx*dx + dy*dy;
+                const radiusSq = drumRadius * drumRadius;
+                const normalizedDistSq = distSq / radiusSq;
 
-            for (let i = 0; i < points.length; i++) {
-                const p = points[i];
-
-                const x = p.clientX;
-                const y = p.clientY;
-
-                const dx = x - drumCenterX;
-                const dy = y - drumCenterY;
-                const distSq = dx * dx + dy * dy;
-                const normalizedDistSq = distSq / drumRadiusSq;
-
-                if (normalizedDistSq < 0.2025) {
+                if (normalizedDistSq < 0.1225) {
                     playSound('bom');
-                } else {
+                } else if (normalizedDistSq > 0.5625) {
                     playSound('poeng');
+                } else {
+                    playSound('pa');
                 }
-
-                requestAnimationFrame(() => createRipple(x, y));
-                visualTriggered = true;
             }
 
-            if (visualTriggered) {
-                requestAnimationFrame(triggerDrumAnimation);
-            }
+            requestAnimationFrame(() => {
+                for (let i = 0; i < len; i++) {
+                    createRipple(touches[i].clientX, touches[i].clientY);
+                }
+                drum.style.transform = 'scale(0.98)';
+                setTimeout(() => drum.style.transform = 'scale(1)', 50);
+            });
         }
 
         function createRipple(x, y) {
@@ -522,12 +528,11 @@
             }, 200);
         }
 
-        // Event Listeners
         drum.addEventListener('touchstart', handleHit, { passive: false });
         drum.addEventListener('mousedown', handleHit); 
         document.body.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
-        // Controls
+        // Controls (UI handlers)
         function toggleNotes() {
             const drumEl = document.getElementById('drum');
             const btn = document.getElementById('btn-notes');
