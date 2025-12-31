@@ -31,7 +31,6 @@ body{
     inset:28%;
     border-radius:50%;
     background:radial-gradient(circle,#3e2723 0%,#5d4037 70%,transparent 100%);
-    opacity:.85;
 }
 .hit-anim{
     position:fixed;
@@ -48,8 +47,9 @@ body{
 </style>
 </head>
 
-<body class="h-screen flex flex-col">
+<body class="h-screen flex flex-col justify-between">
 
+<!-- START -->
 <div id="start-overlay" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
     <div onclick="initAudio()" class="cursor-pointer text-center text-white">
         <i class="fas fa-drum text-6xl text-yellow-400 mb-4"></i>
@@ -57,10 +57,24 @@ body{
     </div>
 </div>
 
+<!-- DRUM -->
 <div class="flex-1 flex items-center justify-center">
     <div id="drum" class="drum-head w-[80vw] h-[80vw] max-w-[480px] max-h-[480px] rounded-full relative">
         <div class="khoon"></div>
     </div>
+</div>
+
+<!-- CONTROLS -->
+<div class="bg-black/40 backdrop-blur-md p-4 flex justify-center gap-3">
+    <button id="recBtn" onclick="toggleRecord()" class="w-16 h-16 rounded-full bg-red-600 text-white">
+        <i class="fas fa-microphone"></i>
+    </button>
+    <button id="playBtn" onclick="playRecording()" disabled class="w-16 h-16 rounded-xl bg-blue-600 text-white opacity-40">
+        <i class="fas fa-play"></i>
+    </button>
+    <button id="downBtn" onclick="downloadRecording()" disabled class="w-16 h-16 rounded-xl bg-green-600 text-white opacity-40">
+        <i class="fas fa-download"></i>
+    </button>
 </div>
 
 <script>
@@ -75,6 +89,8 @@ const soundUrls = {
 
 let audioCtx, masterGain, compressor, reverbNode, reverbGain;
 let audioBuffers = {};
+let destStream, recorder, recordedChunks=[], audioUrl;
+let isRecording=false;
 
 /* =======================
    INIT AUDIO
@@ -95,6 +111,9 @@ async function initAudio(){
 
     compressor.connect(audioCtx.destination);
     masterGain.connect(compressor);
+
+    destStream = audioCtx.createMediaStreamDestination();
+    compressor.connect(destStream);
 
     await setupReverb();
     await loadSoundFiles();
@@ -124,13 +143,12 @@ async function setupReverb(){
 }
 
 /* =======================
-   LOAD FILES (NO TRIM BOM)
+   LOAD FILES
 ======================= */
 async function loadSoundFiles(){
     for(const k in soundUrls){
         const res = await fetch(soundUrls[k]);
-        const buf = await audioCtx.decodeAudioData(await res.arrayBuffer());
-        audioBuffers[k] = buf;
+        audioBuffers[k] = await audioCtx.decodeAudioData(await res.arrayBuffer());
     }
 }
 
@@ -145,15 +163,8 @@ function playSound(type){
     src.buffer = audioBuffers[type];
 
     const filter = audioCtx.createBiquadFilter();
-    filter.type = 'lowpass';
-
-    if(type==='bom'){
-        filter.frequency.value = 4800;
-        filter.Q.value = 0.6;
-    }else{
-        filter.frequency.value = 2200;
-        filter.Q.value = 0.8;
-    }
+    filter.type='lowpass';
+    filter.frequency.value = type==='bom'?4800:2200;
 
     const gain = audioCtx.createGain();
     gain.gain.setValueAtTime(0,t);
@@ -169,11 +180,9 @@ function playSound(type){
     gain.connect(masterGain);
     gain.connect(reverbGain);
 
-    /* SUB HARMONIC (มือถือสั่น) */
     if(type==='bom'){
         const sub = audioCtx.createOscillator();
         const subGain = audioCtx.createGain();
-        sub.type='sine';
         sub.frequency.value=55;
         subGain.gain.setValueAtTime(.9,t);
         subGain.gain.exponentialRampToValueAtTime(.001,t+.45);
@@ -187,14 +196,14 @@ function playSound(type){
 }
 
 /* =======================
-   HIT DETECTION
+   HIT
 ======================= */
-const drum = document.getElementById('drum');
+const drum=document.getElementById('drum');
 drum.addEventListener('mousedown',e=>{
-    const r = drum.getBoundingClientRect();
-    const dx = e.clientX-(r.left+r.width/2);
-    const dy = e.clientY-(r.top+r.height/2);
-    const d = Math.sqrt(dx*dx+dy*dy)/(r.width/2);
+    const r=drum.getBoundingClientRect();
+    const dx=e.clientX-(r.left+r.width/2);
+    const dy=e.clientY-(r.top+r.height/2);
+    const d=Math.sqrt(dx*dx+dy*dy)/(r.width/2);
 
     if(d<.35) playSound('bom');
     else if(d>.75) playSound('poeng');
@@ -207,7 +216,41 @@ drum.addEventListener('mousedown',e=>{
     document.body.appendChild(h);
     setTimeout(()=>h.remove(),200);
 });
-</script>
 
+/* =======================
+   RECORD
+======================= */
+function toggleRecord(){
+    if(!isRecording){
+        recordedChunks=[];
+        recorder=new MediaRecorder(destStream.stream);
+        recorder.ondataavailable=e=>recordedChunks.push(e.data);
+        recorder.onstop=()=>{
+            audioUrl=URL.createObjectURL(new Blob(recordedChunks,{type:'audio/webm'}));
+            playBtn.disabled=false;
+            downBtn.disabled=false;
+            playBtn.classList.remove('opacity-40');
+            downBtn.classList.remove('opacity-40');
+        };
+        recorder.start();
+        isRecording=true;
+        recBtn.innerHTML='<i class="fas fa-stop"></i>';
+    }else{
+        recorder.stop();
+        isRecording=false;
+        recBtn.innerHTML='<i class="fas fa-microphone"></i>';
+    }
+}
+
+function playRecording(){
+    if(audioUrl) new Audio(audioUrl).play();
+}
+function downloadRecording(){
+    const a=document.createElement('a');
+    a.href=audioUrl;
+    a.download='klong-yao.webm';
+    a.click();
+}
+</script>
 </body>
 </html>
