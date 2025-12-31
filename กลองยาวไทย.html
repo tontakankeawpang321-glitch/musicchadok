@@ -257,9 +257,9 @@
 
                 // 1. Compressor
                 compressor = audioCtx.createDynamicsCompressor();
-                compressor.threshold.value = -18; // แก้ไขตามข้อ 3: ป้องกัน compressor กดเสียงเบสมากเกินไป
+                compressor.threshold.value = -18; 
                 compressor.knee.value = 30;
-                compressor.ratio.value = 3; // แก้ไขตามข้อ 3
+                compressor.ratio.value = 3; 
                 compressor.attack.value = 0.001; 
                 compressor.release.value = 0.05; 
                 compressor.connect(audioCtx.destination);
@@ -388,73 +388,61 @@
             reverbGain.connect(reverbNode); 
         }
 
-        // --- PlaySound Logic ---
+        // --- PlaySound Logic (Revised) ---
         function playSound(type) {
             if (!audioCtx) return;
             const t = audioCtx.currentTime;
-            
-            // 1. ตรวจสอบว่ามีไฟล์เสียงโหลดไว้หรือไม่ (Priority สูงสุด)
+
+            /* === GAIN === */
+            const gain = audioCtx.createGain();
+
+            /* === SOURCE === */
+            let source;
             if (audioBuffers[type]) {
-                const source = audioCtx.createBufferSource();
+                source = audioCtx.createBufferSource();
                 source.buffer = audioBuffers[type];
-                
-                const fileGain = audioCtx.createGain();
-                
-                // แก้ไขตามข้อ 2 + 5: ปรับ Gain Envelope ให้เสียงบ่อมดังและแน่น
-                fileGain.gain.setValueAtTime(0, t);
-                fileGain.gain.linearRampToValueAtTime(
-                    type === 'bom' ? 1.5 : 1.0,
-                    t + 0.02
-                );
-                fileGain.gain.exponentialRampToValueAtTime(
-                    0.001,
-                    t + (type === 'bom' ? 0.8 : 0.4)
-                );
-                
-                source.connect(fileGain);
-                fileGain.connect(masterGain);
-                if(reverbGain) fileGain.connect(reverbGain);
-
-                source.start(0);
-
-                source.onended = function() {
-                    source.disconnect();
-                    fileGain.disconnect();
-                };
             } else {
-                // 2. Fallback Synth (ถ้าไม่มีไฟล์เสียง ให้ใช้เสียงสังเคราะห์)
-                const osc = audioCtx.createOscillator();
-                const g = audioCtx.createGain();
-                osc.connect(g);
-                g.connect(masterGain);
-                
-                // แก้ไขตามข้อ 4: Fallback Synth สำหรับบ่อมต้องได้ยินชัดเจน
+                source = audioCtx.createOscillator();
                 if (type === 'bom') {
-                    osc.type = 'square';
-                    osc.frequency.value = 240;
-                    osc.frequency.exponentialRampToValueAtTime(120, t + 0.25);
+                    source.type = 'square';
+                    source.frequency.value = 240;
+                    source.frequency.exponentialRampToValueAtTime(120, t + 0.3);
                 } else {
-                    // ปรับเสียงเปิง: ใช้ Square wave ความถี่สูง
-                    osc.frequency.value = 600;
-                    osc.type = 'square';
-                    // Envelope เดิมสำหรับเสียงเปิง (ไม่ได้แก้)
-                    g.gain.setValueAtTime(1, t);
-                    g.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+                    source.type = 'square';
+                    source.frequency.value = 650;
                 }
-                
-                // ถ้าเป็นบ่อม เราใช้ envelope ใน if block ไม่ได้ เพราะมัน control oscillator ไม่ใช่ gain
-                // ดังนั้นสำหรับบ่อม fallback เราจะตั้ง gain แยกต่างหาก หรือใช้ envelope ร่วมกันก็ได้
-                // แต่ในกรณีนี้เพื่อให้ง่าย เราใช้ gain envelope ร่วมกันสำหรับ fallback ทั้งหมด แต่ปรับตาม type นิดหน่อย
-                if (type !== 'bom') { // ถ้าไม่ใช่บ่อม ใช้ envelope ปกติ
-                     // (code above already handled frequency/type)
-                } else {
-                     // สำหรับบ่อม fallback ปรับ gain ให้เหมาะสมกับ square wave
-                     g.gain.setValueAtTime(0.5, t); // Square ดังกว่า triangle ลด gain ลงนิดหน่อย
-                     g.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
-                }
-                
-                osc.start(t);
-                osc.stop(t + 0.5);
+            }
+
+            /* === ENVELOPE === */
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(
+                type === 'bom' ? 1.8 : 1.0,
+                t + 0.02
+            );
+            gain.gain.exponentialRampToValueAtTime(
+                0.001,
+                t + (type === 'bom' ? 1.0 : 0.35)
+            );
+
+            source.connect(gain);
+
+            /* === OUTPUT ROUTING (Bypass check) === */
+            if (type === 'bom') {
+                // 🔥 บ่อม: ต่อออกลำโพงตรง (Bypass Compressor)
+                gain.connect(audioCtx.destination);
+            } else {
+                // เปิง: ผ่าน compressor
+                gain.connect(masterGain);
+            }
+
+            source.start(t);
+            
+            // Auto-stop for oscillator fallback
+            if (!audioBuffers[type]) source.stop(t + 1.0);
+            
+            source.onended = () => {
+                source.disconnect();
+                gain.disconnect();
             }
         }
 
@@ -474,7 +462,7 @@
         function handleHit(e) {
             if (e.cancelable) e.preventDefault();
             
-            // แก้ไขตามข้อ 1: แก้ปัญหาตีครั้งแรกเงียบ
+            // แก้ไขตามข้อ 1: แก้ปัญหาตีครั้งแรกเงียบ (Wait for init)
             if (!audioCtx) {
                 initAudio().then(() => handleHit(e));
                 return;
