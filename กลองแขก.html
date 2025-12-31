@@ -193,13 +193,31 @@
     <div id="start-overlay" onclick="startApp()">
         <div class="text-6xl mb-4">🥁</div>
         <h2 class="text-2xl font-bold mb-2">กลองแขกจำลอง</h2>
-        <p class="mb-6 opacity-80">แตะเพื่อเริ่มใช้งาน (เสียงดังพิเศษ)</p>
+        <p class="mb-6 opacity-80">แตะเพื่อเริ่มใช้งาน (รองรับไฟล์เสียง)</p>
         <div class="animate-bounce bg-[#e6d5b8] text-[#2c1e12] px-6 py-2 rounded-full font-bold shadow-lg cursor-pointer">
             เริ่มเลย
         </div>
     </div>
 
     <script>
+        // --- 1. Sound Configuration (ใส่ลิงก์เสียงตรงนี้) ---
+        const soundUrls = {
+            male: {
+                center: "kongkang/joman.wav", // ใส่ลิงก์เสียง "โจ๊ะ" (ตัวผู้-กลาง) เช่น 'sounds/jo.mp3'
+                rim: "kongkang/thingman.wav"     // ใส่ลิงก์เสียง "ติง" (ตัวผู้-ขอบ)
+            },
+            female: {
+                center: "kongkang/thingwo.wav", // ใส่ลิงก์เสียง "ต้ม" (ตัวเมีย-กลาง)
+                rim: "kongkang/jowo.wav"     // ใส่ลิงก์เสียง "จ๊ะ" (ตัวเมีย-ขอบ)
+            }
+        };
+
+        // ตัวแปรสำหรับเก็บไฟล์เสียงที่โหลดแล้ว
+        const audioBuffers = {
+            male: { center: null, rim: null },
+            female: { center: null, rim: null }
+        };
+
         // --- Audio Engine Setup ---
         let audioCtx;
         let masterGain;
@@ -210,200 +228,176 @@
         let audioBlob;
         let audioUrl;
         
-        function initAudio() {
+        async function initAudio() {
             if (!audioCtx) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 audioCtx = new AudioContext();
                 
-                // 1. Dynamics Compressor (Hard Limiter mode for MAX VOLUME)
+                // Dynamics Compressor (Limiter)
                 compressor = audioCtx.createDynamicsCompressor();
-                compressor.threshold.value = -10; // High threshold
-                compressor.knee.value = 0; // Hard knee
-                compressor.ratio.value = 20; // High ratio (Limiting)
-                compressor.attack.value = 0.001; // Fast attack
+                compressor.threshold.value = -10;
+                compressor.knee.value = 0;
+                compressor.ratio.value = 20;
+                compressor.attack.value = 0.001;
                 compressor.release.value = 0.1;
 
-                // 2. Master Gain (Boosted)
+                // Master Gain
                 masterGain = audioCtx.createGain();
-                masterGain.gain.value = 1.8; // Boost volume significantly (compressor prevents clipping)
+                masterGain.gain.value = 1.8;
 
-                // Routing: Source -> MasterGain -> Compressor -> Destination (Dry & Loud)
-                // Removed Reverb for direct punchy sound
                 masterGain.connect(compressor);
                 compressor.connect(audioCtx.destination);
 
-                // Setup Recording Stream (From compressor output)
+                // Setup Recording
                 dest = audioCtx.createMediaStreamDestination();
                 compressor.connect(dest);
+
+                // Load custom sounds if URLs provided
+                await loadAllCustomSounds();
             }
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
         }
 
-        // Generate Noise Buffer for "Snap" sound
-        let noiseBuffer;
-        function createNoiseBuffer() {
-            if (!audioCtx) return;
-            const bufferSize = audioCtx.sampleRate * 2; 
-            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                data[i] = Math.random() * 2 - 1;
+        // --- Custom Sound Loader & Processing ---
+        
+        // ฟังก์ชันตัดเสียงเงียบหัวไฟล์ (Trim Silence)
+        function trimSilence(buffer) {
+            const rawData = buffer.getChannelData(0); // ตรวจสอบจาก Channel ซ้าย
+            const len = rawData.length;
+            const threshold = 0.005; // ระดับความดังขั้นต่ำที่จะเริ่มนับ
+
+            // หาจุดเริ่มต้นเสียง (Start Offset)
+            let start = 0;
+            for(let i = 0; i < len; i++){
+                if(Math.abs(rawData[i]) > threshold){
+                    start = i;
+                    break;
+                }
             }
-            noiseBuffer = buffer;
+
+            // ถ้าไม่มีเสียงเงียบ หรือเงียบทั้งไฟล์ ให้คืนค่าเดิม
+            if(start === 0 || start === len) return buffer;
+
+            // ตัดเฉพาะส่วนที่มีเสียงมาสร้าง Buffer ใหม่
+            const newLen = len - start;
+            const newBuffer = audioCtx.createBuffer(buffer.numberOfChannels, newLen, buffer.sampleRate);
+            
+            for(let ch = 0; ch < buffer.numberOfChannels; ch++){
+                const oldData = buffer.getChannelData(ch);
+                const newData = newBuffer.getChannelData(ch);
+                // Copy ข้อมูลแบบ Manual (ใช้ loop เพื่อความเข้ากันได้สูงสุด)
+                for(let i = 0; i < newLen; i++){
+                    newData[i] = oldData[i + start];
+                }
+            }
+            return newBuffer;
         }
 
-        function playSound(type, pitchMultiplier = 1) {
-            if (!audioCtx) initAudio();
-            if (!noiseBuffer) createNoiseBuffer();
+        async function loadSound(url) {
+            if (!url) return null;
+            try {
+                // 1. Fetch File
+                const response = await fetch(url);
+                const arrayBuffer = await response.arrayBuffer();
+                
+                // 2. Decode Audio Data to Buffer
+                let audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                
+                // 3. Trim Silence (Pre-process)
+                audioBuffer = trimSilence(audioBuffer);
+                
+                console.log(`Loaded and trimmed: ${url}`);
+                return audioBuffer;
+            } catch (e) {
+                console.warn("ไม่สามารถโหลดไฟล์เสียงได้:", url, e);
+                return null;
+            }
+        }
 
+        async function loadAllCustomSounds() {
+            // โหลดแบบ Parallel เพื่อความเร็ว
+            const promises = [];
+            if(soundUrls.male.center) promises.push(loadSound(soundUrls.male.center).then(b => audioBuffers.male.center = b));
+            if(soundUrls.male.rim)    promises.push(loadSound(soundUrls.male.rim).then(b => audioBuffers.male.rim = b));
+            if(soundUrls.female.center) promises.push(loadSound(soundUrls.female.center).then(b => audioBuffers.female.center = b));
+            if(soundUrls.female.rim)    promises.push(loadSound(soundUrls.female.rim).then(b => audioBuffers.female.rim = b));
+            await Promise.all(promises);
+        }
+
+        // --- Play Sound Logic (File Only) ---
+        function playSound(zone, drumType) {
+            if (!audioCtx) initAudio();
             const t = audioCtx.currentTime;
 
-            // --- OSCILLATOR SETUP ---
-            const osc1 = audioCtx.createOscillator();
-            const osc1Gain = audioCtx.createGain();
-            osc1.connect(osc1Gain);
-            osc1Gain.connect(masterGain);
-
-            // Noise setup (Impact)
-            const noise = audioCtx.createBufferSource();
-            noise.buffer = noiseBuffer;
-            const noiseFilter = audioCtx.createBiquadFilter();
-            const noiseGain = audioCtx.createGain();
-            noise.connect(noiseFilter);
-            noiseFilter.connect(noiseGain);
-            noiseGain.connect(masterGain);
-
-            // FM Synthesis for "Ting" (Rim)
-            // Carrier -> Modulator logic is implemented by connecting osc to freq param
-            
-            if (type === 'center') {
-                // "JO" or "TOM" - Punchy, Deep, No Ring
-                // To make it realistic: Fast pitch drop + Solid low end
+            // Check if file is loaded
+            const customBuffer = audioBuffers[drumType]?.[zone];
+            if (customBuffer) {
+                // สร้าง Node
+                const source = audioCtx.createBufferSource();
+                const gainNode = audioCtx.createGain(); // เพิ่ม Gain Node สำหรับ Fade
                 
-                const baseFreq = 90 * pitchMultiplier;
+                source.buffer = customBuffer;
                 
-                // Body (Sine wave)
-                osc1.type = 'sine';
-                osc1.frequency.setValueAtTime(baseFreq * 1.5, t); // Start higher
-                osc1.frequency.exponentialRampToValueAtTime(baseFreq, t + 0.1); // Drop faster (Drier pitch)
-                
-                osc1Gain.gain.setValueAtTime(0, t);
-                // ปรับเพิ่มความดัง (Boost gain) และลดหางเสียงให้สั้นลง (Dry decay)
-                osc1Gain.gain.linearRampToValueAtTime(3.5, t + 0.005); // Snap start louder
-                osc1Gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25); // Short/Dry decay (was 0.5)
+                // เชื่อมต่อ: Source -> Gain -> Master
+                source.connect(gainNode);
+                gainNode.connect(masterGain);
 
-                // Impact Click (Low-passed Noise)
-                noiseFilter.type = 'lowpass';
-                noiseFilter.frequency.setValueAtTime(1000, t);
-                // ปรับเพิ่มเสียงกระแทก
-                noiseGain.gain.setValueAtTime(2.5, t);
-                noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05); // Very short click
+                // --- Envelope: Fade In/Out (ระดับ ms) ---
+                // Fade In 2ms (แก้เสียงคลิกตอนเริ่ม)
+                gainNode.gain.setValueAtTime(0, t);
+                gainNode.gain.linearRampToValueAtTime(1, t + 0.002);
 
-                // Secondary Oscillator for Thickness
-                const subOsc = audioCtx.createOscillator();
-                const subGain = audioCtx.createGain();
-                subOsc.type = 'triangle';
-                subOsc.frequency.setValueAtTime(baseFreq * 0.5, t); // Sub-bass
-                subOsc.connect(subGain);
-                subGain.connect(masterGain);
-                // ปรับเพิ่มเสียงเบส และทำให้กระชับขึ้น
-                subGain.gain.setValueAtTime(1.5, t);
-                subGain.gain.exponentialRampToValueAtTime(0.01, t + 0.2); // Tight sub bass
-                subOsc.start(t);
-                subOsc.stop(t + 0.5);
+                // Fade Out ตอนจบไฟล์ (แก้เสียงคลิกตอนจบ)
+                const duration = customBuffer.duration;
+                if (duration > 0.01) {
+                    gainNode.gain.setValueAtTime(1, t + duration - 0.005); // คงความดังไว้จนเกือบจบ
+                    gainNode.gain.linearRampToValueAtTime(0, t + duration); // Fade out 5ms สุดท้าย
+                }
 
-            } else if (type === 'rim') {
-                // "TING" or "JA" - Metallic, High, Sharp
-                // Using FM Synthesis for bell-like tone
-                
-                const baseFreq = 380 * pitchMultiplier;
-
-                // Carrier (The sound we hear)
-                osc1.type = 'sine';
-                osc1.frequency.setValueAtTime(baseFreq, t);
-                
-                // Modulator (Vibrates the pitch of the carrier to make it metallic)
-                const modOsc = audioCtx.createOscillator();
-                const modGain = audioCtx.createGain();
-                modOsc.type = 'square'; // Aggressive modulation
-                modOsc.frequency.setValueAtTime(baseFreq * 2.4, t); // Ratio for metallic sound
-                
-                modGain.gain.setValueAtTime(300, t); // Modulation depth
-                modGain.gain.exponentialRampToValueAtTime(1, t + 0.2); // Modulation fades out
-                
-                modOsc.connect(modGain);
-                modGain.connect(osc1.frequency); // Connect to carrier frequency
-                
-                modOsc.start(t);
-                modOsc.stop(t + 0.4);
-
-                // Amplitude Envelope
-                osc1Gain.gain.setValueAtTime(0, t);
-                osc1Gain.gain.linearRampToValueAtTime(0.8, t + 0.002);
-                osc1Gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3); // Ringing decay
-
-                // Snap (High-passed Noise) - Loud!
-                noiseFilter.type = 'highpass';
-                noiseFilter.frequency.setValueAtTime(3000, t);
-                noiseGain.gain.setValueAtTime(1.5, t); // Boost snap
-                noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05); // Short snap
+                source.start(t);
+            } else {
+                // แจ้งเตือนถ้าไม่มีไฟล์เสียง
+                console.warn(`ไม่มีไฟล์เสียงสำหรับ: ${drumType} (${zone}) - กรุณาใส่ลิงก์ใน soundUrls`);
             }
-
-            osc1.start(t);
-            osc1.stop(t + 0.6);
-            noise.start(t);
-            noise.stop(t + 0.6);
         }
 
         // --- Interaction Logic ---
         
         function handleHit(element, e) {
-            e.preventDefault(); // Prevent scrolling
+            e.preventDefault(); 
             initAudio();
 
-            // Get touch position relative to the element
             const rect = element.getBoundingClientRect();
-            let clientX, clientY;
-
             if (e.changedTouches) {
-                // Handle Multi-touch
                 for (let i = 0; i < e.changedTouches.length; i++) {
-                    const touch = e.changedTouches[i];
-                    processTouch(element, touch.clientX, touch.clientY, rect);
+                    processTouch(element, e.changedTouches[i].clientX, e.changedTouches[i].clientY, rect);
                 }
             } else {
-                // Mouse click
                 processTouch(element, e.clientX, e.clientY, rect);
             }
         }
 
         function processTouch(element, x, y, rect) {
-            // Visual Feedback
             element.classList.add('active');
-            setTimeout(() => element.classList.remove('active'), 80); // Faster visual response
+            setTimeout(() => element.classList.remove('active'), 80);
 
-            // Calculate distance from center to determine Zone
             const centerX = rect.width / 2;
             const centerY = rect.height / 2;
             const touchX = x - rect.left;
             const touchY = y - rect.top;
-            
-            // Distance formula
             const dist = Math.sqrt(Math.pow(touchX - centerX, 2) + Math.pow(touchY - centerY, 2));
-            const radius = rect.width / 2;
-            const centerZoneRadius = radius * 0.45; // 45% is center zone
+            const centerZoneRadius = (rect.width / 2) * 0.45;
 
-            const drumType = element.dataset.drum;
-            const pitchMod = drumType === 'female' ? 1.3 : 1.0; // Adjusted pitch ratio
+            const drumType = element.dataset.drum; // 'male' or 'female'
 
             if (dist < centerZoneRadius) {
-                // Center Hit (Low/Deep)
-                playSound('center', pitchMod);
+                // Center Hit
+                playSound('center', drumType);
             } else {
-                // Rim Hit (High/Slap)
-                playSound('rim', pitchMod);
+                // Rim Hit
+                playSound('rim', drumType);
             }
         }
 
@@ -446,7 +440,6 @@
                 audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
                 audioUrl = URL.createObjectURL(audioBlob);
                 
-                // Enable buttons
                 document.getElementById('btn-play').disabled = false;
                 document.getElementById('btn-play').classList.remove('bg-gray-600');
                 document.getElementById('btn-play').classList.add('bg-green-600');
@@ -459,7 +452,6 @@
             mediaRecorder.start();
             isRecording = true;
             
-            // UI Update
             const btn = document.getElementById('btn-record');
             btn.classList.add('recording');
             document.getElementById('record-text').innerText = "⏹ หยุดอัด";
@@ -469,7 +461,6 @@
             mediaRecorder.stop();
             isRecording = false;
             
-            // UI Update
             const btn = document.getElementById('btn-record');
             btn.classList.remove('recording');
             document.getElementById('record-text').innerText = "🔴 อัดใหม่";
@@ -494,14 +485,13 @@
         // --- App Start ---
         function startApp() {
             initAudio();
-            createNoiseBuffer(); // Pre-generate noise
+            // createNoiseBuffer(); // ลบส่วนสร้างเสียงสังเคราะห์ออก
             document.getElementById('start-overlay').style.opacity = '0';
             setTimeout(() => {
                 document.getElementById('start-overlay').style.display = 'none';
             }, 500);
         }
 
-        // Prevent ContextMenu on hold
         window.oncontextmenu = function(event) {
             event.preventDefault();
             event.stopPropagation();
