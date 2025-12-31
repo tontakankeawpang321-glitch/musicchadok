@@ -208,10 +208,9 @@
 
     <script>
         // --- Configuration ---
-        // ⚠️ ใส่ลิงก์ไฟล์เสียงตรงนี้ (Bom = เสียงบ่อม, Poeng = เสียงเปิง)
         const soundUrls = {
-         bom: 'konglong/momlong.wav',    // เสียง "บ่อม" (กลาง)
-            poeng: 'konglong/pengkob.wav'   // เสียง "เปิง" (ขอบ)
+            bom: '',    // เสียง "บ่อม" (กลาง)
+            poeng: ''   // เสียง "เปิง" (ขอบ)
         };
 
         // --- Global Variables ---
@@ -228,6 +227,7 @@
         let destStream;
 
         let audioBuffers = { bom: null, poeng: null };
+        let globalSaturationCurve = null; // Cache curve
 
         // PRE-CALCULATED GEOMETRY
         const drum = document.getElementById('drum');
@@ -243,6 +243,24 @@
         window.addEventListener('resize', updateDrumGeometry);
         updateDrumGeometry();
 
+        // 1️⃣ WAVE SHAPER (SATURATION) - สร้างฮาร์โมนิกให้เสียงหนา
+        function createSaturation(ctx) {
+            // สร้าง Curve ครั้งเดียวเพื่อประหยัด CPU
+            if (!globalSaturationCurve) {
+                const samples = 44100;
+                globalSaturationCurve = new Float32Array(samples);
+                for (let i = 0; i < samples; i++) {
+                    const x = (i * 2) / samples - 1;
+                    // Math.tanh ให้เสียงแตกแบบ Analog (Soft Clipping)
+                    globalSaturationCurve[i] = Math.tanh(x * 3); 
+                }
+            }
+            const shaper = ctx.createWaveShaper();
+            shaper.curve = globalSaturationCurve;
+            shaper.oversample = '4x'; // คุณภาพสูง
+            return shaper;
+        }
+
         async function initAudio() {
             if (!audioCtx) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -255,7 +273,7 @@
                 source.connect(audioCtx.destination);
                 source.start();
 
-                // 1. Compressor
+                // 1. Compressor (ปรับไม่ให้กดเสียงเบส)
                 compressor = audioCtx.createDynamicsCompressor();
                 compressor.threshold.value = -18; 
                 compressor.knee.value = 30;
@@ -287,15 +305,13 @@
             }
         }
 
-        // --- Safe Trim Silence (สำหรับไฟล์เสียงเบส) ---
+        // --- Safe Trim Silence ---
         function trimSilence(buffer) {
-            // Threshold ต่ำมากเพื่อให้จับเสียงเบสทุ้มๆ ได้
             const threshold = 0.0002; 
             let start = buffer.length;
             let end = 0;
             const numChannels = buffer.numberOfChannels;
 
-            // ตรวจสอบทุก Channel (ซ้าย/ขวา) เพื่อความชัวร์
             for (let c = 0; c < numChannels; c++) {
                 const data = buffer.getChannelData(c);
                 for (let i = 0; i < data.length; i++) {
@@ -312,16 +328,10 @@
                 }
             }
             
-            // Safety 1: ถ้าหาเสียงไม่เจอเลย (Start ไม่ขยับ) ให้ใช้ไฟล์เดิม
             if (start >= buffer.length || end === 0) return buffer;
-
-            // Padding: เผื่อหน้าไว้นิดหน่อยกันหัวเสียงขาด
             start = Math.max(0, start - 100); 
             end = Math.min(buffer.length, end + 200);
-
             const length = end - start;
-            
-            // Safety 2: ถ้าตัดแล้วเหลือสั้นเกินไป (ผิดปกติ) ให้ใช้ไฟล์เดิม
             if (length < 100) return buffer; 
 
             const newBuffer = audioCtx.createBuffer(numChannels, length, buffer.sampleRate);
@@ -357,7 +367,6 @@
                     const arrayBuffer = await response.arrayBuffer();
                     const rawBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                     
-                    // ใช้ Safe Trim
                     audioBuffers[key] = trimSilence(rawBuffer);
                     loadedCount++;
                 } catch (e) {
@@ -388,7 +397,7 @@
             reverbGain.connect(reverbNode); 
         }
 
-        // --- PlaySound Logic (Revised) ---
+        // --- 2️⃣ PRO AUDIO ENGINE (With Saturation & Direct Routing) ---
         function playSound(type) {
             if (!audioCtx) return;
             const t = audioCtx.currentTime;
@@ -403,10 +412,11 @@
                 source.buffer = audioBuffers[type];
             } else {
                 source = audioCtx.createOscillator();
+                // 3️⃣ ปรับความถี่ "บ่อม" ขึ้นตามสูตร (ห้ามต่ำกว่า 320)
                 if (type === 'bom') {
-                    source.type = 'square';
-                    source.frequency.value = 240;
-                    source.frequency.exponentialRampToValueAtTime(120, t + 0.3);
+                    source.type = 'square'; // สี่เหลี่ยมให้เสียงหนา
+                    source.frequency.value = 320; 
+                    source.frequency.exponentialRampToValueAtTime(180, t + 0.4);
                 } else {
                     source.type = 'square';
                     source.frequency.value = 650;
@@ -415,8 +425,9 @@
 
             /* === ENVELOPE === */
             gain.gain.setValueAtTime(0, t);
+            // 4️⃣ Boost Gain บ่อมเป็น 2.2
             gain.gain.linearRampToValueAtTime(
-                type === 'bom' ? 1.8 : 1.0,
+                type === 'bom' ? 2.2 : 1.0, 
                 t + 0.02
             );
             gain.gain.exponentialRampToValueAtTime(
@@ -426,12 +437,14 @@
 
             source.connect(gain);
 
-            /* === OUTPUT ROUTING (Bypass check) === */
+            /* === ROUTING (สำคัญที่สุด: บ่อม BYPASS Compressor) === */
             if (type === 'bom') {
-                // 🔥 บ่อม: ต่อออกลำโพงตรง (Bypass Compressor)
-                gain.connect(audioCtx.destination);
+                // 🔥 บ่อม: Gain -> Saturator -> Output (ตรง)
+                const saturator = createSaturation(audioCtx);
+                gain.connect(saturator);
+                saturator.connect(audioCtx.destination);
             } else {
-                // เปิง: ผ่าน compressor
+                // เปิง: Gain -> Master (Compressor)
                 gain.connect(masterGain);
             }
 
@@ -462,7 +475,7 @@
         function handleHit(e) {
             if (e.cancelable) e.preventDefault();
             
-            // แก้ไขตามข้อ 1: แก้ปัญหาตีครั้งแรกเงียบ (Wait for init)
+            // แก้ปัญหาตีครั้งแรกเงียบ: รอ init แล้วตีซ้ำทันที
             if (!audioCtx) {
                 initAudio().then(() => handleHit(e));
                 return;
