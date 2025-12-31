@@ -277,27 +277,24 @@
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 audioCtx = new AudioContext();
                 
-                // Dynamics Compressor
+                // ✅ 4. ปรับ Compressor ให้ “Drum Pro” ไม่แข็ง
                 compressor = audioCtx.createDynamicsCompressor();
-                compressor.threshold.value = -8; 
-                compressor.knee.value = 30; 
-                compressor.ratio.value = 12; 
-                compressor.attack.value = 0.003; 
-                compressor.release.value = 0.25;
+                compressor.threshold.value = -14;
+                compressor.knee.value = 18;
+                compressor.ratio.value = 4;     // จาก 12 -> 4 เพื่อไม่ให้เสียงบี้เกินไป
+                compressor.attack.value = 0.004;
+                compressor.release.value = 0.18;
 
-                // ✅ 3. Noise Filter (ปิดเสียงอากาศ)
-                // ใช้ Lowpass ที่ 3000Hz ตัดเสียงซ่า (Hiss) ที่มักติดมากับไฟล์
-                const noiseFilter = audioCtx.createBiquadFilter();
-                noiseFilter.type = 'lowpass';
-                noiseFilter.frequency.value = 3000; 
+                // ✅ 3. Noise Filter เดิม (ใช้ Lowpass ใน playSample แทน เพื่อความยืดหยุ่นต่อเสียง)
+                // ตัด Lowpass Global ออก เพื่อให้เสียงอื่นๆ (ถ้ามี) ไม่โดนกระทบ
+                // แต่ยังคง Master Gain ไว้
 
                 // Master Volume
                 masterGain = audioCtx.createGain();
                 masterGain.gain.value = 4.0; 
                 
-                // Chain: Master -> NoiseFilter -> Compressor -> Dest
-                masterGain.connect(noiseFilter);
-                noiseFilter.connect(compressor);
+                // Chain: Master -> Compressor -> Dest
+                masterGain.connect(compressor);
                 compressor.connect(audioCtx.destination);
                 
                 dest = audioCtx.createMediaStreamDestination();
@@ -341,37 +338,38 @@
             }
         }
 
-        // Function เล่นไฟล์เสียง
+        // Function เล่นไฟล์เสียง (Enhanced with Filter & Envelope)
         function playSample(buffer, intensity) {
             const t = audioCtx.currentTime;
             
-            // ✅ 4. เล่นด้วย AudioBufferSourceNode (วิธีที่เสถียรที่สุด)
             const source = audioCtx.createBufferSource();
             source.buffer = buffer;
             
+            // 1️⃣ สร้าง Filter สำหรับ Marching Bass ที่เนียน
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = "lowpass";
+            filter.frequency.value = 1400; // 1200–1800 ช่วงที่ดีสำหรับ Marching Bass
+            filter.Q.value = 0.9;
+
             const sampleGain = audioCtx.createGain();
             const vol = 1.0 * intensity;
-            const duration = buffer.duration;
             
-            // ✅ 5. Fade In/Out ระดับ ms (แก้เสียงคลิก/ตื้ด)
-            
-            // Fade-In: 1ms (0.001s) - แก้ Click ที่จุดเริ่มต้นของไฟล์
+            // 2️⃣ เปลี่ยน Fade แบบ “Sample” -> “Synth Envelope”
+            const attack = 0.008;   // 8ms (ยังแรง)
+            const decay  = 0.55;    // หางกลม
+
+            sampleGain.gain.cancelScheduledValues(t);
             sampleGain.gain.setValueAtTime(0, t);
-            sampleGain.gain.linearRampToValueAtTime(vol, t + 0.001);
+            sampleGain.gain.linearRampToValueAtTime(vol, t + attack);
+            sampleGain.gain.exponentialRampToValueAtTime(0.001, t + decay);
             
-            // Fade-Out: 50ms ก่อนจบไฟล์ - แก้ Click ที่จุดจบของไฟล์ (Trim Silence/Tail)
-            if (duration > 0.05) {
-                sampleGain.gain.setValueAtTime(vol, t + duration - 0.05);
-                sampleGain.gain.linearRampToValueAtTime(0, t + duration);
-            } else {
-                // กรณีไฟล์สั้นมาก
-                sampleGain.gain.linearRampToValueAtTime(0, t + duration);
-            }
-            
-            source.connect(sampleGain);
+            // 3️⃣ ต่อสายใหม่: source -> filter -> sampleGain -> masterGain
+            source.connect(filter);
+            filter.connect(sampleGain);
             sampleGain.connect(masterGain);
             
             source.start(t);
+            // ❌ ไม่ต้อง fade-out ปลายไฟล์อีก เพราะ envelope คุมแทน
         }
 
         // --- Interaction Logic (Rim vs Center) ---
