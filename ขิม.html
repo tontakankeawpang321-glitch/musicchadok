@@ -96,8 +96,14 @@
         // หากใส่แล้ว ระบบจะใช้ไฟล์นี้เล่นเสียง
         // หากปล่อยว่าง ({}) ระบบจะใช้เสียงสังเคราะห์ (Synth)
         const SOUND_URLS = {
-            // 'C4': 'https://example.com/khim-c4.mp3',
-            // 'G4': 'https://example.com/khim-g4.mp3',
+            // Low Register (เสียงต่ำ)
+            'G3': '', 'A3': '', 'B3': '', 'C4': '', 'D4': '', 'E4': '', 'F4': '',
+            
+            // Mid Register (เสียงกลาง - ใช้บ่อย)
+            'G4': '', 'A4': '', 'B4': '', 'C5': '', 'D5': '', 'E5': '', 'F5': '',
+            
+            // High Register (เสียงสูง)
+            'G5': '', 'A5': '', 'B5': '', 'C6': '', 'D6': ''
         };
 
         // --- ENGINE ---
@@ -128,7 +134,11 @@
                     this.masterGain.connect(this.dest);
                     
                     if (Object.keys(SOUND_URLS).length > 0) {
-                        this.preloadSounds();
+                        // Check if any URL is actually filled
+                        const hasUrl = Object.values(SOUND_URLS).some(url => url.length > 0);
+                        if (hasUrl) {
+                            this.preloadSounds();
+                        }
                     }
                 }
                 if (this.ctx.state === 'suspended') {
@@ -142,33 +152,43 @@
                 
                 const statusEl = document.getElementById('preload-status');
                 const textEl = document.getElementById('preload-text');
-                statusEl.classList.remove('hidden');
                 
                 let loadedCount = 0;
-                
-                for (const [noteName, url] of Object.entries(SOUND_URLS)) {
-                    textEl.textContent = `Loading ${noteName}...`;
-                    try {
-                        const response = await fetch(url);
-                        const arrayBuffer = await response.arrayBuffer();
-                        const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
-                        
-                        // Trim Silence
-                        const trimmedBuffer = this.trimSilence(audioBuffer);
-                        
-                        this.buffers[noteName] = trimmedBuffer;
-                        
-                        const freq = this.getFreqFromName(noteName);
-                        if (freq) this.baseFreqs[noteName] = freq;
+                let tasks = [];
 
-                        loadedCount++;
-                    } catch (e) {
-                        console.error(`Failed to load ${noteName}:`, e);
-                    }
+                for (const [noteName, url] of Object.entries(SOUND_URLS)) {
+                    if (!url) continue; // Skip empty strings
+                    
+                    statusEl.classList.remove('hidden');
+                    textEl.textContent = `Loading ${noteName}...`;
+                    
+                    const task = (async () => {
+                        try {
+                            const response = await fetch(url);
+                            const arrayBuffer = await response.arrayBuffer();
+                            const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
+                            
+                            // Trim Silence
+                            const trimmedBuffer = this.trimSilence(audioBuffer);
+                            
+                            this.buffers[noteName] = trimmedBuffer;
+                            
+                            const freq = this.getFreqFromName(noteName);
+                            if (freq) this.baseFreqs[noteName] = freq;
+
+                            loadedCount++;
+                        } catch (e) {
+                            console.error(`Failed to load ${noteName}:`, e);
+                        }
+                    })();
+                    tasks.push(task);
                 }
 
-                textEl.textContent = "Ready";
-                setTimeout(() => statusEl.classList.add('hidden'), 1000);
+                if (tasks.length > 0) {
+                    await Promise.all(tasks);
+                    textEl.textContent = "Ready";
+                    setTimeout(() => statusEl.classList.add('hidden'), 1000);
+                }
             }
 
             trimSilence(buffer) {
