@@ -1,264 +1,618 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>กลองยาวจำลอง (Virtual Klong Yao)</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>กลองยาวจำลอง (Virtual Klong Yao)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
 
-<script src="https://cdn.tailwindcss.com"></script>
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
-body{
-    font-family:'Sarabun',sans-serif;
-    background:#2d1b0e;
-    overflow:hidden;
-    touch-action:none;
-    user-select:none;
-}
-.drum-head{
-    background:radial-gradient(circle,#f3e5ab 0%,#e0c87e 55%,#b69b4c 100%);
-    box-shadow:
-        inset 0 0 30px rgba(0,0,0,.3),
-        0 0 0 12px #5c3a21,
-        0 0 0 24px #8b5a2b,
-        0 18px 30px rgba(0,0,0,.6);
-    cursor:pointer;
-}
-.khoon{
-    position:absolute;
-    inset:28%;
-    border-radius:50%;
-    background:radial-gradient(circle,#3e2723 0%,#5d4037 70%,transparent 100%);
-}
-.hit-anim{
-    position:fixed;
-    width:20px;height:20px;
-    background:rgba(255,255,255,.6);
-    border-radius:50%;
-    animation:ripple .15s ease-out forwards;
-    pointer-events:none;
-}
-@keyframes ripple{
-    from{transform:scale(.5);opacity:.8}
-    to{transform:scale(1.5);opacity:0}
-}
-</style>
-</head>
-
-<body class="h-screen flex flex-col justify-between">
-
-<!-- START -->
-<div id="start-overlay" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-    <div onclick="initAudio()" class="cursor-pointer text-center text-white">
-        <i class="fas fa-drum text-6xl text-yellow-400 mb-4"></i>
-        <div class="text-2xl font-bold">แตะเพื่อเริ่มตีกลอง</div>
-    </div>
-</div>
-
-<!-- DRUM -->
-<div class="flex-1 flex items-center justify-center">
-    <div id="drum" class="drum-head w-[80vw] h-[80vw] max-w-[480px] max-h-[480px] rounded-full relative">
-        <div class="khoon"></div>
-    </div>
-</div>
-
-<!-- CONTROLS -->
-<div class="bg-black/40 backdrop-blur-md p-4 flex justify-center gap-3">
-    <button id="recBtn" onclick="toggleRecord()" class="w-16 h-16 rounded-full bg-red-600 text-white">
-        <i class="fas fa-microphone"></i>
-    </button>
-    <button id="playBtn" onclick="playRecording()" disabled class="w-16 h-16 rounded-xl bg-blue-600 text-white opacity-40">
-        <i class="fas fa-play"></i>
-    </button>
-    <button id="downBtn" onclick="downloadRecording()" disabled class="w-16 h-16 rounded-xl bg-green-600 text-white opacity-40">
-        <i class="fas fa-download"></i>
-    </button>
-</div>
-
-<script>
-/* =======================
-   CONFIG
-======================= */
-const soundUrls = {
-    bom: 'konglong/momlong.wav',
-    pa: 'konglong/paklong.wav',
-    poeng: 'konglong/pengkob.wav'
-};
-
-let audioCtx, masterGain, compressor, reverbNode, reverbGain;
-let audioBuffers = {};
-let destStream, recorder, recordedChunks=[], audioUrl;
-let isRecording=false;
-
-/* =======================
-   INIT AUDIO
-======================= */
-async function initAudio(){
-    if(audioCtx) return;
-    audioCtx = new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
-
-    compressor = audioCtx.createDynamicsCompressor();
-    compressor.threshold.value = -22;
-    compressor.knee.value = 24;
-    compressor.ratio.value = 3.2;
-    compressor.attack.value = 0.02;
-    compressor.release.value = 0.22;
-
-    masterGain = audioCtx.createGain();
-    masterGain.gain.value = 1.6; // 🔥 ดันทั้งระบบ
-
-    compressor.connect(audioCtx.destination);
-    masterGain.connect(compressor);
-
-    destStream = audioCtx.createMediaStreamDestination();
-    compressor.connect(destStream);
-
-    await setupReverb();
-    await loadSoundFiles();
-
-    document.getElementById('start-overlay').style.display='none';
-}
-
-/* =======================
-   REVERB
-======================= */
-async function setupReverb(){
-    reverbNode = audioCtx.createConvolver();
-    reverbGain = audioCtx.createGain();
-    reverbGain.gain.value = 0.25;
-
-    const len = audioCtx.sampleRate * .8;
-    const impulse = audioCtx.createBuffer(2,len,audioCtx.sampleRate);
-    for(let c=0;c<2;c++){
-        const d = impulse.getChannelData(c);
-        for(let i=0;i<len;i++){
-            d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3);
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #2d1b0e; /* Dark wood color */
+            background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20.5V18H0v-2h20v5.1L6 4.1 7.4 2.8 21.6 17l4.4-4.4L11.8.8 13.2-.6 27.5 13.7 34 7.3 35.4 8.7 29 15.1l8.1 8.1-1.4 1.4-8.1-8.1-5.3 5.3 14.2 14.2-1.4 1.4-14.2-14.2-4.4 4.4 14.2 14.2-1.4 1.4-14.2-14.2L2.6 37.4 1.2 36l14.2-14.2L0 20.5h20z' fill='%234a3018' fill-opacity='0.15' fill-rule='evenodd'/%3E%3C/svg%3E");
+            touch-action: none; /* ห้ามการซูมและการเลื่อนโดยเด็ดขาด */
+            overflow: hidden; 
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior: none;
         }
-    }
-    reverbNode.buffer = impulse;
-    reverbGain.connect(reverbNode);
-    reverbNode.connect(masterGain);
-}
 
-/* =======================
-   LOAD FILES (NO TRIM)
-======================= */
-async function loadSoundFiles(){
-    for(const k in soundUrls){
-        const res = await fetch(soundUrls[k]);
-        audioBuffers[k] = await audioCtx.decodeAudioData(await res.arrayBuffer());
-    }
-}
+        /* Drum Head Texture */
+        .drum-head {
+            background: radial-gradient(circle, #f3e5ab 0%, #e0c87e 50%, #d6c485 75%, #b69b4c 100%);
+            box-shadow: 
+                inset 0 0 30px rgba(0,0,0,0.3),
+                0 10px 20px rgba(0,0,0,0.5),
+                0 0 0 10px #5c3a21, /* Inner rim */
+                0 0 0 20px #8b5a2b, /* Outer rim wood */
+                0 15px 30px rgba(0,0,0,0.6); /* Drop shadow */
+            position: relative;
+            cursor: pointer;
+            touch-action: none;
+            will-change: transform;
+            transform-origin: center center;
+        }
 
-/* =======================
-   PLAY SOUND
-======================= */
-function playSound(type){
-    if(!audioCtx) return;
-    const t = audioCtx.currentTime;
+        /* Texture overlay */
+        .drum-texture {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: 50%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.15'/%3E%3C/svg%3E");
+            pointer-events: none;
+        }
 
-    const src = audioCtx.createBufferSource();
-    src.buffer = audioBuffers[type];
+        /* "Rice Paste" Center */
+        .khoon {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 45%; 
+            height: 45%;
+            background: radial-gradient(circle, #3e2723 0%, #5d4037 80%, transparent 100%);
+            border-radius: 50%;
+            opacity: 0.8;
+            filter: blur(2px);
+            pointer-events: none;
+            border: 2px dashed rgba(255,255,255,0.1);
+        }
 
-    const filter = audioCtx.createBiquadFilter();
-    filter.type='lowpass';
-    if(type==='bom'){
-        filter.frequency.value = 6500; // 🔥 เปิด harmonic เต็ม
-        filter.Q.value = 0.9;
-    }else{
-        filter.frequency.value = 2200;
-        filter.Q.value = 0.8;
-    }
+        /* Zone Guides */
+        .pa-zone-guide {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 75%;
+            height: 75%;
+            border-radius: 50%;
+            border: 1px dashed rgba(62, 39, 35, 0.1);
+            pointer-events: none;
+        }
 
-    const gain = audioCtx.createGain();
-    gain.gain.setValueAtTime(0,t);
+        /* Hit animations */
+        @keyframes ripple {
+            0% { opacity: 0.8; transform: translate(-50%, -50%) scale(0.5); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
+        }
+        .hit-anim {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            pointer-events: none;
+            will-change: transform, opacity;
+            z-index: 40;
+            animation: ripple 0.15s ease-out forwards;
+        }
 
-    const peak = type==='bom'?6.5:1.1;   // 🔥 บ่อมดังสุด
-    const decay = type==='bom'?1.0:0.4;
+        /* Note labels */
+        .note-label {
+            position: absolute;
+            color: rgba(62, 39, 35, 0.8);
+            font-weight: bold;
+            pointer-events: none;
+            text-shadow: 0 1px 1px rgba(255,255,255,0.5);
+            display: none;
+            text-align: center;
+        }
+        .show-notes .note-label {
+            display: block;
+        }
 
-    gain.gain.linearRampToValueAtTime(peak,t+.01);
-    gain.gain.exponentialRampToValueAtTime(.001,t+decay);
+        /* Control Panel */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
 
-    src.connect(filter);
-    filter.connect(gain);
-    gain.connect(masterGain);
-    gain.connect(reverbGain);
+        .btn-control {
+            transition: transform 0.1s;
+        }
+        .btn-control:active {
+            transform: scale(0.95);
+        }
+        .recording-pulse {
+            animation: pulse-red 1.5s infinite;
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
 
-    /* SUB HARMONIC – สั่นลำโพงมือถือ */
-    if(type==='bom'){
-        const sub = audioCtx.createOscillator();
-        const subGain = audioCtx.createGain();
-        sub.type='sine';
-        sub.frequency.value=55;
-        subGain.gain.setValueAtTime(1.4,t);
-        subGain.gain.exponentialRampToValueAtTime(.001,t+.6);
-        sub.connect(subGain);
-        subGain.connect(masterGain);
-        sub.start(t);
-        sub.stop(t+.6);
-    }
+        /* Start Overlay */
+        #start-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 50;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            text-align: center;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between overflow-hidden">
 
-    src.start(t);
-}
+    <!-- Start Overlay -->
+    <div id="start-overlay">
+        <div class="p-6 bg-white/10 backdrop-blur-md rounded-xl border border-white/20 animate-bounce cursor-pointer" onclick="initAudio()">
+            <i class="fas fa-drum text-6xl mb-4 text-yellow-400"></i>
+            <h1 class="text-2xl font-bold">แตะเพื่อเริ่มตีกลองยาว</h1>
+            <p class="text-sm mt-2 opacity-80">Tap to Start</p>
+        </div>
+    </div>
 
-/* =======================
-   HIT
-======================= */
-const drum=document.getElementById('drum');
-drum.addEventListener('mousedown',e=>{
-    const r=drum.getBoundingClientRect();
-    const dx=e.clientX-(r.left+r.width/2);
-    const dy=e.clientY-(r.top+r.height/2);
-    const d=Math.sqrt(dx*dx+dy*dy)/(r.width/2);
+    <!-- Header -->
+    <div class="flex justify-between items-center p-4 pt-6 z-10 pointer-events-none">
+        <div>
+            <h1 class="text-white text-xl font-bold drop-shadow-md"><i class="fas fa-music text-yellow-500 mr-2"></i>กลองยาวไทย</h1>
+            <p class="text-yellow-200/70 text-xs">Virtual Klong Yao Simulator</p>
+        </div>
+        <div id="status-indicator" class="text-xs text-green-400 font-mono hidden pointer-events-auto">
+            <i class="fas fa-circle text-[8px] mr-1"></i>พร้อมใช้งาน
+        </div>
+    </div>
 
-    if(d<.35) playSound('bom');
-    else if(d>.75) playSound('poeng');
-    else playSound('pa');
+    <!-- Main Instrument Area -->
+    <div class="flex-1 flex justify-center items-center relative" id="drum-container">
+        
+        <!-- The Drum -->
+        <div id="drum" class="drum-head w-[85vw] h-[85vw] max-w-[500px] max-h-[500px] rounded-full relative">
+            
+            <div class="drum-texture"></div>
+            
+            <!-- Center Target (Bom) -->
+            <div class="khoon"></div>
+            
+            <!-- Middle Zone Guide (Pa) -->
+            <div class="pa-zone-guide"></div>
+            
+            <!-- Note Labels -->
+            <div class="note-label text-3xl text-white drop-shadow-lg" style="top: 50%; left: 50%; transform: translate(-50%, -50%);">บ่อม</div>
+            <div class="note-label text-2xl" style="top: 70%; left: 50%; transform: translate(-50%, -50%);">ปะ</div>
+            <div class="note-label text-xl" style="top: 10%; left: 50%; transform: translate(-50%, -50%);">เปิง</div>
+            <div class="note-label text-xl" style="bottom: 10%; left: 50%; transform: translate(-50%, -50%);">เปิง</div>
+            <div class="note-label text-xl" style="left: 10%; top: 50%; transform: translate(-50%, -50%);">เปิง</div>
+            <div class="note-label text-xl" style="right: 10%; top: 50%; transform: translate(-50%, -50%);">เปิง</div>
+            
+        </div>
+    </div>
 
-    const h=document.createElement('div');
-    h.className='hit-anim';
-    h.style.left=e.clientX+'px';
-    h.style.top=e.clientY+'px';
-    document.body.appendChild(h);
-    setTimeout(()=>h.remove(),200);
-});
+    <!-- Controls -->
+    <div class="glass-panel pb-8 pt-4 px-4 w-full z-20 rounded-t-3xl">
+        <div class="flex justify-between items-center gap-2 max-w-md mx-auto">
+            
+            <button id="btn-notes" class="btn-control flex flex-col items-center justify-center w-16 h-16 rounded-2xl bg-white/10 text-white border border-white/20" onclick="toggleNotes()">
+                <i class="fas fa-eye text-xl mb-1"></i>
+                <span class="text-[10px]">โน้ต</span>
+            </button>
 
-/* =======================
-   RECORD
-======================= */
-function toggleRecord(){
-    if(!isRecording){
-        recordedChunks=[];
-        recorder=new MediaRecorder(destStream.stream);
-        recorder.ondataavailable=e=>recordedChunks.push(e.data);
-        recorder.onstop=()=>{
-            audioUrl=URL.createObjectURL(new Blob(recordedChunks,{type:'audio/webm'}));
-            playBtn.disabled=false;
-            downBtn.disabled=false;
-            playBtn.classList.remove('opacity-40');
-            downBtn.classList.remove('opacity-40');
+            <button id="btn-record" class="btn-control flex flex-col items-center justify-center w-20 h-20 rounded-full bg-red-600/80 text-white shadow-lg border-4 border-red-900/50" onclick="toggleRecord()">
+                <i class="fas fa-microphone text-2xl mb-1"></i>
+                <span class="text-[10px]">อัดเสียง</span>
+            </button>
+
+            <div class="flex gap-2">
+                <button id="btn-play" class="btn-control flex flex-col items-center justify-center w-16 h-16 rounded-2xl bg-blue-500/80 text-white disabled:opacity-30 disabled:grayscale" onclick="playRecording()" disabled>
+                    <i class="fas fa-play text-xl mb-1"></i>
+                    <span class="text-[10px]">ฟัง</span>
+                </button>
+
+                <button id="btn-download" class="btn-control flex flex-col items-center justify-center w-16 h-16 rounded-2xl bg-green-500/80 text-white disabled:opacity-30 disabled:grayscale" onclick="downloadRecording()" disabled>
+                    <i class="fas fa-download text-xl mb-1"></i>
+                    <span class="text-[10px]">โหลด</span>
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration: External Sound URLs ---
+        const soundUrls = {
+            bom: 'konglong/momlong.wav',    // เสียง "บ่อม" (กลาง)
+            pa: 'konglong/paklong.wav',     // เสียง "ปะ" (ล่างวงกลม/ตบ)
+            poeng: 'konglong/pengkob.wav'   // เสียง "เปิง"
         };
-        recorder.start();
-        isRecording=true;
-        recBtn.innerHTML='<i class="fas fa-stop"></i>';
-    }else{
-        recorder.stop();
-        isRecording=false;
-        recBtn.innerHTML='<i class="fas fa-microphone"></i>';
-    }
-}
 
-function playRecording(){
-    if(audioUrl) new Audio(audioUrl).play();
-}
-function downloadRecording(){
-    const a=document.createElement('a');
-    a.href=audioUrl;
-    a.download='klong-yao-recording.webm';
-    a.click();
-}
-</script>
+        // --- Global Variables ---
+        let audioCtx;
+        let masterGain;
+        let compressor;
+        let reverbNode; 
+        let reverbGain; 
+        let recorder;
+        let recordedChunks = [];
+        let audioBlob;
+        let audioUrl;
+        let isRecording = false;
+        let destStream;
+
+        let audioBuffers = { bom: null, pa: null, poeng: null };
+
+        // CACHING DRUM GEOMETRY
+        const drum = document.getElementById('drum');
+        let drumRect = drum.getBoundingClientRect();
+        let drumRadius = drumRect.width / 2;
+        let drumCenterX = drumRect.left + drumRadius;
+        let drumCenterY = drumRect.top + drumRadius;
+
+        window.addEventListener('resize', updateDrumGeometry);
+        function updateDrumGeometry() {
+            drumRect = drum.getBoundingClientRect();
+            drumRadius = drumRect.width / 2;
+            drumCenterX = drumRect.left + drumRadius;
+            drumCenterY = drumRect.top + drumRadius;
+        }
+
+        async function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext({
+                    latencyHint: 'interactive',
+                });
+                
+                // Silent warm-up
+                const buffer = audioCtx.createBuffer(1, 1, 22050);
+                const source = audioCtx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(audioCtx.destination);
+                source.start();
+
+                // 1. Create Compressor
+                compressor = audioCtx.createDynamicsCompressor();
+                compressor.threshold.value = -10;
+                compressor.knee.value = 30;
+                compressor.ratio.value = 8; 
+                compressor.attack.value = 0.001; 
+                compressor.release.value = 0.05;
+                compressor.connect(audioCtx.destination);
+
+                // 2. Master Gain
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 1.2;
+                masterGain.connect(compressor);
+
+                // 3. Setup Reverb
+                await setupReverb();
+
+                // 4. Load External Sounds
+                await loadSoundFiles();
+
+                // Setup Stream for Recording
+                destStream = audioCtx.createMediaStreamDestination();
+                compressor.connect(destStream);
+
+                document.getElementById('start-overlay').style.display = 'none';
+                document.getElementById('status-indicator').classList.remove('hidden');
+            }
+            
+            if (audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+            }
+        }
+
+        // --- IMPROVED TRIM SILENCE ---
+        function trimSilence(buffer) {
+            // ใช้ threshold ที่ต่ำมากเพื่อให้จับเสียงเบสที่เบาได้
+            const threshold = 0.0005; 
+            let start = buffer.length;
+            let end = 0;
+            const numChannels = buffer.numberOfChannels;
+
+            for (let c = 0; c < numChannels; c++) {
+                const data = buffer.getChannelData(c);
+                for (let i = 0; i < data.length; i++) {
+                    if (Math.abs(data[i]) > threshold) {
+                        if (i < start) start = i;
+                        break;
+                    }
+                }
+                for (let i = data.length - 1; i >= 0; i--) {
+                    if (Math.abs(data[i]) > threshold) {
+                        if (i > end) end = i;
+                        break;
+                    }
+                }
+            }
+
+            // ถ้าหาเสียงไม่เจอ หรือไฟล์สั้นผิดปกติ ให้คืนค่า null (เพื่อใช้ fallback หรือไฟล์เดิม)
+            if (start >= end) return null; 
+
+            // Padding: เผื่อหน้าไว้นิดหน่อยกันหัวเสียงขาด
+            start = Math.max(0, start - 100); 
+            end = Math.min(buffer.length, end + 200);
+
+            const length = end - start;
+            if (length < 100) return null; 
+
+            const newBuffer = audioCtx.createBuffer(numChannels, length, buffer.sampleRate);
+            for (let c = 0; c < numChannels; c++) {
+                 const oldData = buffer.getChannelData(c);
+                 const newData = newBuffer.getChannelData(c);
+                 for (let i = 0; i < length; i++) {
+                     newData[i] = oldData[i + start];
+                 }
+            }
+            return newBuffer;
+        }
+
+        async function loadSoundFiles() {
+            let loadedCount = 0;
+            const total = Object.values(soundUrls).filter(u => u).length;
+
+            if (total === 0) {
+                 document.getElementById('status-indicator').innerHTML = '<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>ใช้เสียงสังเคราะห์';
+                 return;
+            }
+
+            for (const [key, url] of Object.entries(soundUrls)) {
+                if (!url) continue;
+                try {
+                    const statusDiv = document.getElementById('status-indicator');
+                    statusDiv.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i>กำลังโหลด ${key}...`;
+                    statusDiv.classList.remove('hidden');
+
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error("File not found"); 
+                    
+                    const arrayBuffer = await response.arrayBuffer();
+                    const rawBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                    
+                    const trimmed = trimSilence(rawBuffer);
+                    
+                    // ถ้า trim แล้วมีปัญหา ให้ใช้ไฟล์ต้นฉบับเลย (Safety)
+                    if (trimmed) {
+                        audioBuffers[key] = trimmed;
+                    } else {
+                        console.warn(`Sound ${key} might be too quiet, using original.`);
+                        audioBuffers[key] = rawBuffer; 
+                    }
+                    loadedCount++;
+                } catch (e) {
+                    console.warn(`Error loading ${key}, using synth.`, e);
+                }
+            }
+            document.getElementById('status-indicator').innerHTML = `<i class="fas fa-check-circle text-green-400 mr-1"></i>พร้อมใช้งาน (${loadedCount}/${total})`;
+        }
+
+        async function setupReverb() {
+            reverbNode = audioCtx.createConvolver();
+            reverbGain = audioCtx.createGain();
+            reverbGain.gain.value = 0.25; 
+
+            const length = audioCtx.sampleRate * 0.8; 
+            const impulse = audioCtx.createBuffer(2, length, audioCtx.sampleRate);
+            const left = impulse.getChannelData(0);
+            const right = impulse.getChannelData(1);
+
+            for (let i = 0; i < length; i++) {
+                const decay = Math.pow(1 - i / length, 3);
+                left[i] = (Math.random() * 2 - 1) * decay;
+                right[i] = (Math.random() * 2 - 1) * decay;
+            }
+
+            reverbNode.buffer = impulse;
+            reverbNode.connect(masterGain); 
+            reverbGain.connect(reverbNode); 
+        }
+
+        // --- PlaySound (Tuned for Volume) ---
+        function playSound(type) {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const t = audioCtx.currentTime;
+            
+            // 1. Create Filter (LowPass) - Open up the filter a bit for cleaner attack
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = "lowpass";
+            filter.frequency.value = 2200; 
+            filter.Q.value = 0.8;
+
+            // 2. Create Gain Node (Envelope)
+            const fileGain = audioCtx.createGain();
+            
+            // 3. Envelope Settings (VOLUME BOOST HERE)
+            fileGain.gain.cancelScheduledValues(t);
+            fileGain.gain.setValueAtTime(0, t);
+            
+            // ตรวจสอบชนิดเสียงและ Boost Gain
+            const isBom = type === 'bom';
+            const peakVolume = isBom ? 2.5 : 1.0; // Boost Bom 2.5 เท่า
+            const decayTime = isBom ? 0.6 : 0.45; // Bom หางเสียงยาวกว่านิดหน่อย
+
+            fileGain.gain.linearRampToValueAtTime(peakVolume, t + 0.01); // Fast attack
+            fileGain.gain.exponentialRampToValueAtTime(0.001, t + decayTime);
+
+            let source;
+
+            if (audioBuffers[type]) {
+                // Use File
+                source = audioCtx.createBufferSource();
+                source.buffer = audioBuffers[type];
+            } else {
+                // Fallback Synth
+                source = audioCtx.createOscillator();
+                if (type === 'bom') {
+                    // Bom Synth: Triangle Wave (แน่นกว่า Sine)
+                    source.frequency.value = 160; 
+                    source.type = 'triangle'; 
+                    source.frequency.exponentialRampToValueAtTime(60, t + 0.2); 
+                } else if (type === 'pa') {
+                    source.frequency.value = 350;
+                    source.type = 'triangle';
+                } else {
+                    source.frequency.value = 650;
+                    source.type = 'square';
+                }
+            }
+            
+            // 4. Connect
+            source.connect(filter);
+            filter.connect(fileGain);
+            fileGain.connect(masterGain);
+            if(reverbGain) fileGain.connect(reverbGain);
+
+            // Start
+            source.start(0);
+
+            // Cleanup
+            source.onended = function() {
+                source.disconnect();
+                filter.disconnect(); 
+                fileGain.disconnect();
+            };
+
+            if (!audioBuffers[type]) {
+                source.stop(t + 0.45);
+            }
+        }
+
+        // --- Touch Handler ---
+        function handleHit(e) {
+            if (e.cancelable) e.preventDefault();
+            
+            if (!audioCtx) {
+                initAudio().then(() => handleHit(e)); // Retry after init
+                return;
+            }
+
+            // Fix: Support both Touch and Mouse events
+            const points = e.changedTouches ? e.changedTouches : [e];
+            const len = points.length;
+
+            for (let i = 0; i < len; i++) {
+                const t = points[i];
+                const dx = t.clientX - drumCenterX;
+                const dy = t.clientY - drumCenterY;
+                const distSq = dx*dx + dy*dy;
+                const radiusSq = drumRadius * drumRadius;
+                const normalizedDistSq = distSq / radiusSq;
+
+                if (normalizedDistSq < 0.1225) {
+                    playSound('bom');
+                } else if (normalizedDistSq > 0.5625) {
+                    playSound('poeng');
+                } else {
+                    playSound('pa');
+                }
+            }
+
+            requestAnimationFrame(() => {
+                for (let i = 0; i < len; i++) {
+                    const t = points[i];
+                    createRipple(t.clientX, t.clientY);
+                }
+                drum.style.transform = 'scale(0.98)';
+                setTimeout(() => drum.style.transform = 'scale(1)', 50);
+            });
+        }
+
+        function createRipple(x, y) {
+            const el = document.createElement('div');
+            el.className = 'hit-anim';
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            document.body.appendChild(el);
+            setTimeout(() => {
+                el.remove();
+            }, 200);
+        }
+
+        // Event Listeners
+        drum.addEventListener('touchstart', handleHit, { passive: false });
+        drum.addEventListener('mousedown', handleHit); 
+        document.body.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+
+        // Controls
+        function toggleNotes() {
+            const drumEl = document.getElementById('drum');
+            const btn = document.getElementById('btn-notes');
+            drumEl.classList.toggle('show-notes');
+            if (drumEl.classList.contains('show-notes')) {
+                btn.classList.remove('bg-white/10');
+                btn.classList.add('bg-yellow-500/80');
+            } else {
+                btn.classList.add('bg-white/10');
+                btn.classList.remove('bg-yellow-500/80');
+            }
+        }
+
+        function toggleRecord() {
+            if (!isRecording) startRecording();
+            else stopRecording();
+        }
+
+        function startRecording() {
+            if (!audioCtx) initAudio();
+            recordedChunks = [];
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
+            recorder = new MediaRecorder(destStream.stream, { mimeType: mimeType });
+            recorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+            recorder.onstop = () => {
+                audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+                audioUrl = URL.createObjectURL(audioBlob);
+                document.getElementById('btn-play').disabled = false;
+                document.getElementById('btn-download').disabled = false;
+            };
+            recorder.start();
+            isRecording = true;
+            const recBtn = document.getElementById('btn-record');
+            recBtn.classList.add('recording-pulse', 'bg-red-700');
+            recBtn.innerHTML = '<i class="fas fa-stop text-2xl mb-1"></i><span class="text-[10px]">หยุดอัด</span>';
+            document.getElementById('btn-play').disabled = true;
+            document.getElementById('btn-download').disabled = true;
+        }
+
+        function stopRecording() {
+            recorder.stop();
+            isRecording = false;
+            const recBtn = document.getElementById('btn-record');
+            recBtn.classList.remove('recording-pulse', 'bg-red-700');
+            recBtn.classList.add('bg-red-600/80');
+            recBtn.innerHTML = '<i class="fas fa-microphone text-2xl mb-1"></i><span class="text-[10px]">อัดเสียง</span>';
+        }
+
+        function playRecording() {
+            if (!audioUrl) return;
+            const audio = new Audio(audioUrl);
+            const playBtn = document.getElementById('btn-play');
+            const originalHTML = playBtn.innerHTML;
+            playBtn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl mb-1"></i><span class="text-[10px]">เล่นอยู่</span>';
+            playBtn.disabled = true;
+            audio.onended = () => {
+                playBtn.innerHTML = originalHTML;
+                playBtn.disabled = false;
+            };
+            audio.play();
+        }
+
+        function downloadRecording() {
+            if (!audioUrl) return;
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = audioUrl;
+            const date = new Date();
+            a.download = `klong-yao-recording-${date.getHours()}-${date.getMinutes()}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => document.body.removeChild(a), 100);
+        }
+
+        window.oncontextmenu = (e) => { e.preventDefault(); return false; };
+
+    </script>
 </body>
 </html>
