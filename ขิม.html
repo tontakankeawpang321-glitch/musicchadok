@@ -3,106 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ขิมไทยเสมือนจริง (Virtual Thai Khim)</title>
+    <title>ขิมไทยเสมือนจริง Pro (Hardcoded URL)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
-        /* ป้องกันการเลือก text และการ zoom double-tap */
+        /* Base Settings */
         body {
             touch-action: manipulation;
             -webkit-user-select: none;
             user-select: none;
             overflow: hidden;
-            /* ใช้ dvh เพื่อให้เต็มจอจริงๆ บน mobile browsers */
             height: 100dvh; 
+            font-family: 'Sarabun', sans-serif;
         }
         
-        /* Wood Grain Pattern Overlay */
         .wood-pattern {
             background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, #2e1a0f 10px, #2e1a0f 20px);
         }
 
-        /* Animation Classes */
+        /* Animations */
         .string-active {
-            background-color: #fde68a !important; /* amber-200 */
+            background-color: #fde68a !important;
             box-shadow: 0 0 10px #fbbf24 !important;
         }
 
         .cap-active {
             transform: scale(0.9);
-            background-color: #fbbf24 !important; /* amber-400 */
+            background-color: #fbbf24 !important;
             color: black !important;
             box-shadow: 0 10px 15px -3px rgba(245, 158, 11, 0.5) !important;
         }
 
-        /* Hide scrollbars completely */
-        ::-webkit-scrollbar {
-            display: none;
-        }
+        ::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body class="bg-stone-900 flex flex-col font-sans text-stone-200 overflow-hidden fixed inset-0 w-full">
 
-    <!-- Header / Control Panel (Flex Item: Fixed Height) -->
-    <div class="flex-none w-full bg-stone-800 p-3 md:p-4 shadow-lg z-20 flex items-center justify-between gap-2 border-b border-stone-700">
+    <!-- Header -->
+    <div class="flex-none w-full bg-stone-800 p-3 md:p-4 shadow-lg z-30 flex items-center justify-between gap-2 border-b border-stone-700">
         <div class="flex items-center gap-2">
             <i class="ph-fill ph-music-notes text-amber-500 text-xl md:text-2xl"></i>
-            <h1 class="text-lg md:text-2xl font-bold text-amber-50 text-nowrap">ขิมไทย</h1>
+            <h1 class="text-lg md:text-2xl font-bold text-amber-50 text-nowrap">ขิมไทย Pro</h1>
         </div>
 
         <div class="flex items-center gap-2 md:gap-3">
-            <!-- Labels Toggle -->
+            <!-- Loading Indicator -->
+            <div id="preload-status" class="hidden flex items-center gap-2 text-xs text-amber-400 bg-stone-900/50 px-3 py-1 rounded-full border border-amber-500/30">
+                <i class="ph-bold ph-spinner animate-spin"></i>
+                <span id="preload-text">Loading...</span>
+            </div>
+
             <button id="btn-labels" onclick="toggleLabels()" class="p-2 rounded-full bg-amber-600 text-white transition-all shadow-md active:scale-95 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center">
-                <i class="ph-bold ph-gear text-lg md:text-xl"></i>
+                <i class="ph-bold ph-text-t text-lg md:text-xl"></i>
             </button>
 
-            <!-- Recording Button -->
-            <button id="btn-record" onclick="toggleRecording()" class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full font-semibold transition-all bg-stone-700 hover:bg-stone-600 text-stone-200 shadow-md active:scale-95 text-sm md:text-base">
+            <button id="btn-record" onclick="toggleRecording()" class="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full font-semibold transition-all bg-stone-700 hover:bg-stone-600 text-stone-200 shadow-md active:scale-95 text-sm md:text-base border border-stone-600">
                 <i class="ph-bold ph-microphone text-base md:text-lg"></i> 
-                <span id="text-record">อัดเสียง</span>
+                <span id="text-record" class="hidden sm:inline">อัดเสียง</span>
             </button>
 
-            <!-- Download Button (Hidden by default) -->
             <a id="btn-download" href="#" download="khim-recording.webm" class="hidden flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full bg-green-600 hover:bg-green-700 text-white font-semibold transition-all shadow-md active:scale-95 text-sm md:text-base">
-                <i class="ph-bold ph-download text-base md:text-lg"></i> <span class="hidden md:inline">โหลด</span>
+                <i class="ph-bold ph-download text-base md:text-lg"></i>
             </a>
         </div>
     </div>
 
-    <!-- Main Instrument Area (Flex Item: Grow to fill space) -->
-    <div class="flex-1 w-full max-w-6xl mx-auto p-1 md:p-8 flex items-center justify-center relative bg-gradient-to-b from-stone-900 to-black overflow-hidden">
-        
-        <!-- Wood Board Container - Full Height on Mobile, Aspect Ratio on Desktop -->
-        <div class="relative w-full h-full md:h-auto md:aspect-[16/9] lg:aspect-[2/1] bg-[#4a3222] rounded-xl md:rounded-3xl shadow-2xl border-2 md:border-4 border-[#3e2723] overflow-hidden flex flex-col">
-            
-            <!-- Texture Layers -->
+    <!-- Main Instrument Area -->
+    <div class="flex-1 w-full max-w-7xl mx-auto p-1 md:p-6 flex items-center justify-center relative bg-gradient-to-b from-stone-900 to-black overflow-hidden">
+        <div class="relative w-full h-full md:h-auto md:aspect-[16/9] lg:aspect-[2.2/1] bg-[#4a3222] rounded-xl md:rounded-3xl shadow-2xl border-2 md:border-4 border-[#3e2723] overflow-hidden flex flex-col">
             <div class="wood-pattern absolute inset-0 opacity-40 mix-blend-overlay pointer-events-none"></div>
             <div class="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-black/40 pointer-events-none"></div>
             
-            <!-- Bridges Container (Flex) -->
             <div id="board-container" class="relative z-10 flex flex-col md:flex-row items-stretch md:items-center justify-evenly p-1 md:p-8 gap-1 md:gap-4 h-full w-full">
-                <!-- Javascript will inject bridges here using Flex-1 -->
+                <!-- Javascript will inject bridges here -->
             </div>
 
-            <!-- Logo / Decoration -->
             <div class="absolute bottom-2 right-2 md:bottom-4 md:right-4 text-white/10 pointer-events-none">
                 <i class="ph-fill ph-speaker-high text-4xl md:text-6xl"></i>
             </div>
         </div>
     </div>
 
-    <!-- Footer (Flex Item: Fixed Height) -->
-    <div class="flex-none bg-stone-900 text-stone-500 text-[10px] md:text-xs p-1 pb-2 md:p-2 text-center w-full">
-        Tip: ใช้หูฟังเพื่อเสียงที่ชัดเจนที่สุด | Use headphones for best quality
+    <div class="flex-none bg-stone-900 text-stone-500 text-[10px] md:text-xs p-1 pb-2 text-center w-full">
+        Tip: ใช้หูฟังเพื่อเสียงที่สมจริง | Use headphones for best quality
     </div>
 
     <script>
-        // --- 1. Sound Engine Class ---
+        // --- CONFIGURATION ---
+        
+        // ใส่ลิงก์เสียงตรงนี้ (Mapping: Note Name -> URL)
+        // หากใส่แล้ว ระบบจะใช้ไฟล์นี้เล่นเสียง
+        // หากปล่อยว่าง ({}) ระบบจะใช้เสียงสังเคราะห์ (Synth)
+        const SOUND_URLS = {
+            // 'C4': 'https://example.com/khim-c4.mp3',
+            // 'G4': 'https://example.com/khim-g4.mp3',
+        };
+
+        // --- ENGINE ---
+
         class KhimAudioEngine {
             constructor() {
                 this.ctx = null;
                 this.masterGain = null;
                 this.dest = null;
+                
+                this.buffers = {}; 
+                this.baseFreqs = {};
+                
+                // Recording
                 this.mediaRecorder = null;
                 this.audioChunks = [];
             }
@@ -112,100 +120,190 @@
                     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
                     this.ctx = new AudioContextClass();
                     this.masterGain = this.ctx.createGain();
-                    this.masterGain.gain.value = 0.6; // Master volume
+                    this.masterGain.gain.value = 0.8;
                     
-                    // Recording Output
                     this.dest = this.ctx.createMediaStreamDestination();
                     this.masterGain.connect(this.ctx.destination);
                     this.masterGain.connect(this.dest);
+                    
+                    if (Object.keys(SOUND_URLS).length > 0) {
+                        this.preloadSounds();
+                    }
                 }
                 if (this.ctx.state === 'suspended') {
                     this.ctx.resume();
                 }
             }
 
-            playNote(frequency, velocity = 1) {
+            // --- Preload & Decode ---
+            async preloadSounds() {
                 if (!this.ctx) this.init();
-                const t = this.ctx.currentTime;
-
-                // Main String (Triangle + Sine mix for Khim sound)
-                const osc = this.ctx.createOscillator();
-                const sine = this.ctx.createOscillator();
                 
+                const statusEl = document.getElementById('preload-status');
+                const textEl = document.getElementById('preload-text');
+                statusEl.classList.remove('hidden');
+                
+                let loadedCount = 0;
+                
+                for (const [noteName, url] of Object.entries(SOUND_URLS)) {
+                    textEl.textContent = `Loading ${noteName}...`;
+                    try {
+                        const response = await fetch(url);
+                        const arrayBuffer = await response.arrayBuffer();
+                        const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
+                        
+                        // Trim Silence
+                        const trimmedBuffer = this.trimSilence(audioBuffer);
+                        
+                        this.buffers[noteName] = trimmedBuffer;
+                        
+                        const freq = this.getFreqFromName(noteName);
+                        if (freq) this.baseFreqs[noteName] = freq;
+
+                        loadedCount++;
+                    } catch (e) {
+                        console.error(`Failed to load ${noteName}:`, e);
+                    }
+                }
+
+                textEl.textContent = "Ready";
+                setTimeout(() => statusEl.classList.add('hidden'), 1000);
+            }
+
+            trimSilence(buffer) {
+                const rawData = buffer.getChannelData(0);
+                const len = rawData.length;
+                const threshold = 0.005; 
+                
+                let start = 0;
+                for (let i = 0; i < len; i++) {
+                    if (Math.abs(rawData[i]) > threshold) {
+                        start = i;
+                        break;
+                    }
+                }
+                
+                let end = len;
+                for (let i = len - 1; i >= 0; i--) {
+                    if (Math.abs(rawData[i]) > threshold) {
+                        end = i + 1;
+                        break;
+                    }
+                }
+                
+                if (end <= start) return buffer;
+
+                const newLen = end - start;
+                const newBuffer = this.ctx.createBuffer(buffer.numberOfChannels, newLen, buffer.sampleRate);
+
+                for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+                    const chData = buffer.getChannelData(ch);
+                    const newChData = newBuffer.getChannelData(ch);
+                    for (let i = 0; i < newLen; i++) {
+                        newChData[i] = chData[start + i];
+                    }
+                }
+                
+                return newBuffer;
+            }
+
+            playNote(targetFreq, velocity = 1) {
+                if (!this.ctx) this.init();
+
+                // If buffers exist, use them. Otherwise, synth.
+                if (Object.keys(this.buffers).length > 0) {
+                    this.playBuffer(targetFreq, velocity);
+                } else {
+                    this.playSynth(targetFreq, velocity);
+                }
+            }
+
+            playBuffer(targetFreq, velocity) {
+                let bestNote = null;
+                let minDiff = Infinity;
+                
+                for (const noteName in this.baseFreqs) {
+                    const baseFreq = this.baseFreqs[noteName];
+                    const diff = Math.abs(targetFreq - baseFreq);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        bestNote = noteName;
+                    }
+                }
+
+                if (!bestNote) return; 
+
+                const buffer = this.buffers[bestNote];
+                const baseFreq = this.baseFreqs[bestNote];
+                
+                const source = this.ctx.createBufferSource();
+                source.buffer = buffer;
+                source.playbackRate.value = targetFreq / baseFreq;
+
+                const gainNode = this.ctx.createGain();
+                const t = this.ctx.currentTime;
+                
+                gainNode.gain.setValueAtTime(0, t);
+                gainNode.gain.linearRampToValueAtTime(velocity, t + 0.005); 
+                gainNode.gain.exponentialRampToValueAtTime(0.01, t + 3.5); 
+
+                source.connect(gainNode);
+                gainNode.connect(this.masterGain);
+                
+                source.start(0);
+            }
+
+            playSynth(frequency, velocity) {
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
                 osc.type = 'triangle';
                 osc.frequency.value = frequency;
                 
-                sine.type = 'sine';
-                sine.frequency.value = frequency; 
-                
                 const gain = this.ctx.createGain();
                 gain.gain.setValueAtTime(0, t);
-                gain.gain.linearRampToValueAtTime(velocity, t + 0.005); // Attack
-                gain.gain.exponentialRampToValueAtTime(0.001, t + 3.0); // Decay
-
-                // Hammer Attack (Click sound)
-                const attackOsc = this.ctx.createOscillator();
-                attackOsc.type = 'square';
-                attackOsc.frequency.value = frequency * 4;
-                const attackGain = this.ctx.createGain();
-                attackGain.gain.setValueAtTime(0.3 * velocity, t);
-                attackGain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+                gain.gain.linearRampToValueAtTime(velocity, t + 0.002);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 2.0);
 
                 osc.connect(gain);
-                sine.connect(gain);
-                attackOsc.connect(attackGain);
-                
                 gain.connect(this.masterGain);
-                attackGain.connect(this.masterGain);
-
                 osc.start(t);
-                sine.start(t);
-                attackOsc.start(t);
-
-                osc.stop(t + 3.1);
-                sine.stop(t + 3.1);
-                attackOsc.stop(t + 0.1);
+                osc.stop(t + 2.0);
             }
 
+            getFreqFromName(name) {
+                const note = KHIM_NOTES.find(n => n.eng === name);
+                return note ? note.freq : null;
+            }
+            
             startRecording() {
                 if (!this.dest) this.init();
                 this.audioChunks = [];
-                // Check browser support for WebM Opus
-                const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-                    ? 'audio/webm;codecs=opus' 
-                    : 'audio/webm';
-                
+                const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
                 this.mediaRecorder = new MediaRecorder(this.dest.stream, { mimeType });
-                
                 this.mediaRecorder.ondataavailable = (evt) => {
                     if (evt.data.size > 0) this.audioChunks.push(evt.data);
                 };
-                
                 this.mediaRecorder.start();
             }
-
             stopRecording() {
                 return new Promise((resolve) => {
                     if (!this.mediaRecorder) return resolve('');
-                    
                     this.mediaRecorder.onstop = () => {
                         const blob = new Blob(this.audioChunks, { type: 'audio/webm' });
                         const url = URL.createObjectURL(blob);
                         resolve(url);
                     };
-                    
                     this.mediaRecorder.stop();
                 });
             }
         }
 
-        // --- 2. Data & State ---
+        // --- DATA ---
         const engine = new KhimAudioEngine();
         let showLabels = true;
         let isRecording = false;
         
         const KHIM_NOTES = [
-            // Low Register
             { id: 'l1', name: 'ซ', eng: 'G3', freq: 196.00, group: 'low' },
             { id: 'l2', name: 'ล', eng: 'A3', freq: 220.00, group: 'low' },
             { id: 'l3', name: 'ท', eng: 'B3', freq: 246.94, group: 'low' },
@@ -213,7 +311,6 @@
             { id: 'l5', name: 'ร', eng: 'D4', freq: 293.66, group: 'low' },
             { id: 'l6', name: 'ม', eng: 'E4', freq: 329.63, group: 'low' },
             { id: 'l7', name: 'ฟ', eng: 'F4', freq: 349.23, group: 'low' },
-            // Mid Register
             { id: 'm1', name: 'ซ', eng: 'G4', freq: 392.00, group: 'mid' },
             { id: 'm2', name: 'ล', eng: 'A4', freq: 440.00, group: 'mid' },
             { id: 'm3', name: 'ท', eng: 'B4', freq: 493.88, group: 'mid' },
@@ -221,76 +318,61 @@
             { id: 'm5', name: 'ร', eng: 'D5', freq: 587.33, group: 'mid' },
             { id: 'm6', name: 'ม', eng: 'E5', freq: 659.25, group: 'mid' },
             { id: 'm7', name: 'ฟ', eng: 'F5', freq: 698.46, group: 'mid' },
-            // High Register
             { id: 'h1', name: 'ซ', eng: 'G5', freq: 783.99, group: 'high' },
             { id: 'h2', name: 'ล', eng: 'A5', freq: 880.00, group: 'high' },
             { id: 'h3', name: 'ท', eng: 'B5', freq: 987.77, group: 'high' },
             { id: 'h4', name: 'ด', eng: 'C6', freq: 1046.50, group: 'high' },
-            { id: 'h5', name: 'ร', eng: 'D6', freq: 1174.66, group: 'high' },
+            { id: 'h5', name: 'ร', eng: 'D6', freq: 1174.66, group: 'high' }
         ];
 
-        // --- 3. UI Rendering ---
+        // --- UI ---
         function initApp() {
             const container = document.getElementById('board-container');
-            
-            // Group notes
             const groups = {
                 low: KHIM_NOTES.filter(n => n.group === 'low'),
                 mid: KHIM_NOTES.filter(n => n.group === 'mid'),
                 high: KHIM_NOTES.filter(n => n.group === 'high')
             };
 
-            // Render Bridges
             ['low', 'mid', 'high'].forEach(pos => {
-                const notes = groups[pos];
-                const bridgeHtml = createBridgeHtml(notes, pos);
-                container.insertAdjacentHTML('beforeend', bridgeHtml);
+                container.insertAdjacentHTML('beforeend', createBridgeHtml(groups[pos], pos));
             });
 
-            // Bind Events (Click & Touch) to all note buttons
             document.querySelectorAll('.khim-string').forEach(btn => {
                 const freq = parseFloat(btn.dataset.freq);
                 const id = btn.dataset.id;
                 
                 const playHandler = (e) => {
-                    e.preventDefault(); // Prevent double firing
-                    e.stopPropagation(); // Prevent bubbling
+                    e.preventDefault(); 
+                    e.stopPropagation();
                     playNote(id, freq);
                 };
-
-                // Use touchstart for faster mobile response
+                
                 btn.addEventListener('touchstart', playHandler, { passive: false });
                 btn.addEventListener('mousedown', playHandler);
             });
         }
 
         function createBridgeHtml(notes, position) {
-            // Adjust styles for position
             let scaleClass = 'scale-95 opacity-90';
             let bridgeColor = 'bg-[#4e342e]';
             let zIndex = '';
             
             if (position === 'center' || position === 'mid') {
-                scaleClass = 'scale-100 md:scale-110'; // Reset scale on mobile for fit
+                scaleClass = 'scale-100 md:scale-110'; 
                 bridgeColor = 'bg-[#5d4037]';
                 zIndex = 'z-10';
             }
 
-            // Create Strings HTML
-            // Using flex-1 to allow dynamic resizing instead of fixed h-10
             const stringsHtml = notes.slice().reverse().map(note => `
                 <div class="khim-string relative w-full flex-1 flex items-center justify-center cursor-pointer touch-manipulation group min-h-0"
                      data-freq="${note.freq}" 
                      data-id="${note.id}">
-                     
-                    <!-- Lines (Strings) -->
                     <div class="absolute inset-x-0 flex flex-col items-center justify-center gap-[1px] md:gap-[3px] pointer-events-none">
                         <div class="line-string h-[1px] w-full bg-amber-100/40 transition-colors duration-75"></div>
                         <div class="line-string h-[1px] w-full bg-amber-100/60 transition-colors duration-75"></div>
                         <div class="line-string h-[1px] w-full bg-amber-100/40 transition-colors duration-75"></div>
                     </div>
-
-                    <!-- Cap/Hit Area (Responsive Size) -->
                     <div class="cap-visual relative z-10 w-6 h-6 md:w-10 md:h-10 rounded-full flex items-center justify-center bg-[#3e2723] text-amber-100/80 shadow-md border border-amber-900/50 transition-all duration-75">
                         <span class="note-label font-bold text-xs md:text-lg drop-shadow-md select-none">${note.name}</span>
                     </div>
@@ -299,10 +381,7 @@
 
             return `
                 <div class="relative flex-1 md:h-full w-full md:w-auto flex items-center justify-center ${zIndex}">
-                    <!-- Bridge Base (Vertical on desktop, fits container) -->
                     <div class="absolute top-0 bottom-0 w-8 md:w-12 rounded-lg shadow-xl ${bridgeColor} border-x border-black/30 pointer-events-none"></div>
-                    
-                    <!-- Strings Container (Flex Column to spread vertically) -->
                     <div class="flex flex-col items-center justify-evenly gap-0 md:gap-2 w-full h-full max-w-[120px] md:max-w-[150px] ${scaleClass} py-1 md:py-0">
                         ${stringsHtml}
                     </div>
@@ -310,23 +389,14 @@
             `;
         }
 
-        // --- 4. Logic Functions ---
-        
         function playNote(id, freq) {
-            // Play Audio
             engine.playNote(freq);
-
-            // Visual Feedback
             const btn = document.querySelector(`.khim-string[data-id="${id}"]`);
             if (btn) {
                 const lines = btn.querySelectorAll('.line-string');
                 const cap = btn.querySelector('.cap-visual');
-
-                // Add active classes
                 lines.forEach(l => l.classList.add('string-active'));
                 cap.classList.add('cap-active');
-
-                // Remove classes after short delay
                 setTimeout(() => {
                     lines.forEach(l => l.classList.remove('string-active'));
                     cap.classList.remove('cap-active');
@@ -338,7 +408,6 @@
             showLabels = !showLabels;
             const btn = document.getElementById('btn-labels');
             const labels = document.querySelectorAll('.note-label');
-            
             if (showLabels) {
                 btn.classList.add('bg-amber-600', 'text-white');
                 btn.classList.remove('bg-stone-700', 'text-stone-400');
@@ -357,51 +426,38 @@
             const downloadBtn = document.getElementById('btn-download');
 
             if (isRecording) {
-                // Stop Recording
                 isRecording = false;
-                btn.classList.remove('bg-red-500', 'hover:bg-red-600', 'animate-pulse', 'text-white');
-                btn.classList.add('bg-stone-700', 'hover:bg-stone-600', 'text-stone-200');
+                btn.classList.remove('bg-red-500', 'animate-pulse', 'text-white');
+                btn.classList.add('bg-stone-700', 'text-stone-200');
                 btnIcon.classList.replace('ph-stop', 'ph-microphone');
                 btnText.textContent = "อัดเสียง";
-
                 const url = await engine.stopRecording();
                 if (url) {
                     downloadBtn.href = url;
                     downloadBtn.classList.remove('hidden');
                     downloadBtn.classList.add('flex');
-                    // Rename file with timestamp
                     const timestamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
                     downloadBtn.download = `Thai-Khim-${timestamp}.webm`;
                 }
-
             } else {
-                // Start Recording
-                // Ensure audio context is running
                 engine.init();
-                
                 isRecording = true;
-                downloadBtn.classList.add('hidden'); // Hide previous download
+                downloadBtn.classList.add('hidden');
                 downloadBtn.classList.remove('flex');
-                
                 engine.startRecording();
-                
-                btn.classList.remove('bg-stone-700', 'hover:bg-stone-600', 'text-stone-200');
-                btn.classList.add('bg-red-500', 'hover:bg-red-600', 'animate-pulse', 'text-white');
+                btn.classList.remove('bg-stone-700', 'text-stone-200');
+                btn.classList.add('bg-red-500', 'animate-pulse', 'text-white');
                 btnIcon.classList.replace('ph-microphone', 'ph-stop');
                 btnText.textContent = "หยุดบันทึก";
             }
         }
 
-        // Initialize on load
         window.addEventListener('load', initApp);
-
-        // Global click to ensure AudioContext starts (browser policy)
         document.body.addEventListener('click', () => {
             if (engine.ctx && engine.ctx.state === 'suspended') {
                 engine.ctx.resume();
             }
         }, { once: true });
-
     </script>
 </body>
 </html>
